@@ -12,4 +12,4 @@ sites:
     name: "AHEAD"
     url: "https://jobs.lever.co/thinkahead"
     adapter: lever
-    enabled: true
+    enabled: false

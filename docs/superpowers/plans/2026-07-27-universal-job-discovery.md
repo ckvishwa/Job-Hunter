@@ -164,6 +164,8 @@ Covered by Task 0 Step 9 (bug fixes) + Task 2 (schema support) + Task 3 (typed c
 
 Covered by Task 0 Steps 5, 6, 8. This task is the checkpoint: confirm `tests/resolver/posting-resolver.test.ts` covers the new verification-pause behavior and the fixed import/narrowing, expand only if a case from the original 17-task test list is still missing (unresolved-URL preservation with a reason is called out explicitly in the task brief — confirm a test exists for "resolver marks an unresolvable discovery with a reason and never silently drops it").
 
+- [ ] **Found during Task 0 review, not yet fixed:** `posting-resolver.ts`'s `detectAtsType`+Workday branch (`site: parts[3] || "careers"`) fabricates the Workday `site` path segment when sniffing an arbitrary discovered URL that isn't registry-matched (only `hostname`/`tenant` come from the URL itself; `site` is guessed). Per approval #4 ("never fabricate ATS details"), this must skip/mark-unresolved with a reason instead of guessing, same as the registry-driven fabrication already fixed in `company-careers.ts`. Add a test asserting a Workday URL with no third path segment resolves as "unresolved, reason: cannot determine Workday site segment" rather than guessing `"careers"`.
+
 ---
 
 ## Task 11: Cross-source dedup — verify only
