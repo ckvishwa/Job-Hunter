@@ -35,6 +35,8 @@ export interface DiscoveryContext {
   checkpoint: DiscoveryCheckpoint;
   onPageProcessed: (jobs: DiscoveredJobLite[], nextPageNum: number) => Promise<void>;
   siteConfig?: SiteConfig;
+  profileIds: string[];
+  onVerificationPause?: () => void;
 }
 
 export interface PortalDiscoveryAdapter {

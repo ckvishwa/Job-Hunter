@@ -165,10 +165,8 @@ export async function runDiscover(
                 saveCheckpoints(paths.checkpointsPath, checkpoints);
               },
               siteConfig,
+              profileIds: [role.profile],
             };
-
-            // Custom metadata properties on context for specific adapters
-            (discoveryCtx as any).profileIds = [role.profile];
 
             await adapter.discover(discoveryCtx);
 

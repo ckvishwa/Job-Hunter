@@ -102,6 +102,7 @@ describe("Indeed Discovery Adapter", () => {
       onPageProcessed: async (jobs) => {
         processed.push(...jobs);
       },
+      profileIds: ["sdet"],
     };
 
     await indeedDiscoveryAdapter.discover(context);
@@ -140,6 +141,7 @@ describe("Monster Discovery Adapter", () => {
       onPageProcessed: async (jobs) => {
         processed.push(...jobs);
       },
+      profileIds: ["security"],
     };
 
     await monsterDiscoveryAdapter.discover(context);
@@ -174,6 +176,7 @@ describe("LinkedIn Public Discovery Adapter", () => {
       onPageProcessed: async (jobs) => {
         processed.push(...jobs);
       },
+      profileIds: ["cloud"],
     };
 
     await linkedinPublicDiscoveryAdapter.discover(context);
@@ -208,6 +211,7 @@ describe("Google Jobs Discovery Adapter", () => {
       onPageProcessed: async (jobs) => {
         processed.push(...jobs);
       },
+      profileIds: ["network"],
     };
 
     await googleJobsDiscoveryAdapter.discover(context);
@@ -260,7 +264,8 @@ describe("Configurable Generic Portal Adapter", () => {
         processed.push(...jobs);
       },
       siteConfig,
-    } as any;
+      profileIds: ["sdet"],
+    };
 
     await configurableGenericPortalAdapter.discover(context);
     expect(processed).toHaveLength(1);

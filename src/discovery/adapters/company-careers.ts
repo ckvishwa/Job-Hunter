@@ -16,7 +16,7 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
     const searches = [
       {
         keyword: keyword,
-        profileIds: (context as any).profileIds || [],
+        profileIds: context.profileIds,
       },
     ];
 
@@ -89,8 +89,8 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
         const genericDeps = {
           context: page.context(),
           onVerificationPause: () => {
-            if ((context as any).onVerificationPause) {
-              (context as any).onVerificationPause();
+            if (context.onVerificationPause) {
+              context.onVerificationPause();
             }
           },
         };
