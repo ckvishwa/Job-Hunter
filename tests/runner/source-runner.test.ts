@@ -1,0 +1,150 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { runCollect } from "../../src/runner/source-runner.js";
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), { status: 200 });
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+function writeConfigs(dir: string): { sitesPath: string; rolesPath: string; jobsPath: string } {
+  const sitesPath = path.join(dir, "sites.yml");
+  const rolesPath = path.join(dir, "roles.yml");
+  const jobsPath = path.join(dir, "jobs.jsonl");
+
+  writeFileSync(
+    sitesPath,
+    `
+settings:
+  maxPagesPerSource: 5
+  maxJobsPerSource: 100
+  navigationTimeoutMs: 1000
+  delayBetweenRequestsMs: 0
+sites:
+  - id: acme-greenhouse
+    name: Acme
+    url: "https://boards.greenhouse.io/acme"
+    adapter: greenhouse
+    enabled: true
+  - id: acme-workday
+    name: Acme Workday
+    url: "https://acme.wd1.myworkdayjobs.com/External"
+    adapter: workday
+    enabled: true
+`,
+    "utf-8",
+  );
+
+  writeFileSync(
+    rolesPath,
+    `
+roles:
+  - id: sdet
+    profile: sdet
+    keywords:
+      - SDET
+`,
+    "utf-8",
+  );
+
+  return { sitesPath, rolesPath, jobsPath };
+}
+
+describe("runCollect", () => {
+  it("collects from a working site and isolates a failing site's error", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "job-hunter-runner-"));
+    const { sitesPath, rolesPath, jobsPath } = writeConfigs(dir);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes("boards-api.greenhouse.io")) {
+          return Promise.resolve(
+            jsonResponse({
+              jobs: [
+                {
+                  id: 1,
+                  title: "SDET II",
+                  absolute_url: "https://boards.greenhouse.io/acme/jobs/1",
+                  content: "<p>5 years required.</p>",
+                },
+              ],
+            }),
+          );
+        }
+        // Workday site has no `workday:` config block in sites.yml above,
+        // so the adapter should throw before ever reaching fetch. This
+        // branch should not be hit; if it is, fail loudly.
+        return Promise.reject(new Error("unexpected fetch call for workday"));
+      }),
+    );
+
+    const summary = await runCollect({
+      sitesConfigPath: sitesPath,
+      rolesConfigPath: rolesPath,
+      jobsStorePath: jobsPath,
+    });
+
+    expect(summary.sitesAttempted).toBe(2);
+    expect(summary.sitesSucceeded).toBe(1);
+    expect(summary.sitesFailed).toBe(1);
+    expect(summary.errors).toHaveLength(1);
+    expect(summary.errors[0]!.site).toBe("acme-workday");
+    expect(summary.errors[0]!.message).toMatch(/no workday config/);
+    expect(summary.jobsWritten).toBe(1);
+    expect(summary.totalsByProfile.sdet).toBe(1);
+  });
+
+  it("does not duplicate jobs across repeated runs", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "job-hunter-runner-"));
+    const { sitesPath, rolesPath, jobsPath } = writeConfigs(dir);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes("boards-api.greenhouse.io")) {
+          return Promise.resolve(
+            jsonResponse({
+              jobs: [
+                {
+                  id: 1,
+                  title: "SDET II",
+                  absolute_url: "https://boards.greenhouse.io/acme/jobs/1",
+                  content: "<p>5 years required.</p>",
+                },
+              ],
+            }),
+          );
+        }
+        return Promise.reject(new Error("workday not configured"));
+      }),
+    );
+
+    await runCollect({ sitesConfigPath: sitesPath, rolesConfigPath: rolesPath, jobsStorePath: jobsPath });
+    const second = await runCollect({
+      sitesConfigPath: sitesPath,
+      rolesConfigPath: rolesPath,
+      jobsStorePath: jobsPath,
+    });
+
+    expect(second.jobsWritten).toBe(1);
+  });
+
+  it("filters sites by --site equivalent siteIds filter", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "job-hunter-runner-"));
+    const { sitesPath, rolesPath, jobsPath } = writeConfigs(dir);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ jobs: [] })));
+
+    const summary = await runCollect(
+      { sitesConfigPath: sitesPath, rolesConfigPath: rolesPath, jobsStorePath: jobsPath },
+      { siteIds: ["acme-greenhouse"] },
+    );
+
+    expect(summary.sitesAttempted).toBe(1);
+  });
+});

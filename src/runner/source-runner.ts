@@ -1,0 +1,135 @@
+import type { BrowserContext } from "playwright";
+import { loadCollectSettings, loadRolesConfig, loadSitesConfig } from "../config/loader.js";
+import { launchPersistentChrome } from "../browser/launcher.js";
+import { resolveAdapter } from "../adapters/registry.js";
+import { loadJobs, saveJobs } from "../storage/jsonl-store.js";
+import { mergeJobs } from "../dedup/deduplicator.js";
+import type { GenericPlaywrightDeps } from "../adapters/generic-playwright.js";
+import type { JobPosting, RoleSearch } from "../adapters/types.js";
+
+export interface CollectPaths {
+  sitesConfigPath: string;
+  rolesConfigPath: string;
+  jobsStorePath: string;
+}
+
+export interface CollectFilters {
+  siteIds?: string[];
+  profileIds?: string[];
+  limit?: number;
+}
+
+export interface CollectSummary {
+  sitesAttempted: number;
+  sitesSucceeded: number;
+  sitesFailed: number;
+  listingsDiscovered: number;
+  jdsExtracted: number;
+  duplicatesRemoved: number;
+  verificationPauses: number;
+  jobsWritten: number;
+  totalsByProfile: Record<string, number>;
+  errors: { site: string; message: string }[];
+}
+
+function buildRoleSearches(
+  roles: ReturnType<typeof loadRolesConfig>,
+  profileFilter?: string[],
+): RoleSearch[] {
+  const byKeyword = new Map<string, Set<string>>();
+  for (const role of roles) {
+    if (profileFilter && !profileFilter.includes(role.profile)) continue;
+    for (const keyword of role.keywords) {
+      const key = keyword.toLowerCase();
+      const set = byKeyword.get(key) ?? new Set<string>();
+      set.add(role.profile);
+      byKeyword.set(key, set);
+    }
+  }
+  return [...byKeyword.entries()].map(([keyword, profiles]) => ({
+    keyword,
+    profileIds: [...profiles],
+  }));
+}
+
+export async function runCollect(
+  paths: CollectPaths,
+  filters: CollectFilters = {},
+): Promise<CollectSummary> {
+  const sites = loadSitesConfig(paths.sitesConfigPath);
+  const roles = loadRolesConfig(paths.rolesConfigPath);
+  const settings = loadCollectSettings(paths.sitesConfigPath);
+  const searches = buildRoleSearches(roles, filters.profileIds);
+
+  const summary: CollectSummary = {
+    sitesAttempted: 0,
+    sitesSucceeded: 0,
+    sitesFailed: 0,
+    listingsDiscovered: 0,
+    jdsExtracted: 0,
+    duplicatesRemoved: 0,
+    verificationPauses: 0,
+    jobsWritten: 0,
+    totalsByProfile: {},
+    errors: [],
+  };
+
+  const targetSites = sites.filter(
+    (site) => site.enabled && (!filters.siteIds || filters.siteIds.includes(site.id)),
+  );
+
+  let context: BrowserContext | undefined;
+  async function ensureContext(): Promise<BrowserContext> {
+    if (!context) context = await launchPersistentChrome();
+    return context;
+  }
+
+  const collected: JobPosting[] = [];
+
+  for (const site of targetSites) {
+    summary.sitesAttempted += 1;
+    try {
+      let genericDeps: GenericPlaywrightDeps | undefined;
+      if (site.adapter === "generic") {
+        genericDeps = {
+          context: await ensureContext(),
+          onVerificationPause: () => {
+            summary.verificationPauses += 1;
+          },
+        };
+      }
+
+      const adapter = resolveAdapter(site, genericDeps);
+      const discovered = await adapter.discoverJobs(site, searches, settings);
+      summary.listingsDiscovered += discovered.length;
+
+      for (const job of discovered) {
+        const rawDetail = await adapter.fetchJobDetails(job, site, settings);
+        summary.jdsExtracted += 1;
+        const normalized = adapter.normalize(rawDetail, site, job.matchedProfiles);
+        collected.push(normalized);
+        for (const profileId of normalized.matchedProfiles) {
+          summary.totalsByProfile[profileId] = (summary.totalsByProfile[profileId] ?? 0) + 1;
+        }
+        if (settings.delayBetweenRequestsMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, settings.delayBetweenRequestsMs));
+        }
+      }
+
+      summary.sitesSucceeded += 1;
+    } catch (err) {
+      summary.sitesFailed += 1;
+      summary.errors.push({ site: site.id, message: (err as Error).message });
+    }
+  }
+
+  const existing = loadJobs(paths.jobsStorePath);
+  const merged = mergeJobs(existing, collected, new Date().toISOString());
+  summary.duplicatesRemoved = existing.length + collected.length - merged.length;
+
+  const limited = typeof filters.limit === "number" ? merged.slice(0, filters.limit) : merged;
+  saveJobs(paths.jobsStorePath, limited);
+  summary.jobsWritten = limited.length;
+
+  return summary;
+}
