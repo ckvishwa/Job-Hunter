@@ -8,7 +8,8 @@
     "dev": "tsx src/index.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "collect": "tsx src/runner/cli.ts"
   },
   "dependencies": {
     "js-yaml": "^4.1.0",
