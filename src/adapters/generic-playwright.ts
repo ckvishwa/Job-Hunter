@@ -11,6 +11,11 @@ export interface GenericPlaywrightDeps {
   onVerificationPause?: () => void;
 }
 
+// NOTE: "resultCardSelector" is validated as required below but is not currently
+// read anywhere in this adapter -- link collection uses jobLinkSelector directly
+// against the whole page. It's reserved for future card-scoped link collection
+// (e.g. resolving jobLinkSelector within each resultCardSelector match instead of
+// page-wide) -- this is intentional, not dead config, so don't remove it.
 const REQUIRED_SELECTORS = [
   "searchInputSelector",
   "searchButtonSelector",
@@ -36,7 +41,7 @@ export function createGenericPlaywrightAdapter(deps: GenericPlaywrightDeps): Sou
   const { context, onVerificationPause } = deps;
 
   async function checkVerification(page: Page): Promise<void> {
-    const result = await pauseForVerification(page as never);
+    const result = await pauseForVerification(page);
     if (result.detected) onVerificationPause?.();
   }
 
@@ -85,6 +90,8 @@ export function createGenericPlaywrightAdapter(deps: GenericPlaywrightDeps): Sou
 
   return {
     sourceType: "generic",
+    // fetchJobDetails navigates a real Playwright page per job.
+    fetchesPerJob: true,
 
     canHandle(site: SiteConfig): boolean {
       return site.adapter === "generic";

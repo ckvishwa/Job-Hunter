@@ -43,6 +43,10 @@ describe("leverAdapter", () => {
     expect(leverAdapter.canHandle({ ...site, adapter: "greenhouse" })).toBe(false);
   });
 
+  it("declares fetchesPerJob: false (fetchJobDetails is a pure local transform, no per-job network call)", () => {
+    expect(leverAdapter.fetchesPerJob).toBe(false);
+  });
+
   it("discovers postings and tags matched profiles", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(postings)));
     const discovered = await leverAdapter.discoverJobs(

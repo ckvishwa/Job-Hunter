@@ -55,6 +55,14 @@ export interface JobPosting {
 
 export interface SourceAdapter {
   sourceType: SiteConfig["adapter"];
+  /**
+   * Whether fetchJobDetails makes a real network/browser call per job (true for
+   * Workday and the generic Playwright adapter) versus being a pure local transform
+   * over already-fetched rawMetadata (false for Greenhouse and Lever). The runner
+   * uses this to decide whether delayBetweenRequestsMs should apply -- there's no
+   * reason to rate-limit a loop that never actually makes a per-job request.
+   */
+  fetchesPerJob: boolean;
   canHandle(site: SiteConfig): boolean;
   discoverJobs(
     site: SiteConfig,

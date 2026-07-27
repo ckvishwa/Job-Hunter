@@ -31,6 +31,10 @@ describe("greenhouseAdapter", () => {
     expect(greenhouseAdapter.canHandle({ ...site, adapter: "lever" })).toBe(false);
   });
 
+  it("declares fetchesPerJob: false (fetchJobDetails is a pure local transform, no per-job network call)", () => {
+    expect(greenhouseAdapter.fetchesPerJob).toBe(false);
+  });
+
   it("discovers jobs from the board and tags matched profiles", async () => {
     vi.stubGlobal(
       "fetch",

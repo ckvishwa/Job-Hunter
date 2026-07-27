@@ -27,6 +27,10 @@ afterEach(() => {
 });
 
 describe("workdayAdapter", () => {
+  it("declares fetchesPerJob: true (fetchJobDetails makes a real per-job network call)", () => {
+    expect(workdayAdapter.fetchesPerJob).toBe(true);
+  });
+
   it("throws when the site has no workday config block", async () => {
     const badSite: SiteConfig = { ...site, workday: undefined };
     await expect(workdayAdapter.discoverJobs(badSite, [], settings)).rejects.toThrow(

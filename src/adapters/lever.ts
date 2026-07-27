@@ -49,6 +49,9 @@ async function fetchPostings(siteSlug: string): Promise<LeverPosting[]> {
 
 export const leverAdapter: SourceAdapter = {
   sourceType: "lever",
+  // fetchJobDetails is a pure local transform over rawMetadata already fetched
+  // during discoverJobs -- no per-job network call, so no rate-limit delay needed.
+  fetchesPerJob: false,
 
   canHandle(site: SiteConfig): boolean {
     return site.adapter === "lever";

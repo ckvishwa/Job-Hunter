@@ -58,6 +58,9 @@ async function fetchBoard(token: string): Promise<GreenhouseBoardResponse> {
 
 export const greenhouseAdapter: SourceAdapter = {
   sourceType: "greenhouse",
+  // fetchJobDetails is a pure local transform over rawMetadata already fetched
+  // during discoverJobs -- no per-job network call, so no rate-limit delay needed.
+  fetchesPerJob: false,
 
   canHandle(site: SiteConfig): boolean {
     return site.adapter === "greenhouse";

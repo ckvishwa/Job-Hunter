@@ -82,6 +82,12 @@ function makeFakePage(script: {
 }
 
 describe("createGenericPlaywrightAdapter", () => {
+  it("declares fetchesPerJob: true (fetchJobDetails navigates a real page per job)", () => {
+    const context = { newPage: vi.fn() };
+    const adapter = createGenericPlaywrightAdapter({ context: context as never });
+    expect(adapter.fetchesPerJob).toBe(true);
+  });
+
   it("stops pagination when no load-more button remains", async () => {
     const { page } = makeFakePage({
       linkBatches: [

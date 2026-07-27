@@ -63,6 +63,8 @@ async function searchPage(
 
 export const workdayAdapter: SourceAdapter = {
   sourceType: "workday",
+  // fetchJobDetails makes a real per-job network call to fetch the full posting.
+  fetchesPerJob: true,
 
   canHandle(site: SiteConfig): boolean {
     return site.adapter === "workday";
