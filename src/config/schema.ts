@@ -8,12 +8,7 @@ export const collectSettingsSchema = z
     navigationTimeoutMs: z.number().int().positive().default(30000),
     delayBetweenRequestsMs: z.number().int().nonnegative().default(500),
   })
-  .default({
-    maxPagesPerSource: 100,
-    maxJobsPerSource: 5000,
-    navigationTimeoutMs: 30000,
-    delayBetweenRequestsMs: 500,
-  });
+  .default({});
 
 export const workdaySiteSchema = z.object({
   hostname: z.string().min(1),
@@ -47,17 +42,9 @@ export const siteSchema = z.object({
 });
 
 export const sitesFileSchema = z.object({
-  settings: collectSettingsSchema.optional(),
+  settings: collectSettingsSchema,
   sites: z.array(siteSchema).min(1),
-}).transform((data) => ({
-  ...data,
-  settings: data.settings ?? {
-    maxPagesPerSource: 100,
-    maxJobsPerSource: 5000,
-    navigationTimeoutMs: 30000,
-    delayBetweenRequestsMs: 500,
-  },
-}));
+});
 
 export const roleSchema = z.object({
   id: z.string().min(1),
