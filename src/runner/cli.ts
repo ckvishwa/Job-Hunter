@@ -1,7 +1,8 @@
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { runCollect, type CollectFilters, type CollectSummary } from "./source-runner.js";
 
-function parseArgs(argv: string[]): CollectFilters {
+export function parseArgs(argv: string[]): CollectFilters {
   const result: CollectFilters = {};
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -13,7 +14,18 @@ function parseArgs(argv: string[]): CollectFilters {
       result.profileIds = (result.profileIds ?? []).concat(value.split(",").filter(Boolean));
     } else if (arg === "--limit") {
       const value = argv[++i];
-      result.limit = Number(value);
+      const parsed = Number(value);
+      // Number(undefined) and Number("abc") both produce NaN, which passes a naive
+      // `typeof === "number"` guard downstream and silently caps results at 0 (see
+      // Array.prototype.slice(0, NaN) === []). Require a genuine positive integer;
+      // otherwise ignore the flag entirely rather than risk silent data loss.
+      if (Number.isInteger(parsed) && parsed > 0) {
+        result.limit = parsed;
+      } else {
+        console.error(
+          `Ignoring invalid --limit value "${value ?? ""}" - must be a positive integer. Running without a limit.`,
+        );
+      }
     }
   }
   return result;
@@ -55,7 +67,14 @@ async function main(): Promise<void> {
   printSummary(summary);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+// Only run when this file is executed directly (`npm run collect` / `tsx src/runner/cli.ts`),
+// never as a side effect of another module importing it (e.g. tests importing parseArgs) --
+// otherwise every test import would trigger a real collect run against real config/data paths.
+const isMainModule = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMainModule) {
+  main().catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
+}
