@@ -1,0 +1,90 @@
+# Job-search portals to search. Only portals listed here are ever visited.
+# type must be one of: google-jobs, indeed, monster, linkedin-public, generic
+#
+# Selector/URL values below for the 4 named portals mirror what is currently
+# HARDCODED in the matching src/discovery/adapters/*.ts file (extracted, not
+# invented). They are not yet consumed by those adapters (that wiring is a
+# later task) — this file exists so that config, once wired, replaces the
+# hardcoded literals with the same values. All entries are enabled: false;
+# this file's presence does not make anything run automatically.
+
+settings:
+  maxPagesPerSource: 100
+  maxJobsPerSource: 5000
+  navigationTimeoutMs: 30000
+  delayBetweenRequestsMs: 500
+
+portals:
+  - id: google-jobs
+    type: google-jobs
+    enabled: false
+    baseUrl: "https://www.google.com/search"
+    keywordParam: "q" # location is folded into the "q" query string today, not a separate param
+    resultCardSelector: "li[data-job-id], [role='treeitem'], .i3PoEe, [class*='JobCard']"
+    # No jobLinkSelector: the current adapter builds resultUrl synthetically
+    # from the card's data-job-id/id attribute, it never reads an <a href>.
+    titleSelector: "[role='heading'], [class*='Title'], h2, h3"
+    locationSelector: ".SuWscb, .Qk3OTc, [class*='Location'], [class*='location']"
+    companySelector: ".t7YFBb, .wTabPo, [class*='Company'], [class*='company']"
+    salarySelector: "[class*='Salary'], [class*='salary']"
+    dateSelector: "[class*='Date'], [class*='date'], span:has-text('ago')"
+
+  - id: indeed
+    type: indeed
+    enabled: false
+    baseUrl: "https://www.indeed.com/jobs"
+    keywordParam: "q"
+    locationParam: "l"
+    resultCardSelector: ".job_seen_beacon"
+    jobLinkSelector: "a.jcs-JobTitle"
+    titleSelector: "span[id^='jobTitle']"
+    locationSelector: "[data-testid='text-location']"
+    companySelector: "[data-testid='company-name']"
+    salarySelector: ".salary-snippet-container, .estimated-salary-container"
+    dateSelector: "span.date"
+
+  - id: monster
+    type: monster
+    enabled: false
+    baseUrl: "https://www.monster.com/jobs/search"
+    keywordParam: "q"
+    locationParam: "where"
+    resultCardSelector: "article, [data-testid='job-card'], [class*='JobCard']"
+    jobLinkSelector: "a"
+    titleSelector: "[data-testid='job-title'], [class*='Title'], h2"
+    locationSelector: "[data-testid='job-location'], [class*='Location']"
+    companySelector: "[data-testid='job-company'], [class*='Company']"
+    salarySelector: "[data-testid='job-salary'], [class*='Salary']"
+    dateSelector: "[data-testid='job-date'], [class*='Date']"
+
+  - id: linkedin-public
+    type: linkedin-public
+    enabled: false
+    baseUrl: "https://www.linkedin.com/jobs/search"
+    keywordParam: "keywords"
+    locationParam: "location"
+    resultCardSelector: ".job-search-card, .base-search-card, li[data-id]"
+    jobLinkSelector: "a.base-card__full-link, a"
+    titleSelector: ".base-search-card__title, h3"
+    locationSelector: ".job-search-card__location, span[class*='location']"
+    companySelector: ".base-search-card__subtitle, h4, [class*='subtitle']"
+    salarySelector: ".job-search-card__salary-info"
+    dateSelector: "time, .job-search-card__listdate"
+
+  # Example entry for a custom/generic career-portal search page. Selector
+  # values below are PLACEHOLDERS — they must be replaced with real, verified
+  # selectors for an actual target site before this entry is ever enabled.
+  - id: example-generic-portal
+    type: generic
+    enabled: false
+    baseUrl: "https://example.com/jobs/search"
+    searchInputSelector: "PLACEHOLDER-search-input-selector"
+    searchButtonSelector: "PLACEHOLDER-search-button-selector"
+    resultCardSelector: "PLACEHOLDER-result-card-selector"
+    jobLinkSelector: "PLACEHOLDER-job-link-selector"
+    titleSelector: "PLACEHOLDER-title-selector"
+    locationSelector: "PLACEHOLDER-location-selector"
+    companySelector: "PLACEHOLDER-company-selector"
+    salarySelector: "PLACEHOLDER-salary-selector"
+    dateSelector: "PLACEHOLDER-date-selector"
+    searchUrlTemplate: "https://example.com/jobs?q={{keyword}}&l={{location}}&page={{page}}"
