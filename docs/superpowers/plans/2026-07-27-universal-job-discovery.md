@@ -23,7 +23,7 @@
 - [x] Task 2 — Fortune 500 registry: rename, schema fixes, uniqueness validation — commit 2f2bbab. Reviewed clean.
 - [x] Task 3 — Discovery types cleanup (remove `as any` side-channels) — commit 12b8b56. Reviewed clean.
 - [x] Task 4 — Discovery storage (already done — verify + add missing tests) — commit 24b12ad. Reviewed clean.
-- [ ] Task 5 — Checkpoints (already done — fix company-careers integration bug)
+- [x] Task 5 — Checkpoints (already done — fix company-careers integration bug) — commits c3742aa, d47b701. Review found and fixed a real orchestrator bug (checkpoint.completed short-circuited all future retries) and a real identity-vs-index bug (registry reorder would misattribute progress). Known non-blocking gap: a structurally-skipped company stays skipped after its registry data is later filled in, until a checkpoint reset (--reset-checkpoint is Task 14, not built yet).
 - [ ] Task 6 — Shared retry/backoff + domain-pacing helper
 - [ ] Task 7 — Portal adapters: wire to `portals.yml`, remove selector-config cast
 - [ ] Task 8 — Portal adapter registry (already done — add tests)
