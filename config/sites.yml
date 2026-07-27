@@ -1,0 +1,26 @@
+# Career sites to search. Only sites listed here are ever visited.
+# adapter must be one of: greenhouse, lever, workday, generic
+sites:
+  - id: example-greenhouse
+    name: "Example Co (Greenhouse)"
+    url: "https://boards.greenhouse.io/example"
+    adapter: greenhouse
+    enabled: false
+
+  - id: example-lever
+    name: "Example Co (Lever)"
+    url: "https://jobs.lever.co/example"
+    adapter: lever
+    enabled: false
+
+  - id: example-workday
+    name: "Example Co (Workday)"
+    url: "https://example.wd1.myworkdayjobs.com/careers"
+    adapter: workday
+    enabled: false
+
+  - id: example-generic
+    name: "Example Co (Generic careers page)"
+    url: "https://example.com/careers"
+    adapter: generic
+    enabled: false

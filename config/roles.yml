@@ -1,0 +1,34 @@
+# Search role keywords, grouped by which resume profile they map to.
+# profile must be one of: sdet, security, cloud, network
+roles:
+  - id: sdet-qa
+    profile: sdet
+    keywords:
+      - "SDET"
+      - "QA Automation Engineer"
+      - "Software Development Engineer in Test"
+      - "Test Automation Engineer"
+
+  - id: security-soc
+    profile: security
+    keywords:
+      - "SOC Analyst"
+      - "Security Analyst"
+      - "Security Operations Center"
+      - "Incident Response Analyst"
+
+  - id: cloud-iam
+    profile: cloud
+    keywords:
+      - "IAM Engineer"
+      - "Cloud Security Engineer"
+      - "Identity and Access Management"
+      - "Cloud Engineer"
+
+  - id: network-noc
+    profile: network
+    keywords:
+      - "NOC Engineer"
+      - "Network Engineer"
+      - "Network Operations Center"
+      - "Network Administrator"

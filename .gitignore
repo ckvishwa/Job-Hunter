@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.chrome-profile/
+data/*.sqlite
+output/*.html
+output/*.csv
+output/*.json
+!output/.gitkeep
+*.log
