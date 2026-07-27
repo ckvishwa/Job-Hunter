@@ -177,3 +177,132 @@ describe("companyCareersDiscoveryAdapter resume behavior", () => {
     expect(discoverJobsB).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("companyCareersDiscoveryAdapter real-data extraction and structural skips", () => {
+  beforeEach(() => {
+    discoverJobsA.mockReset();
+    discoverJobsB.mockReset();
+    resolveAdapterMock.mockReset();
+    loadCompanyRegistryMock.mockReset();
+  });
+
+  it("uses fetchJobDetails for the real location instead of fabricating one (greenhouse)", async () => {
+    const registry: CompanyRegistryEntry[] = [
+      {
+        company: "CompanyA",
+        fortuneRank: null,
+        corporateDomain: "companya.com",
+        careersUrl: "https://companya.com/careers",
+        atsType: "greenhouse",
+        atsTenantOrBoardId: "companya",
+        atsWorkdaySite: null,
+        verificationStatus: "verified",
+        lastVerifiedDate: "2026-01-01",
+      },
+    ];
+    loadCompanyRegistryMock.mockReturnValue(registry);
+
+    discoverJobsA.mockResolvedValue([
+      { externalId: "a1", title: "SDET", url: "https://companya.com/jobs/a1", matchedProfiles: ["sdet-qa"] },
+    ]);
+    const fetchJobDetails = vi.fn(async (): Promise<RawJobDetail> => ({
+      externalId: "a1",
+      title: "SDET",
+      descriptionText: "desc",
+      descriptionHtml: null,
+      location: "Austin, TX",
+      department: null,
+      employmentType: null,
+      requisitionId: null,
+      postingDate: null,
+      salaryText: null,
+      canonicalUrl: "https://companya.com/jobs/a1",
+      applyUrl: "https://companya.com/jobs/a1",
+      rawMetadata: {},
+    }));
+
+    resolveAdapterMock.mockImplementation(
+      (): SourceAdapter => ({
+        sourceType: "greenhouse",
+        fetchesPerJob: false, // exercises the fetchJobDetails-for-real-location path
+        canHandle: () => true,
+        discoverJobs: discoverJobsA as SourceAdapter["discoverJobs"],
+        fetchJobDetails,
+        normalize: () => {
+          throw new Error("normalize not used by company-careers adapter");
+        },
+      }),
+    );
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async (_jobs: DiscoveredJobLite[], _nextPageNum: number) => {});
+
+    await expect(
+      companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed)),
+    ).resolves.toBeUndefined();
+
+    expect(fetchJobDetails).toHaveBeenCalledTimes(1);
+    const [jobs] = onPageProcessed.mock.calls[0] as [DiscoveredJobLite[], number];
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]!.location).toBe("Austin, TX");
+  });
+
+  it("skips a workday entry with atsWorkdaySite: null without calling any adapter, and marks it completed", async () => {
+    const registry: CompanyRegistryEntry[] = [
+      {
+        company: "CompanyW",
+        fortuneRank: null,
+        corporateDomain: "companyw.com",
+        careersUrl: "https://companyw.com/careers",
+        atsType: "workday",
+        atsTenantOrBoardId: null,
+        atsWorkdaySite: null,
+        verificationStatus: "unverified",
+        lastVerifiedDate: null,
+      },
+    ];
+    loadCompanyRegistryMock.mockReturnValue(registry);
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async (_jobs: DiscoveredJobLite[], _nextPageNum: number) => {});
+
+    await expect(
+      companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed)),
+    ).resolves.toBeUndefined();
+
+    expect(resolveAdapterMock).not.toHaveBeenCalled();
+    const [jobs] = onPageProcessed.mock.calls[0] as [DiscoveredJobLite[], number];
+    expect(jobs).toEqual([]);
+    expect(checkpoint.completedCompanyKeys).toEqual(["companyw::companyw.com"]);
+  });
+
+  it("skips a generic entry with no genericSelectors without calling any adapter, and marks it completed", async () => {
+    const registry: CompanyRegistryEntry[] = [
+      {
+        company: "CompanyG",
+        fortuneRank: null,
+        corporateDomain: "companyg.com",
+        careersUrl: "https://companyg.com/careers",
+        atsType: "generic",
+        atsTenantOrBoardId: null,
+        atsWorkdaySite: null,
+        // genericSelectors intentionally omitted
+        verificationStatus: "unverified",
+        lastVerifiedDate: null,
+      },
+    ];
+    loadCompanyRegistryMock.mockReturnValue(registry);
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async (_jobs: DiscoveredJobLite[], _nextPageNum: number) => {});
+
+    await expect(
+      companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed)),
+    ).resolves.toBeUndefined();
+
+    expect(resolveAdapterMock).not.toHaveBeenCalled();
+    const [jobs] = onPageProcessed.mock.calls[0] as [DiscoveredJobLite[], number];
+    expect(jobs).toEqual([]);
+    expect(checkpoint.completedCompanyKeys).toEqual(["companyg::companyg.com"]);
+  });
+});
