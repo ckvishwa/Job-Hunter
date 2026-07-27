@@ -22,7 +22,7 @@
 - [x] Task 1 — `config/portals.yml` + schema — commits d12cb63, 9222a13. Reviewed clean (1 cosmetic comment fix).
 - [x] Task 2 — Fortune 500 registry: rename, schema fixes, uniqueness validation — commit 2f2bbab. Reviewed clean.
 - [x] Task 3 — Discovery types cleanup (remove `as any` side-channels) — commit 12b8b56. Reviewed clean.
-- [ ] Task 4 — Discovery storage (already done — verify + add missing tests)
+- [x] Task 4 — Discovery storage (already done — verify + add missing tests) — commit 24b12ad. Reviewed clean.
 - [ ] Task 5 — Checkpoints (already done — fix company-careers integration bug)
 - [ ] Task 6 — Shared retry/backoff + domain-pacing helper
 - [ ] Task 7 — Portal adapters: wire to `portals.yml`, remove selector-config cast
