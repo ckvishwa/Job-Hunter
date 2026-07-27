@@ -108,9 +108,6 @@ export async function runCollect(
         summary.jdsExtracted += 1;
         const normalized = adapter.normalize(rawDetail, site, job.matchedProfiles);
         collected.push(normalized);
-        for (const profileId of normalized.matchedProfiles) {
-          summary.totalsByProfile[profileId] = (summary.totalsByProfile[profileId] ?? 0) + 1;
-        }
         if (settings.delayBetweenRequestsMs > 0) {
           await new Promise((resolve) => setTimeout(resolve, settings.delayBetweenRequestsMs));
         }
@@ -123,13 +120,23 @@ export async function runCollect(
     }
   }
 
-  const existing = loadJobs(paths.jobsStorePath);
-  const merged = mergeJobs(existing, collected, new Date().toISOString());
-  summary.duplicatesRemoved = existing.length + collected.length - merged.length;
+  // `limit` caps how many newly-collected jobs get merged in this run — it must never
+  // truncate the persisted store's pre-existing content (see Task 11 review fix).
+  const cappedCollected =
+    typeof filters.limit === "number" ? collected.slice(0, filters.limit) : collected;
 
-  const limited = typeof filters.limit === "number" ? merged.slice(0, filters.limit) : merged;
-  saveJobs(paths.jobsStorePath, limited);
-  summary.jobsWritten = limited.length;
+  for (const job of cappedCollected) {
+    for (const profileId of job.matchedProfiles) {
+      summary.totalsByProfile[profileId] = (summary.totalsByProfile[profileId] ?? 0) + 1;
+    }
+  }
+
+  const existing = loadJobs(paths.jobsStorePath);
+  const merged = mergeJobs(existing, cappedCollected, new Date().toISOString());
+  summary.duplicatesRemoved = existing.length + cappedCollected.length - merged.length;
+
+  saveJobs(paths.jobsStorePath, merged);
+  summary.jobsWritten = merged.length;
 
   return summary;
 }

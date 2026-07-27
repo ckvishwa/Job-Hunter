@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCollect } from "../../src/runner/source-runner.js";
+import { loadJobs } from "../../src/storage/jsonl-store.js";
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), { status: 200 });
@@ -146,5 +147,66 @@ describe("runCollect", () => {
     );
 
     expect(summary.sitesAttempted).toBe(1);
+  });
+
+  it("does not truncate the persisted store when a run-level limit caps new intake", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "job-hunter-runner-"));
+    const { sitesPath, rolesPath, jobsPath } = writeConfigs(dir);
+
+    // Same 3 jobs are returned by the board every time this test calls fetch --
+    // the second run's "newly collected" jobs are therefore duplicates of what's
+    // already in the store, which is exactly the scenario that exposed the bug:
+    // slicing the *merged* (existing + incoming) array truncated pre-existing data.
+    const boardResponse = jsonResponse({
+      jobs: [
+        {
+          id: 1,
+          title: "SDET II",
+          absolute_url: "https://boards.greenhouse.io/acme/jobs/1",
+          content: "<p>5 years required. Role focuses on API test automation.</p>",
+        },
+        {
+          id: 2,
+          title: "SDET III",
+          absolute_url: "https://boards.greenhouse.io/acme/jobs/2",
+          content: "<p>6 years required. Role focuses on mobile test automation.</p>",
+        },
+        {
+          id: 3,
+          title: "Staff SDET",
+          absolute_url: "https://boards.greenhouse.io/acme/jobs/3",
+          content: "<p>8 years required. Role focuses on performance test automation.</p>",
+        },
+      ],
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes("boards-api.greenhouse.io")) {
+          return Promise.resolve(boardResponse.clone());
+        }
+        return Promise.reject(new Error("workday not configured"));
+      }),
+    );
+
+    const first = await runCollect({
+      sitesConfigPath: sitesPath,
+      rolesConfigPath: rolesPath,
+      jobsStorePath: jobsPath,
+    });
+    expect(first.jobsWritten).toBe(3);
+
+    const second = await runCollect(
+      { sitesConfigPath: sitesPath, rolesConfigPath: rolesPath, jobsStorePath: jobsPath },
+      { limit: 1 },
+    );
+
+    // `limit` must only cap how many newly-collected jobs get merged in --
+    // it must never cause previously-persisted jobs to be dropped from the store.
+    expect(second.jobsWritten).toBe(3);
+
+    const onDisk = loadJobs(jobsPath);
+    expect(onDisk).toHaveLength(3);
   });
 });
