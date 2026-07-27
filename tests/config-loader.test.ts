@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { ConfigValidationError, loadRolesConfig, loadSitesConfig } from "../src/config/loader.js";
+import { ConfigValidationError, loadCollectSettings, loadRolesConfig, loadSitesConfig } from "../src/config/loader.js";
 
 function tempFile(name: string, contents: string): string {
   const dir = mkdtempSync(path.join(tmpdir(), "job-hunter-test-"));
@@ -136,5 +136,54 @@ roles:
     );
 
     expect(() => loadRolesConfig(filePath)).toThrow(ConfigValidationError);
+  });
+});
+
+describe("loadCollectSettings", () => {
+  it("applies defaults when settings block is omitted", () => {
+    const filePath = tempFile(
+      "sites.yml",
+      `
+sites:
+  - id: acme
+    name: Acme Corp
+    url: "https://acme.com/careers"
+    adapter: greenhouse
+    enabled: true
+`,
+    );
+
+    expect(loadCollectSettings(filePath)).toEqual({
+      maxPagesPerSource: 100,
+      maxJobsPerSource: 5000,
+      navigationTimeoutMs: 30000,
+      delayBetweenRequestsMs: 500,
+    });
+  });
+
+  it("respects an explicit settings block", () => {
+    const filePath = tempFile(
+      "sites.yml",
+      `
+settings:
+  maxPagesPerSource: 5
+  maxJobsPerSource: 10
+  navigationTimeoutMs: 1000
+  delayBetweenRequestsMs: 0
+sites:
+  - id: acme
+    name: Acme Corp
+    url: "https://acme.com/careers"
+    adapter: greenhouse
+    enabled: true
+`,
+    );
+
+    expect(loadCollectSettings(filePath)).toEqual({
+      maxPagesPerSource: 5,
+      maxJobsPerSource: 10,
+      navigationTimeoutMs: 1000,
+      delayBetweenRequestsMs: 0,
+    });
   });
 });
