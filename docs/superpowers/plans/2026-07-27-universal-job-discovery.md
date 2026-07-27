@@ -26,7 +26,7 @@
 - [x] Task 5 — Checkpoints (already done — fix company-careers integration bug) — commits c3742aa, d47b701. Review found and fixed a real orchestrator bug (checkpoint.completed short-circuited all future retries) and a real identity-vs-index bug (registry reorder would misattribute progress). Known non-blocking gap: a structurally-skipped company stays skipped after its registry data is later filled in, until a checkpoint reset (--reset-checkpoint is Task 14, not built yet).
 - [x] Task 6 — Shared retry/backoff + domain-pacing helper — commit 607b1a3. Review found + fixed a real scope-too-wide bug (module-level pacer in posting-resolver.ts shared across unrelated instances). One scope-too-narrow gap tracked, not fixed (see note under Task 6 above).
 - [x] Task 7 — Portal adapters: wire to `portals.yml`, remove selector-config cast — commit 1b4db5a. Reviewed clean; deliberate behavior change (nothing runs by default now, matches sites.yml convention) confirmed correct by direct trace. One pre-existing UX gap logged under Task 15.
-- [ ] Task 8 — Portal adapter registry (already done — add tests)
+- [x] Task 8 — Portal adapter registry (already done — add tests) — commit d319ed3c. Reviewed clean.
 - [ ] Task 9 — Company-careers runner: stop fabricating data
 - [ ] Task 10 — Posting resolver: fix typecheck + add verification-pause
 - [ ] Task 11 — Cross-source dedup (already done — verify only)
