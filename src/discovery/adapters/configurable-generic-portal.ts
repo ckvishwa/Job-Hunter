@@ -1,5 +1,6 @@
 import type { DiscoveredJobLite, PortalDiscoveryAdapter, DiscoveryContext } from "../types.js";
 import { pauseForVerification } from "../../browser/verification.js";
+import { pacer, withRetry } from "../rate-limit.js";
 import type { SiteConfig } from "../../types.js";
 
 export interface GenericPortalSelectors {
@@ -33,6 +34,7 @@ export const configurableGenericPortalAdapter: PortalDiscoveryAdapter = {
   async discover(context: DiscoveryContext): Promise<void> {
     const { page, keyword, location, settings, checkpoint, onPageProcessed } = context;
     const startPage = checkpoint.lastPage + 1;
+    const pace = pacer(settings.delayBetweenRequestsMs);
 
     // We expect the config to be passed in some site settings, but for this discovery adapter,
     // we can retrieve the selector set from generic metadata in SiteConfig if passed.
@@ -57,10 +59,18 @@ export const configurableGenericPortalAdapter: PortalDiscoveryAdapter = {
           .replace("{{keyword}}", encodeURIComponent(keyword))
           .replace("{{location}}", encodeURIComponent(location))
           .replace("{{page}}", String(pageNum));
-        await page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs });
+        await pace(url);
+        await withRetry(
+          () => page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs }),
+          { retries: 2, backoffMs: 500 },
+        );
       } else {
         if (pageNum === startPage) {
-          await page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs });
+          await pace(url);
+          await withRetry(
+            () => page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs }),
+            { retries: 2, backoffMs: 500 },
+          );
           await pauseForVerification(page);
           if (keyword && gp.searchInputSelector && gp.searchButtonSelector) {
             await page.fill(gp.searchInputSelector, keyword);

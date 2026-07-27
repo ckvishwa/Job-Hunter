@@ -1,5 +1,6 @@
 import type { DiscoveredJobLite, PortalDiscoveryAdapter, DiscoveryContext } from "../types.js";
 import { pauseForVerification } from "../../browser/verification.js";
+import { pacer, withRetry } from "../rate-limit.js";
 
 export const googleJobsDiscoveryAdapter: PortalDiscoveryAdapter = {
   source: "google-jobs",
@@ -7,11 +8,16 @@ export const googleJobsDiscoveryAdapter: PortalDiscoveryAdapter = {
   async discover(context: DiscoveryContext): Promise<void> {
     const { page, keyword, location, settings, checkpoint, onPageProcessed } = context;
     const startPage = checkpoint.lastPage + 1;
+    const pace = pacer(settings.delayBetweenRequestsMs);
 
     // Google Jobs is typically accessed via Google search with "ibp=htl;jobs"
     const url = `https://www.google.com/search?q=${encodeURIComponent(keyword + " jobs " + location)}&ibp=htl;jobs`;
 
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs });
+    await pace(url);
+    await withRetry(
+      () => page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs }),
+      { retries: 2, backoffMs: 500 },
+    );
     await pauseForVerification(page);
 
     // Google Jobs uses an infinite scrolling list of jobs on the left.

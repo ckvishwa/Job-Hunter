@@ -1,5 +1,6 @@
 import type { DiscoveredJobLite, PortalDiscoveryAdapter, DiscoveryContext } from "../types.js";
 import { pauseForVerification } from "../../browser/verification.js";
+import { pacer, withRetry } from "../rate-limit.js";
 
 export const linkedinPublicDiscoveryAdapter: PortalDiscoveryAdapter = {
   source: "linkedin-public",
@@ -7,12 +8,17 @@ export const linkedinPublicDiscoveryAdapter: PortalDiscoveryAdapter = {
   async discover(context: DiscoveryContext): Promise<void> {
     const { page, keyword, location, settings, checkpoint, onPageProcessed } = context;
     const startPage = checkpoint.lastPage + 1;
+    const pace = pacer(settings.delayBetweenRequestsMs);
 
     for (let pageNum = startPage; pageNum <= settings.maxPagesPerSource; pageNum++) {
       const startParam = (pageNum - 1) * 25;
       const url = `https://www.linkedin.com/jobs/search?keywords=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}&start=${startParam}`;
 
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs });
+      await pace(url);
+      await withRetry(
+        () => page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs }),
+        { retries: 2, backoffMs: 500 },
+      );
       await pauseForVerification(page);
 
       // Selectors for LinkedIn public

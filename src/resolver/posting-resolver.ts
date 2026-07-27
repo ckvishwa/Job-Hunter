@@ -9,24 +9,35 @@ import { stripHtml } from "../extraction/jd-cleaner.js";
 import type { SiteConfig } from "../types.js";
 import type { CompanyRegistryEntry } from "../config/schema.js";
 import { pauseForVerification } from "../browser/verification.js";
+import { pacer, withRetry } from "../discovery/rate-limit.js";
 import path from "node:path";
+
+const RETRY_OPTS = { retries: 2, backoffMs: 500 };
 
 export async function resolveRedirects(url: string): Promise<string> {
   try {
-    const res = await fetch(url, {
-      method: "GET",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      },
-      redirect: "follow",
-    });
+    const res = await withRetry(
+      () =>
+        fetch(url, {
+          method: "GET",
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          },
+          redirect: "follow",
+        }),
+      RETRY_OPTS,
+    );
     return res.url || url;
   } catch {
     return url;
   }
 }
 
-export async function resolveRedirectsWithPlaywright(url: string, context?: BrowserContext): Promise<string> {
+export async function resolveRedirectsWithPlaywright(
+  url: string,
+  context?: BrowserContext,
+  pace: (url: string) => Promise<void> = pacer(500),
+): Promise<string> {
   if (!context) return resolveRedirects(url);
 
   const urlObj = new URL(url);
@@ -37,7 +48,11 @@ export async function resolveRedirectsWithPlaywright(url: string, context?: Brow
 
   const page = await context.newPage();
   try {
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => undefined);
+    await pace(url);
+    await withRetry(
+      () => page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 }),
+      RETRY_OPTS,
+    ).catch(() => undefined);
     await pauseForVerification(page);
     return page.url();
   } catch {
@@ -112,6 +127,11 @@ async function extractFallback(page: Page, url: string): Promise<RawJobDetail> {
 
 export class PostingResolver {
   private registry: CompanyRegistryEntry[];
+  // One pacer per resolver instance (i.e. per discovery run), not module-level -- resolve()
+  // is called once per job, so pacing only does anything useful if it persists across those
+  // calls, but scoped to this instance so unrelated PostingResolver instances (e.g. separate
+  // test cases, or any future multi-run process) never share pacing state by accident.
+  private pace = pacer(500);
 
   constructor() {
     const registryPath = path.resolve("config/fortune500-registry.json");
@@ -119,7 +139,7 @@ export class PostingResolver {
   }
 
   async resolve(job: DiscoveredJobLite, context?: BrowserContext): Promise<JobPosting | null> {
-    const finalUrl = await resolveRedirectsWithPlaywright(job.resultUrl, context);
+    const finalUrl = await resolveRedirectsWithPlaywright(job.resultUrl, context, this.pace);
     const now = new Date().toISOString();
 
     const companyMatch = matchCompany(finalUrl, this.registry);
@@ -176,7 +196,10 @@ export class PostingResolver {
           const jobMatch = finalUrl.match(/jobs\/(\d+)/i) || finalUrl.match(/jobs=([^&]+)/);
           const jobId = jobMatch ? jobMatch[1] : null;
           if (jobId) {
-            const apiRes = await fetch(`https://boards-api.greenhouse.io/v1/boards/${boardToken}/jobs/${jobId}`);
+            const apiRes = await withRetry(
+              () => fetch(`https://boards-api.greenhouse.io/v1/boards/${boardToken}/jobs/${jobId}`),
+              RETRY_OPTS,
+            );
             if (apiRes.ok) {
               rawMetadata = (await apiRes.json().catch(() => ({}))) as Record<string, unknown>;
             }
@@ -185,7 +208,10 @@ export class PostingResolver {
           const postMatch = finalUrl.match(/jobs\.lever\.co\/[^/]+\/([^/?#]+)/i);
           const postId = postMatch ? postMatch[1] : null;
           if (postId) {
-            const apiRes = await fetch(`https://api.lever.co/v0/postings/${leverSite}/${postId}`);
+            const apiRes = await withRetry(
+              () => fetch(`https://api.lever.co/v0/postings/${leverSite}/${postId}`),
+              RETRY_OPTS,
+            );
             if (apiRes.ok) {
               rawMetadata = (await apiRes.json().catch(() => ({}))) as Record<string, unknown>;
             }

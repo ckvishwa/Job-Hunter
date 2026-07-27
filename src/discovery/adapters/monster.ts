@@ -1,5 +1,6 @@
 import type { DiscoveredJobLite, PortalDiscoveryAdapter, DiscoveryContext } from "../types.js";
 import { pauseForVerification } from "../../browser/verification.js";
+import { pacer, withRetry } from "../rate-limit.js";
 
 export const monsterDiscoveryAdapter: PortalDiscoveryAdapter = {
   source: "monster",
@@ -7,12 +8,17 @@ export const monsterDiscoveryAdapter: PortalDiscoveryAdapter = {
   async discover(context: DiscoveryContext): Promise<void> {
     const { page, keyword, location, settings, checkpoint, onPageProcessed } = context;
     const startPage = checkpoint.lastPage + 1;
+    const pace = pacer(settings.delayBetweenRequestsMs);
 
     for (let pageNum = startPage; pageNum <= settings.maxPagesPerSource; pageNum++) {
       // Monster allows pagination via page query parameter
       const url = `https://www.monster.com/jobs/search?q=${encodeURIComponent(keyword)}&where=${encodeURIComponent(location)}&page=${pageNum}`;
 
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs });
+      await pace(url);
+      await withRetry(
+        () => page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs }),
+        { retries: 2, backoffMs: 500 },
+      );
       await pauseForVerification(page);
 
       // Selectors for Monster
