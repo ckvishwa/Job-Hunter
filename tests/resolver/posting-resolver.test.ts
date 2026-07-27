@@ -120,4 +120,85 @@ describe("PostingResolver", () => {
     expect(resolved!.sourceType).toBe("portal");
     expect(resolved!.descriptionText).toContain("This is a job description");
   });
+
+  it("falls back to generic scraping for an unregistered Workday URL with no site segment, instead of fabricating 'careers'", async () => {
+    const workdayUrl = "https://foo.myworkdayjobs.com/en-US";
+    const job: DiscoveredJobLite = {
+      source: "linkedin-public",
+      searchKeyword: "sdet",
+      title: "SDET",
+      company: "Foo Inc",
+      location: "Remote",
+      salarySnippet: null,
+      resultUrl: workdayUrl,
+      possibleOfficialUrl: null,
+      postingAgeOrDate: null,
+      sourceJobId: "789",
+      discoveredAt: "2026-01-01T00:00:00.000Z",
+      matchedProfiles: ["sdet"],
+    };
+
+    // No redirect: fetch echoes back the same URL.
+    (fetch as any).mockImplementation(async (url: string) => ({
+      url,
+      ok: true,
+      json: async () => ({}),
+    }));
+
+    const mockPage = {
+      goto: vi.fn().mockResolvedValue(undefined),
+      content: vi.fn().mockResolvedValue("<html>no captcha</html>"),
+      title: vi.fn().mockResolvedValue("SDET at Foo Inc"),
+      close: vi.fn().mockResolvedValue(undefined),
+      url: () => workdayUrl,
+      evaluate: vi.fn().mockResolvedValue("<div class='description'>Generic scrape fallback description.</div>"),
+    };
+
+    const mockContext = {
+      newPage: vi.fn().mockResolvedValue(mockPage),
+    };
+
+    const resolver = new PostingResolver();
+    const resolved = await resolver.resolve(job, mockContext as any);
+
+    // Never silently dropped, and never fabricated a "careers" Workday site guess.
+    expect(resolved).not.toBeNull();
+    expect(resolved!.descriptionText).toContain("Generic scrape fallback description");
+    expect(resolved!.canonicalUrl).not.toContain("careers");
+    expect(JSON.stringify(resolved!.rawMetadata)).not.toContain("careers");
+  });
+
+  it("never silently drops a job even when there is no context and no ATS/registry match (placeholder JobPosting, not null)", async () => {
+    const workdayUrl = "https://foo.myworkdayjobs.com/en-US";
+    const job: DiscoveredJobLite = {
+      source: "linkedin-public",
+      searchKeyword: "sdet",
+      title: "SDET",
+      company: "Foo Inc",
+      location: "Remote",
+      salarySnippet: "100k",
+      resultUrl: workdayUrl,
+      possibleOfficialUrl: null,
+      postingAgeOrDate: null,
+      sourceJobId: "789",
+      discoveredAt: "2026-01-01T00:00:00.000Z",
+      matchedProfiles: ["sdet"],
+    };
+
+    (fetch as any).mockImplementation(async (url: string) => ({
+      url,
+      ok: true,
+      json: async () => ({}),
+    }));
+
+    const resolver = new PostingResolver();
+    // No context passed at all -- neither the ATS-adapter path nor the generic
+    // Playwright fallback can run, only the final placeholder path can produce a result.
+    const resolved = await resolver.resolve(job);
+
+    expect(resolved).not.toBeNull();
+    expect(resolved!.descriptionText).toContain("Full description not extracted");
+    expect(resolved!.canonicalUrl).toBe(workdayUrl);
+    expect(resolved!.canonicalUrl).not.toContain("careers");
+  });
 });

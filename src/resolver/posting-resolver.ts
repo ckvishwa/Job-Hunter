@@ -154,7 +154,16 @@ export class PostingResolver {
       sourceType = "company-careers";
     }
 
-    if (atsType && context) {
+    // Workday needs a real per-job "site" path segment: a registry-verified
+    // atsWorkdaySite value, or one already present in the discovered URL. Never fabricate
+    // a default like "careers" -- matches company-careers.ts's skip-rather-than-guess rule
+    // for the same field. Compute it up front so we can skip the ATS-adapter path entirely
+    // when it can't be determined, and fall through to the generic Playwright DOM-scrape
+    // fallback below instead of guessing.
+    const workdayUrlParts = atsType === "workday" ? new URL(finalUrl).pathname.split("/") : null;
+    const workdaySite = atsType === "workday" ? companyMatch?.atsWorkdaySite || workdayUrlParts?.[3] || null : null;
+
+    if (atsType && context && (atsType !== "workday" || workdaySite)) {
       const site: SiteConfig = {
         id: companyMatch ? `company-careers::${companyMatch.company.toLowerCase()}` : `resolved-ats::${atsType}`,
         name: companyName,
@@ -176,11 +185,10 @@ export class PostingResolver {
         site.lever = { site: leverSite };
       } else if (atsType === "workday") {
         const urlObj = new URL(finalUrl);
-        const parts = urlObj.pathname.split("/");
         site.workday = {
           hostname: urlObj.hostname,
-          tenant: companyMatch?.atsTenantOrBoardId || parts[2] || "",
-          site: parts[3] || "careers",
+          tenant: companyMatch?.atsTenantOrBoardId || workdayUrlParts?.[2] || "",
+          site: workdaySite!,
         };
       }
 
