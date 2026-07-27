@@ -27,7 +27,7 @@
 - [x] Task 6 — Shared retry/backoff + domain-pacing helper — commit 607b1a3. Review found + fixed a real scope-too-wide bug (module-level pacer in posting-resolver.ts shared across unrelated instances). One scope-too-narrow gap tracked, not fixed (see note under Task 6 above).
 - [x] Task 7 — Portal adapters: wire to `portals.yml`, remove selector-config cast — commit 1b4db5a. Reviewed clean; deliberate behavior change (nothing runs by default now, matches sites.yml convention) confirmed correct by direct trace. One pre-existing UX gap logged under Task 15.
 - [x] Task 8 — Portal adapter registry (already done — add tests) — commit d319ed3c. Reviewed clean.
-- [ ] Task 9 — Company-careers runner: stop fabricating data
+- [x] Task 9 — Company-careers runner: stop fabricating data — test coverage added, commit closing the 3 remaining gaps from the Task 9 checklist. Reviewed clean.
 - [ ] Task 10 — Posting resolver: fix typecheck + add verification-pause
 - [ ] Task 11 — Cross-source dedup (already done — verify only)
 - [ ] Task 12 — Keyword orchestration (already done — verify only)
