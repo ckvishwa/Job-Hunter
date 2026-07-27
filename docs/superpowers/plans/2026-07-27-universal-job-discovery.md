@@ -24,7 +24,7 @@
 - [x] Task 3 — Discovery types cleanup (remove `as any` side-channels) — commit 12b8b56. Reviewed clean.
 - [x] Task 4 — Discovery storage (already done — verify + add missing tests) — commit 24b12ad. Reviewed clean.
 - [x] Task 5 — Checkpoints (already done — fix company-careers integration bug) — commits c3742aa, d47b701. Review found and fixed a real orchestrator bug (checkpoint.completed short-circuited all future retries) and a real identity-vs-index bug (registry reorder would misattribute progress). Known non-blocking gap: a structurally-skipped company stays skipped after its registry data is later filled in, until a checkpoint reset (--reset-checkpoint is Task 14, not built yet).
-- [ ] Task 6 — Shared retry/backoff + domain-pacing helper
+- [x] Task 6 — Shared retry/backoff + domain-pacing helper — commit 607b1a3. Review found + fixed a real scope-too-wide bug (module-level pacer in posting-resolver.ts shared across unrelated instances). One scope-too-narrow gap tracked, not fixed (see note under Task 6 above).
 - [ ] Task 7 — Portal adapters: wire to `portals.yml`, remove selector-config cast
 - [ ] Task 8 — Portal adapter registry (already done — add tests)
 - [ ] Task 9 — Company-careers runner: stop fabricating data
@@ -124,6 +124,8 @@
 - [ ] `export function pacer(delayBetweenActionsMs: number): () => Promise<void>` — returns a function that, called before each navigation to the same domain, waits out the configured delay since the domain's last call. Track last-call timestamp in a `Map<string, number>` closed over by the returned function — no external state, no new dependency.
 - [ ] Wire both into each portal adapter's navigation/pagination loop and into the resolver's redirect-follow/fetch path, replacing whatever ad-hoc `setTimeout`/delay each currently has.
 - [ ] Test: `withRetry` retries the configured number of times then throws the last error; `pacer` delays a second call to the same domain but not a call to a different domain.
+
+- [ ] **Found during Task 6 review, tracked not fixed:** each portal adapter creates its `pacer` fresh inside `discover()`, which the orchestrator calls once per (source × role × keyword) — so pacing only holds within one keyword's own pagination, not across back-to-back keyword searches against the same portal (e.g. indeed.com searched for "SDET" then immediately "QA Engineer" with zero enforced delay between them). Judged acceptable for Task 6's literal scope (satisfies "wire into each adapter's pagination loop") but doesn't naturally belong to any later task as currently scoped either. Real fix, if ever prioritized: hoist one `pacer` instance per run per source in the orchestrator and pass it into `DiscoveryContext` instead of each adapter creating its own.
 
 ---
 
