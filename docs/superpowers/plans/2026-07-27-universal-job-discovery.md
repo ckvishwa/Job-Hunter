@@ -25,7 +25,7 @@
 - [x] Task 4 — Discovery storage (already done — verify + add missing tests) — commit 24b12ad. Reviewed clean.
 - [x] Task 5 — Checkpoints (already done — fix company-careers integration bug) — commits c3742aa, d47b701. Review found and fixed a real orchestrator bug (checkpoint.completed short-circuited all future retries) and a real identity-vs-index bug (registry reorder would misattribute progress). Known non-blocking gap: a structurally-skipped company stays skipped after its registry data is later filled in, until a checkpoint reset (--reset-checkpoint is Task 14, not built yet).
 - [x] Task 6 — Shared retry/backoff + domain-pacing helper — commit 607b1a3. Review found + fixed a real scope-too-wide bug (module-level pacer in posting-resolver.ts shared across unrelated instances). One scope-too-narrow gap tracked, not fixed (see note under Task 6 above).
-- [ ] Task 7 — Portal adapters: wire to `portals.yml`, remove selector-config cast
+- [x] Task 7 — Portal adapters: wire to `portals.yml`, remove selector-config cast — commit 1b4db5a. Reviewed clean; deliberate behavior change (nothing runs by default now, matches sites.yml convention) confirmed correct by direct trace. One pre-existing UX gap logged under Task 15.
 - [ ] Task 8 — Portal adapter registry (already done — add tests)
 - [ ] Task 9 — Company-careers runner: stop fabricating data
 - [ ] Task 10 — Posting resolver: fix typecheck + add verification-pause
@@ -213,6 +213,7 @@ Covered by Task 0 Steps 5, 6, 8. This task is the checkpoint: confirm `tests/res
 - [ ] `export interface DiscoveryRunSummary` (per spec — sources attempted/succeeded/failed, companies attempted, keywords searched, pages processed, listings discovered, discoveries rejected, official postings resolved, unresolved discoveries, duplicates merged, complete JDs extracted, verification pauses, jobs by profile, jobs by source, jobs written, source-specific errors).
 - [ ] `export function buildSummary(...): DiscoveryRunSummary` — pure function assembling the summary from counters the orchestrator already tracks (or needs to start tracking) during the run.
 - [ ] Orchestrator accumulates the counters through the run and calls `buildSummary` once at the end; `cli.ts`'s existing `printDiscoverSummary` prints this structured object instead of (or in addition to) whatever ad-hoc totals it prints today.
+- [ ] **Found during Task 7 review, pre-existing (not introduced by Task 7), tracked here:** `--source X` where X is a known but currently-disabled portal/site id silently produces zero attempted sources with no explanation (same gap already existed for `sites.yml`-driven sources before Task 7). Worth a clear "requested source X exists but is disabled in config" line in the summary rather than a silent zero.
 - [ ] Test: `buildSummary` produces correct counts from a set of fake per-phase inputs; a run with zero portals attempted still produces a valid (all-zero) summary rather than throwing.
 
 ---
