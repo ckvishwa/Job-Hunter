@@ -24,6 +24,19 @@ export function mergeJobs(
     byFingerprint.set(fingerprintDescription(job.descriptionText), idx);
   }
 
+  function deindex(job: JobPosting, idx: number): void {
+    const urlKey = canonicalizeUrl(job.canonicalUrl);
+    if (byUrl.get(urlKey) === idx) byUrl.delete(urlKey);
+    if (job.requisitionId) {
+      const reqKey = `${job.source}::${job.requisitionId}`;
+      if (byReq.get(reqKey) === idx) byReq.delete(reqKey);
+    }
+    const ctlKey = normalizeKey(job.company, job.title, job.location);
+    if (byCompanyTitleLoc.get(ctlKey) === idx) byCompanyTitleLoc.delete(ctlKey);
+    const fpKey = fingerprintDescription(job.descriptionText);
+    if (byFingerprint.get(fpKey) === idx) byFingerprint.delete(fpKey);
+  }
+
   result.forEach(index);
 
   for (const incomingJob of incoming) {
@@ -41,7 +54,8 @@ export function mergeJobs(
       byFingerprint.get(fpKey);
 
     if (matchIdx !== undefined) {
-      const original = result[matchIdx];
+      const original = result[matchIdx]!;
+      deindex(original, matchIdx);
       const merged: JobPosting = {
         ...incomingJob,
         id: original.id,
