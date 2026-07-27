@@ -6,6 +6,20 @@ function normalizeKey(...parts: (string | null)[]): string {
   return parts.map((part) => (part ?? "").toLowerCase().trim().replace(/\s+/g, " ")).join("::");
 }
 
+// Minimum trimmed description length before it's trusted as a fingerprint match key.
+// An empty (or near-empty) description text is not a reliable identifying signal --
+// fingerprintDescription("") is a constant hash, so without this guard any two jobs
+// with no/blank description would incorrectly collapse into one record on tier 4.
+const MIN_FINGERPRINTABLE_DESCRIPTION_LENGTH = 10;
+
+function hasUsableTitle(title: string): boolean {
+  return title.trim().length > 0;
+}
+
+function hasFingerprintableDescription(descriptionText: string): boolean {
+  return descriptionText.trim().length >= MIN_FINGERPRINTABLE_DESCRIPTION_LENGTH;
+}
+
 export function mergeJobs(
   existing: JobPosting[],
   incoming: JobPosting[],
@@ -20,8 +34,12 @@ export function mergeJobs(
   function index(job: JobPosting, idx: number): void {
     byUrl.set(canonicalizeUrl(job.canonicalUrl), idx);
     if (job.requisitionId) byReq.set(`${job.source}::${job.requisitionId}`, idx);
-    byCompanyTitleLoc.set(normalizeKey(job.company, job.title, job.location), idx);
-    byFingerprint.set(fingerprintDescription(job.descriptionText), idx);
+    if (hasUsableTitle(job.title)) {
+      byCompanyTitleLoc.set(normalizeKey(job.company, job.title, job.location), idx);
+    }
+    if (hasFingerprintableDescription(job.descriptionText)) {
+      byFingerprint.set(fingerprintDescription(job.descriptionText), idx);
+    }
   }
 
   function deindex(job: JobPosting, idx: number): void {
@@ -31,10 +49,14 @@ export function mergeJobs(
       const reqKey = `${job.source}::${job.requisitionId}`;
       if (byReq.get(reqKey) === idx) byReq.delete(reqKey);
     }
-    const ctlKey = normalizeKey(job.company, job.title, job.location);
-    if (byCompanyTitleLoc.get(ctlKey) === idx) byCompanyTitleLoc.delete(ctlKey);
-    const fpKey = fingerprintDescription(job.descriptionText);
-    if (byFingerprint.get(fpKey) === idx) byFingerprint.delete(fpKey);
+    if (hasUsableTitle(job.title)) {
+      const ctlKey = normalizeKey(job.company, job.title, job.location);
+      if (byCompanyTitleLoc.get(ctlKey) === idx) byCompanyTitleLoc.delete(ctlKey);
+    }
+    if (hasFingerprintableDescription(job.descriptionText)) {
+      const fpKey = fingerprintDescription(job.descriptionText);
+      if (byFingerprint.get(fpKey) === idx) byFingerprint.delete(fpKey);
+    }
   }
 
   result.forEach(index);
@@ -50,8 +72,10 @@ export function mergeJobs(
     const matchIdx =
       byUrl.get(urlKey) ??
       (reqKey ? byReq.get(reqKey) : undefined) ??
-      byCompanyTitleLoc.get(ctlKey) ??
-      byFingerprint.get(fpKey);
+      (hasUsableTitle(incomingJob.title) ? byCompanyTitleLoc.get(ctlKey) : undefined) ??
+      (hasFingerprintableDescription(incomingJob.descriptionText)
+        ? byFingerprint.get(fpKey)
+        : undefined);
 
     if (matchIdx !== undefined) {
       const original = result[matchIdx]!;

@@ -184,4 +184,68 @@ describe("mergeJobs", () => {
     expect(c!.location).toBe("NYC");
     expect(c!.descriptionText).toBe("Completely different posting for requisition 2.");
   });
+
+  it("does NOT collapse distinct jobs that all have an empty descriptionText (tier-4 fingerprint guard)", () => {
+    // Regression test: fingerprintDescription("") is a constant hash, so without a
+    // guard, any two jobs with an empty description would incorrectly match on tier 4.
+    const now = "2026-02-01T00:00:00.000Z";
+    const incoming = [
+      makeJob({
+        id: "id-1",
+        canonicalUrl: "https://acme.com/jobs/1",
+        requisitionId: "1",
+        title: "Engineer A",
+        location: "NYC",
+        descriptionText: "",
+      }),
+      makeJob({
+        id: "id-2",
+        canonicalUrl: "https://acme.com/jobs/2",
+        requisitionId: "2",
+        title: "Engineer B",
+        location: "SF",
+        descriptionText: "",
+      }),
+      makeJob({
+        id: "id-3",
+        canonicalUrl: "https://acme.com/jobs/3",
+        requisitionId: null,
+        title: "Engineer C",
+        location: "Austin",
+        descriptionText: "",
+      }),
+    ];
+
+    const result = mergeJobs([], incoming, now);
+    expect(result).toHaveLength(3);
+  });
+
+  it("does NOT collapse distinct jobs that both have an empty/blank title (tier-3 company+title+location guard)", () => {
+    // Regression test: an empty title must not let two otherwise-distinct jobs match
+    // on the company+title+location tier just because title normalizes to "".
+    const now = "2026-02-01T00:00:00.000Z";
+    const existing = [
+      makeJob({
+        id: "id-1",
+        canonicalUrl: "https://acme.com/jobs/1",
+        requisitionId: "1",
+        title: "",
+        location: "Remote",
+        descriptionText: "First distinct posting body text that is reasonably long.",
+      }),
+    ];
+    const incoming = [
+      makeJob({
+        id: "id-2",
+        canonicalUrl: "https://acme.com/jobs/2",
+        requisitionId: "2",
+        title: "   ",
+        location: "Remote",
+        descriptionText: "Second distinct posting body text that is different.",
+      }),
+    ];
+
+    const result = mergeJobs(existing, incoming, now);
+    expect(result).toHaveLength(2);
+  });
 });
