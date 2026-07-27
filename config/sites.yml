@@ -1,5 +1,6 @@
 # Career sites to search. Only sites listed here are ever visited.
 # adapter must be one of: greenhouse, lever, workday, generic
+
 settings:
   maxPagesPerSource: 100
   maxJobsPerSource: 5000
@@ -7,40 +8,8 @@ settings:
   delayBetweenRequestsMs: 500
 
 sites:
-  - id: example-greenhouse
-    name: "Example Co (Greenhouse)"
-    url: "https://boards.greenhouse.io/example"
-    adapter: greenhouse
-    enabled: false
-
-  - id: example-lever
-    name: "Example Co (Lever)"
-    url: "https://jobs.lever.co/example"
+  - id: ahead-lever
+    name: "AHEAD"
+    url: "https://jobs.lever.co/thinkahead"
     adapter: lever
-    enabled: false
-
-  - id: example-workday
-    name: "Example Co (Workday)"
-    url: "https://example.wd1.myworkdayjobs.com/careers"
-    adapter: workday
-    enabled: false
-    workday:
-      hostname: "example.wd1.myworkdayjobs.com"
-      tenant: "example"
-      site: "careers"
-
-  - id: example-generic
-    name: "Example Co (Generic careers page)"
-    url: "https://example.com/careers"
-    adapter: generic
-    enabled: false
-    generic:
-      searchInputSelector: "#search-input"
-      searchButtonSelector: "#search-button"
-      resultCardSelector: ".job-card"
-      jobLinkSelector: ".job-card a"
-      loadMoreSelector: ".load-more"
-      titleSelector: "h1.job-title"
-      locationSelector: ".job-location"
-      descriptionSelector: ".job-description"
-      applyLinkSelector: "a.apply-button"
+    enabled: true

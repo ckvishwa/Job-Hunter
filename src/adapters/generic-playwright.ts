@@ -65,7 +65,7 @@ export function createGenericPlaywrightAdapter(deps: GenericPlaywrightDeps): Sou
       await checkVerification(page);
 
       const links = await page.$$eval(selectors.jobLinkSelector, (elements) =>
-        elements.map((el) => el.href).filter(Boolean),
+        elements.map((el) => (el as HTMLAnchorElement).href).filter(Boolean),
       );
       const beforeSize = found.size;
       for (const link of links) {
@@ -145,7 +145,7 @@ export function createGenericPlaywrightAdapter(deps: GenericPlaywrightDeps): Sou
         const location = await page.$eval(selectors.locationSelector, (el) => el.textContent?.trim() ?? "").catch(() => "");
         const descriptionHtml = await page.$eval(selectors.descriptionSelector, (el) => el.innerHTML).catch(() => "");
         const applyUrl = selectors.applyLinkSelector
-          ? await page.$eval(selectors.applyLinkSelector, (el) => el.href).catch(() => job.url)
+          ? await page.$eval(selectors.applyLinkSelector, (el) => (el as HTMLAnchorElement).href).catch(() => job.url)
           : job.url;
 
         return {
@@ -191,6 +191,7 @@ export function createGenericPlaywrightAdapter(deps: GenericPlaywrightDeps): Sou
         requiredYears: extractRequiredYears(raw.descriptionText),
         salaryText: raw.salaryText,
         matchedProfiles,
+        discoveredFrom: [site.id],
         rawMetadata: raw.rawMetadata,
       };
     },

@@ -115,6 +115,7 @@ export const leverAdapter: SourceAdapter = {
       requiredYears: extractRequiredYears(raw.descriptionText),
       salaryText: raw.salaryText,
       matchedProfiles,
+      discoveredFrom: [site.id],
       rawMetadata: raw.rawMetadata,
     };
   },

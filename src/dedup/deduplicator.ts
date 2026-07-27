@@ -6,14 +6,47 @@ function normalizeKey(...parts: (string | null)[]): string {
   return parts.map((part) => (part ?? "").toLowerCase().trim().replace(/\s+/g, " ")).join("::");
 }
 
+const GENERIC_TITLES = new Set([
+  "software engineer",
+  "developer",
+  "engineer",
+  "manager",
+  "director",
+  "consultant",
+  "analyst",
+  "intern",
+  "associate",
+  "specialist",
+  "coordinator",
+  "lead",
+  "architect",
+  "qa",
+  "tester",
+  "sdet",
+  "qa engineer",
+  "qa analyst",
+  "systems engineer",
+  "staff engineer",
+  "senior software engineer",
+  "senior engineer",
+  "admin",
+  "administrator",
+]);
+
+export function isGenericTitle(title: string): boolean {
+  const normalized = title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ");
+  return GENERIC_TITLES.has(normalized);
+}
+
 // Minimum trimmed description length before it's trusted as a fingerprint match key.
-// An empty (or near-empty) description text is not a reliable identifying signal --
-// fingerprintDescription("") is a constant hash, so without this guard any two jobs
-// with no/blank description would incorrectly collapse into one record on tier 4.
 const MIN_FINGERPRINTABLE_DESCRIPTION_LENGTH = 10;
 
 function hasUsableTitle(title: string): boolean {
-  return title.trim().length > 0;
+  return title.trim().length > 0 && !isGenericTitle(title);
 }
 
 function hasFingerprintableDescription(descriptionText: string): boolean {
@@ -80,16 +113,35 @@ export function mergeJobs(
     if (matchIdx !== undefined) {
       const original = result[matchIdx]!;
       deindex(original, matchIdx);
+      
+      const mergedDiscoveredFrom = Array.from(
+        new Set([
+          ...(original.discoveredFrom || [original.source]),
+          ...(incomingJob.discoveredFrom || [incomingJob.source]),
+        ])
+      );
+
+      const mergedProfiles = Array.from(
+        new Set([...(original.matchedProfiles || []), ...(incomingJob.matchedProfiles || [])])
+      );
+
       const merged: JobPosting = {
         ...incomingJob,
         id: original.id,
         discoveredAt: original.discoveredAt,
         lastSeenAt: now,
+        discoveredFrom: mergedDiscoveredFrom,
+        matchedProfiles: mergedProfiles,
       };
       result[matchIdx] = merged;
       index(merged, matchIdx);
     } else {
-      const fresh: JobPosting = { ...incomingJob, discoveredAt: now, lastSeenAt: now };
+      const fresh: JobPosting = {
+        ...incomingJob,
+        discoveredAt: now,
+        lastSeenAt: now,
+        discoveredFrom: incomingJob.discoveredFrom || [incomingJob.source],
+      };
       result.push(fresh);
       index(fresh, result.length - 1);
     }
@@ -97,3 +149,4 @@ export function mergeJobs(
 
   return result;
 }
+

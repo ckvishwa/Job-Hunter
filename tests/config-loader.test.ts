@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { ConfigValidationError, loadCollectSettings, loadRolesConfig, loadSitesConfig } from "../src/config/loader.js";
+import { ConfigValidationError, loadCollectSettings, loadRolesConfig, loadSitesConfig, loadCompanyRegistry } from "../src/config/loader.js";
 
 function tempFile(name: string, contents: string): string {
   const dir = mkdtempSync(path.join(tmpdir(), "job-hunter-test-"));
@@ -187,3 +187,51 @@ sites:
     });
   });
 });
+
+describe("loadCompanyRegistry", () => {
+  it("parses a valid registry JSON", () => {
+    const filePath = tempFile(
+      "registry.json",
+      JSON.stringify([
+        {
+          company: "AHEAD",
+          fortuneRank: null,
+          corporateDomain: "thinkahead.com",
+          careersUrl: "https://jobs.lever.co/thinkahead",
+          atsType: "lever",
+          atsTenantOrBoardId: "thinkahead",
+          verificationStatus: "verified",
+          lastVerifiedDate: "2026-07-27"
+        }
+      ])
+    );
+    const registry = loadCompanyRegistry(filePath);
+    expect(registry).toEqual([
+      {
+        company: "AHEAD",
+        fortuneRank: null,
+        corporateDomain: "thinkahead.com",
+        careersUrl: "https://jobs.lever.co/thinkahead",
+        atsType: "lever",
+        atsTenantOrBoardId: "thinkahead",
+        verificationStatus: "verified",
+        lastVerifiedDate: "2026-07-27"
+      }
+    ]);
+  });
+
+  it("throws on invalid registry schema", () => {
+    const filePath = tempFile(
+      "registry.json",
+      JSON.stringify([
+        {
+          company: "AHEAD",
+          fortuneRank: "not-a-number",
+          corporateDomain: "thinkahead.com"
+        }
+      ])
+    );
+    expect(() => loadCompanyRegistry(filePath)).toThrow(ConfigValidationError);
+  });
+});
+

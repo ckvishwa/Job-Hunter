@@ -32,7 +32,7 @@ export interface RawJobDetail {
 export interface JobPosting {
   id: string;
   source: string;
-  sourceType: SiteConfig["adapter"];
+  sourceType: SiteConfig["adapter"] | "portal" | "company-careers";
   company: string;
   title: string;
   location: string | null;
@@ -50,6 +50,8 @@ export interface JobPosting {
   requiredYears: number | null;
   salaryText: string | null;
   matchedProfiles: string[];
+  discoveredFrom: string[];
+  discoveredUrl?: string;
   rawMetadata: Record<string, unknown>;
 }
 

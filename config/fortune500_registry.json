@@ -1,0 +1,52 @@
+[
+  {
+    "company": "AHEAD",
+    "fortuneRank": null,
+    "corporateDomain": "thinkahead.com",
+    "careersUrl": "https://jobs.lever.co/thinkahead",
+    "atsType": "lever",
+    "atsTenantOrBoardId": "thinkahead",
+    "verificationStatus": "verified",
+    "lastVerifiedDate": "2026-07-27"
+  },
+  {
+    "company": "Walmart",
+    "fortuneRank": 1,
+    "corporateDomain": "walmart.com",
+    "careersUrl": "https://careers.walmart.com",
+    "atsType": "workday",
+    "atsTenantOrBoardId": "walmart",
+    "verificationStatus": "verified",
+    "lastVerifiedDate": "2026-07-27"
+  },
+  {
+    "company": "Amazon",
+    "fortuneRank": 2,
+    "corporateDomain": "amazon.com",
+    "careersUrl": "https://www.amazon.jobs",
+    "atsType": "generic",
+    "atsTenantOrBoardId": null,
+    "verificationStatus": "verified",
+    "lastVerifiedDate": "2026-07-27"
+  },
+  {
+    "company": "Apple",
+    "fortuneRank": 3,
+    "corporateDomain": "apple.com",
+    "careersUrl": "https://jobs.apple.com",
+    "atsType": "generic",
+    "atsTenantOrBoardId": null,
+    "verificationStatus": "verified",
+    "lastVerifiedDate": "2026-07-27"
+  },
+  {
+    "company": "Google",
+    "fortuneRank": 8,
+    "corporateDomain": "google.com",
+    "careersUrl": "https://www.google.com/about/careers/applications",
+    "atsType": "greenhouse",
+    "atsTenantOrBoardId": "google",
+    "verificationStatus": "verified",
+    "lastVerifiedDate": "2026-07-27"
+  }
+]

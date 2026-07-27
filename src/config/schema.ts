@@ -58,3 +58,19 @@ export const rolesFileSchema = z.object({
 
 export type SitesFile = z.infer<typeof sitesFileSchema>;
 export type RolesFile = z.infer<typeof rolesFileSchema>;
+
+export const companyRegistryEntrySchema = z.object({
+  company: z.string().min(1),
+  fortuneRank: z.number().int().positive().nullable(),
+  corporateDomain: z.string().min(1),
+  careersUrl: z.string().url(),
+  atsType: z.enum(["greenhouse", "lever", "workday", "generic"]),
+  atsTenantOrBoardId: z.string().min(1).nullable(),
+  verificationStatus: z.enum(["verified", "unverified", "blocked"]),
+  lastVerifiedDate: z.string().nullable(),
+});
+
+export const companyRegistrySchema = z.array(companyRegistryEntrySchema);
+
+export type CompanyRegistryEntry = z.infer<typeof companyRegistryEntrySchema>;
+

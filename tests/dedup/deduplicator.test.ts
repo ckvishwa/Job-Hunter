@@ -24,6 +24,7 @@ function makeJob(overrides: Partial<JobPosting> = {}): JobPosting {
     requiredYears: 5,
     salaryText: null,
     matchedProfiles: ["sdet"],
+    discoveredFrom: ["acme-greenhouse"],
     rawMetadata: {},
     ...overrides,
   };

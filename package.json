@@ -9,7 +9,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "collect": "tsx src/runner/cli.ts"
+    "collect": "tsx src/runner/cli.ts",
+    "discover": "tsx src/discovery/cli.ts"
   },
   "dependencies": {
     "js-yaml": "^4.1.0",
