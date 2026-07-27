@@ -1,5 +1,5 @@
-# Job-search portals to search. Only portals listed here are ever visited.
-# type must be one of: google-jobs, indeed, monster, linkedin-public, generic
+# Job-search portals config. type must be one of: google-jobs, indeed, monster, linkedin-public, generic
+# Not yet read by any adapter (see note below) -- nothing here is "visited" by its mere presence.
 #
 # Selector/URL values below for the 4 named portals mirror what is currently
 # HARDCODED in the matching src/discovery/adapters/*.ts file (extracted, not
