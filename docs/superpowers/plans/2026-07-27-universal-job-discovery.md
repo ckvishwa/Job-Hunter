@@ -20,7 +20,7 @@
 
 - [x] Task 0 — Stabilize existing WIP (typecheck + real bug fixes) — commits 9bf2a1a, 2d07906. Independently reviewed; 2 real findings (accidental sites.yml live-enable, reverted; posting-resolver.ts Workday-site fabrication, logged into Task 10 above). Dedup generic-title-guard behavior change reviewed and confirmed intentional (Task 11 requirement), not a defect.
 - [x] Task 1 — `config/portals.yml` + schema — commits d12cb63, 9222a13. Reviewed clean (1 cosmetic comment fix).
-- [ ] Task 2 — Fortune 500 registry: rename, schema fixes, uniqueness validation
+- [x] Task 2 — Fortune 500 registry: rename, schema fixes, uniqueness validation — commit 2f2bbab. Reviewed clean.
 - [ ] Task 3 — Discovery types cleanup (remove `as any` side-channels)
 - [ ] Task 4 — Discovery storage (already done — verify + add missing tests)
 - [ ] Task 5 — Checkpoints (already done — fix company-careers integration bug)
