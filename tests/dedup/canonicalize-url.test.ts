@@ -20,6 +20,11 @@ describe("canonicalizeUrl", () => {
     const b = canonicalizeUrl("https://acme.com/jobs/1?utm_source=x&gh_jid=1");
     expect(a).toBe(b);
   });
+
+  it("does not throw on a malformed URL and returns something usable instead", () => {
+    expect(() => canonicalizeUrl("not a valid url")).not.toThrow();
+    expect(canonicalizeUrl("not a valid url")).toBe("not a valid url");
+  });
 });
 
 describe("computeJobId", () => {

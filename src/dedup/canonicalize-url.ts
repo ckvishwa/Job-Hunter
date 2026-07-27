@@ -3,7 +3,15 @@ import { createHash } from "node:crypto";
 const TRACKING_PARAMS_EXACT = new Set(["gh_src", "lever-source", "ref", "trk"]);
 
 export function canonicalizeUrl(rawUrl: string): string {
-  const url = new URL(rawUrl);
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    // A single malformed URL (corrupted JSONL data, a bad href scraped by the
+    // generic adapter, etc.) must never abort the whole run -- fall back to the
+    // raw string. It's still usable as a dedup key, just not normalized.
+    return rawUrl;
+  }
   url.hash = "";
   url.hostname = url.hostname.toLowerCase();
 
