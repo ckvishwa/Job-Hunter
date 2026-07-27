@@ -22,6 +22,10 @@ export interface DiscoveryCheckpoint {
   completed: boolean;
   lastUpdated: string;
   sourceJobIds: string[];
+  // company-careers only: company completion isn't sequential (company 5 can fail while
+  // company 6 succeeds), unlike portal pagination's lastPage cursor, so it tracks done
+  // company indices directly. Optional so portal-adapter checkpoints are unaffected.
+  completedIndices?: number[];
 }
 
 import type { Page } from "playwright";

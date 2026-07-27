@@ -20,7 +20,12 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
       },
     ];
 
-    const startIndex = checkpoint.lastPage;
+    // Company completion isn't sequential (company 5 can fail while company 6 succeeds), so
+    // unlike portal pagination's lastPage cursor, resume tracks exactly which company indices
+    // are done via checkpoint.completedIndices. Every run considers every company, skipping
+    // only indices already recorded as done; failed indices are retried each run/resume.
+    if (!checkpoint.completedIndices) checkpoint.completedIndices = [];
+    const completedIndices = checkpoint.completedIndices;
 
     // Only greenhouse/lever registry entries carry enough verified data to build a real
     // SiteConfig today (a boardToken/site slug). Workday needs a verified per-company ATS
@@ -32,15 +37,9 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
     let readyCount = 0;
     const skipped: { company: string; atsType: string; reason: string; missingFields: string[] }[] = [];
 
-    // checkpointCursor is the resume point persisted to disk. It only advances past a
-    // company once that company has been attempted (successfully or as a structural skip);
-    // it freezes at the first *failure* so a future --resume retries that company instead
-    // of silently skipping it forever. Within this run we still attempt every remaining
-    // company once -- no retry loop within a single run.
-    let checkpointCursor = startIndex;
-    let hitFailure = false;
+    for (let i = 0; i < companies.length; i++) {
+      if (completedIndices.includes(i)) continue;
 
-    for (let i = startIndex; i < companies.length; i++) {
       const company = companies[i]!;
       const companyName = company.company.toLowerCase();
       console.log(`[company-careers] Processing company: ${company.company} (${company.atsType})`);
@@ -53,8 +52,10 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
           reason: "missing verified Workday ATS site identifier",
           missingFields: ["atsWorkdaySite"],
         });
-        if (!hitFailure) checkpointCursor = i + 1;
-        await onPageProcessed([], checkpointCursor);
+        // A structural skip is a permanent, non-transient outcome (the registry data will
+        // never appear mid-run) -- mark it done so it isn't reattempted every run.
+        completedIndices.push(i);
+        await onPageProcessed([], i + 1);
         continue;
       }
 
@@ -66,8 +67,8 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
           reason: "missing verified generic-portal selectors",
           missingFields: ["genericSelectors"],
         });
-        if (!hitFailure) checkpointCursor = i + 1;
-        await onPageProcessed([], checkpointCursor);
+        completedIndices.push(i);
+        await onPageProcessed([], i + 1);
         continue;
       }
 
@@ -137,14 +138,13 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
         });
 
         readyCount += 1;
-        if (!hitFailure) checkpointCursor = i + 1;
-        await onPageProcessed(newJobs, checkpointCursor);
+        completedIndices.push(i);
+        await onPageProcessed(newJobs, i + 1);
       } catch (err) {
-        hitFailure = true;
         console.error(
-          `[company-careers] Error processing company ${company.company}: ${(err as Error).message}. Checkpoint held at index ${checkpointCursor} -- will retry on next --resume.`,
+          `[company-careers] Error processing company ${company.company}: ${(err as Error).message}. Not marked complete -- will retry on next --resume.`,
         );
-        await onPageProcessed([], checkpointCursor);
+        await onPageProcessed([], i + 1);
       }
     }
 
@@ -154,5 +154,20 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
           ? `Skipped: ${skipped.map((s) => `${s.company} (${s.reason})`).join("; ")}`
           : "No skips."),
     );
+
+    // The orchestrator marks the whole checkpoint `completed: true` unconditionally once
+    // discover() returns without throwing (it has no visibility into per-company outcomes).
+    // Since every per-company failure above is already caught, discover() would otherwise
+    // never throw and the orchestrator would wrongly mark this source::keyword::location
+    // combo fully done even with companies pending retry -- which would make --resume never
+    // re-enter this adapter at all (the orchestrator skips already-`completed` checkpoints
+    // before calling discover()). Throwing here, after every company's real work and
+    // checkpointing has already happened via onPageProcessed, keeps `checkpoint.completed`
+    // false so a future run retries exactly the still-incomplete companies.
+    if (completedIndices.length < companies.length) {
+      throw new Error(
+        `[company-careers] ${companies.length - completedIndices.length} of ${companies.length} companies not completed this run (failures); will retry on next --resume.`,
+      );
+    }
   },
 };
