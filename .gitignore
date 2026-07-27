@@ -2,6 +2,7 @@ node_modules/
 dist/
 .chrome-profile/
 data/*.sqlite
+data/*.jsonl
 output/*.html
 output/*.csv
 output/*.json
