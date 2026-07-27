@@ -209,4 +209,89 @@ describe("runCollect", () => {
     const onDisk = loadJobs(jobsPath);
     expect(onDisk).toHaveLength(3);
   });
+
+  it("launches the browser context lazily for a generic-adapter site and closes it exactly once after the run", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "job-hunter-runner-"));
+    const sitesPath = path.join(dir, "sites.yml");
+    const rolesPath = path.join(dir, "roles.yml");
+    const jobsPath = path.join(dir, "jobs.jsonl");
+
+    writeFileSync(
+      sitesPath,
+      `
+settings:
+  maxPagesPerSource: 5
+  maxJobsPerSource: 100
+  navigationTimeoutMs: 1000
+  delayBetweenRequestsMs: 0
+sites:
+  - id: acme-generic
+    name: Acme Generic
+    url: "https://acme.com/careers"
+    adapter: generic
+    enabled: true
+    generic:
+      searchInputSelector: "#search"
+      searchButtonSelector: "#go"
+      resultCardSelector: ".card"
+      jobLinkSelector: ".card a"
+      titleSelector: "h1"
+      locationSelector: ".loc"
+      descriptionSelector: ".desc"
+`,
+      "utf-8",
+    );
+
+    writeFileSync(
+      rolesPath,
+      `
+roles:
+  - id: sdet
+    profile: sdet
+    keywords:
+      - SDET
+`,
+      "utf-8",
+    );
+
+    // Minimal fake Page/BrowserContext (never a real Playwright browser) --
+    // discoverJobs only calls $$eval/$/content/title/url; fetchJobDetails only
+    // calls $eval sequentially for title, location, descriptionHtml (no
+    // applyLinkSelector configured above, so applyUrl falls back to job.url).
+    const page = {
+      url: () => "https://acme.com/careers",
+      content: async () => "<html>no captcha here</html>",
+      title: async () => "Careers",
+      goto: vi.fn().mockResolvedValue(undefined),
+      fill: vi.fn().mockResolvedValue(undefined),
+      click: vi.fn().mockResolvedValue(undefined),
+      waitForLoadState: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      $$eval: vi.fn().mockResolvedValue(["https://acme.com/jobs/1"]),
+      $eval: vi
+        .fn()
+        .mockResolvedValueOnce("SDET II")
+        .mockResolvedValueOnce("Remote")
+        .mockResolvedValueOnce("<p>5 years required</p>"),
+      $: vi.fn().mockResolvedValue(null),
+    };
+
+    const contextClose = vi.fn().mockResolvedValue(undefined);
+    const context = {
+      newPage: vi.fn().mockResolvedValue(page),
+      close: contextClose,
+    };
+    const launchFn = vi.fn().mockResolvedValue(context);
+
+    const summary = await runCollect(
+      { sitesConfigPath: sitesPath, rolesConfigPath: rolesPath, jobsStorePath: jobsPath },
+      {},
+      launchFn as never,
+    );
+
+    expect(launchFn).toHaveBeenCalledTimes(1);
+    expect(contextClose).toHaveBeenCalledTimes(1);
+    expect(summary.sitesSucceeded).toBe(1);
+    expect(summary.jobsWritten).toBe(1);
+  });
 });

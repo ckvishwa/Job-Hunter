@@ -55,6 +55,7 @@ function buildRoleSearches(
 export async function runCollect(
   paths: CollectPaths,
   filters: CollectFilters = {},
+  launchFn: typeof launchPersistentChrome = launchPersistentChrome,
 ): Promise<CollectSummary> {
   const sites = loadSitesConfig(paths.sitesConfigPath);
   const roles = loadRolesConfig(paths.rolesConfigPath);
@@ -80,63 +81,74 @@ export async function runCollect(
 
   let context: BrowserContext | undefined;
   async function ensureContext(): Promise<BrowserContext> {
-    if (!context) context = await launchPersistentChrome();
+    if (!context) context = await launchFn();
     return context;
   }
 
   const collected: JobPosting[] = [];
 
-  for (const site of targetSites) {
-    summary.sitesAttempted += 1;
-    try {
-      let genericDeps: GenericPlaywrightDeps | undefined;
-      if (site.adapter === "generic") {
-        genericDeps = {
-          context: await ensureContext(),
-          onVerificationPause: () => {
-            summary.verificationPauses += 1;
-          },
-        };
-      }
-
-      const adapter = resolveAdapter(site, genericDeps);
-      const discovered = await adapter.discoverJobs(site, searches, settings);
-      summary.listingsDiscovered += discovered.length;
-
-      for (const job of discovered) {
-        const rawDetail = await adapter.fetchJobDetails(job, site, settings);
-        summary.jdsExtracted += 1;
-        const normalized = adapter.normalize(rawDetail, site, job.matchedProfiles);
-        collected.push(normalized);
-        if (settings.delayBetweenRequestsMs > 0) {
-          await new Promise((resolve) => setTimeout(resolve, settings.delayBetweenRequestsMs));
+  // The persistent Chrome context (if the generic adapter ever launched one) must be
+  // closed once the whole run is done, or every collect invocation leaks a Chrome
+  // process. try/finally here only closes it after all sites have been processed --
+  // it does not affect pauseForVerification, which keeps the same context open across
+  // a mid-run pause on stdin.
+  try {
+    for (const site of targetSites) {
+      summary.sitesAttempted += 1;
+      try {
+        let genericDeps: GenericPlaywrightDeps | undefined;
+        if (site.adapter === "generic") {
+          genericDeps = {
+            context: await ensureContext(),
+            onVerificationPause: () => {
+              summary.verificationPauses += 1;
+            },
+          };
         }
+
+        const adapter = resolveAdapter(site, genericDeps);
+        const discovered = await adapter.discoverJobs(site, searches, settings);
+        summary.listingsDiscovered += discovered.length;
+
+        for (const job of discovered) {
+          const rawDetail = await adapter.fetchJobDetails(job, site, settings);
+          summary.jdsExtracted += 1;
+          const normalized = adapter.normalize(rawDetail, site, job.matchedProfiles);
+          collected.push(normalized);
+          if (adapter.fetchesPerJob && settings.delayBetweenRequestsMs > 0) {
+            await new Promise((resolve) => setTimeout(resolve, settings.delayBetweenRequestsMs));
+          }
+        }
+
+        summary.sitesSucceeded += 1;
+      } catch (err) {
+        summary.sitesFailed += 1;
+        summary.errors.push({ site: site.id, message: (err as Error).message });
       }
+    }
 
-      summary.sitesSucceeded += 1;
-    } catch (err) {
-      summary.sitesFailed += 1;
-      summary.errors.push({ site: site.id, message: (err as Error).message });
+    // `limit` caps how many newly-collected jobs get merged in this run — it must never
+    // truncate the persisted store's pre-existing content (see Task 11 review fix).
+    const cappedCollected =
+      typeof filters.limit === "number" ? collected.slice(0, filters.limit) : collected;
+
+    for (const job of cappedCollected) {
+      for (const profileId of job.matchedProfiles) {
+        summary.totalsByProfile[profileId] = (summary.totalsByProfile[profileId] ?? 0) + 1;
+      }
+    }
+
+    const existing = loadJobs(paths.jobsStorePath);
+    const merged = mergeJobs(existing, cappedCollected, new Date().toISOString());
+    summary.duplicatesRemoved = existing.length + cappedCollected.length - merged.length;
+
+    saveJobs(paths.jobsStorePath, merged);
+    summary.jobsWritten = merged.length;
+
+    return summary;
+  } finally {
+    if (context) {
+      await context.close();
     }
   }
-
-  // `limit` caps how many newly-collected jobs get merged in this run — it must never
-  // truncate the persisted store's pre-existing content (see Task 11 review fix).
-  const cappedCollected =
-    typeof filters.limit === "number" ? collected.slice(0, filters.limit) : collected;
-
-  for (const job of cappedCollected) {
-    for (const profileId of job.matchedProfiles) {
-      summary.totalsByProfile[profileId] = (summary.totalsByProfile[profileId] ?? 0) + 1;
-    }
-  }
-
-  const existing = loadJobs(paths.jobsStorePath);
-  const merged = mergeJobs(existing, cappedCollected, new Date().toISOString());
-  summary.duplicatesRemoved = existing.length + cappedCollected.length - merged.length;
-
-  saveJobs(paths.jobsStorePath, merged);
-  summary.jobsWritten = merged.length;
-
-  return summary;
 }
