@@ -200,6 +200,7 @@ describe("loadCompanyRegistry", () => {
           careersUrl: "https://jobs.lever.co/thinkahead",
           atsType: "lever",
           atsTenantOrBoardId: "thinkahead",
+          atsWorkdaySite: null,
           verificationStatus: "verified",
           lastVerifiedDate: "2026-07-27"
         }
@@ -214,6 +215,7 @@ describe("loadCompanyRegistry", () => {
         careersUrl: "https://jobs.lever.co/thinkahead",
         atsType: "lever",
         atsTenantOrBoardId: "thinkahead",
+        atsWorkdaySite: null,
         verificationStatus: "verified",
         lastVerifiedDate: "2026-07-27"
       }

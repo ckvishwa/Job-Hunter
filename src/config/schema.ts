@@ -113,11 +113,61 @@ export const companyRegistryEntrySchema = z.object({
   careersUrl: z.string().url(),
   atsType: z.enum(["greenhouse", "lever", "workday", "generic"]),
   atsTenantOrBoardId: z.string().min(1).nullable(),
+  // Required (not optional) so every entry states explicitly whether a
+  // verified Workday site segment exists (a value) or doesn't (null) —
+  // never silently absent. Only meaningful for atsType: "workday" entries;
+  // present-and-null on all others for schema uniformity.
+  atsWorkdaySite: z.string().min(1).nullable(),
+  // Reuses the existing genericSelectorsSchema (SiteConfig.generic) — no new
+  // selector shape. Absent = "not yet configured", never fabricated.
+  genericSelectors: genericSelectorsSchema.optional(),
   verificationStatus: z.enum(["verified", "unverified", "blocked"]),
   lastVerifiedDate: z.string().nullable(),
 });
 
-export const companyRegistrySchema = z.array(companyRegistryEntrySchema);
+export const companyRegistrySchema = z.array(companyRegistryEntrySchema).superRefine((entries, ctx) => {
+  const rankSeen = new Map<number, number[]>();
+  const domainSeen = new Map<string, number[]>();
+
+  entries.forEach((entry, index) => {
+    if (entry.fortuneRank !== null) {
+      const indices = rankSeen.get(entry.fortuneRank) ?? [];
+      indices.push(index);
+      rankSeen.set(entry.fortuneRank, indices);
+    }
+
+    const domainKey = `${entry.company.toLowerCase()}::${entry.corporateDomain.toLowerCase()}`;
+    const indices = domainSeen.get(domainKey) ?? [];
+    indices.push(index);
+    domainSeen.set(domainKey, indices);
+  });
+
+  for (const [rank, indices] of rankSeen) {
+    if (indices.length > 1) {
+      const names = indices.map((i) => entries[i]?.company).join(", ");
+      for (const index of indices) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, "fortuneRank"],
+          message: `Duplicate fortuneRank ${rank} shared by: ${names}`,
+        });
+      }
+    }
+  }
+
+  for (const [, indices] of domainSeen) {
+    if (indices.length > 1) {
+      const names = indices.map((i) => entries[i]?.company).join(", ");
+      for (const index of indices) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, "corporateDomain"],
+          message: `Duplicate company+corporateDomain pair shared by: ${names}`,
+        });
+      }
+    }
+  }
+});
 
 export type CompanyRegistryEntry = z.infer<typeof companyRegistryEntrySchema>;
 

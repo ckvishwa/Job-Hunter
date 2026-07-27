@@ -114,7 +114,7 @@ export class PostingResolver {
   private registry: CompanyRegistryEntry[];
 
   constructor() {
-    const registryPath = path.resolve("config/fortune500_registry.json");
+    const registryPath = path.resolve("config/fortune500-registry.json");
     this.registry = loadCompanyRegistry(registryPath);
   }
 

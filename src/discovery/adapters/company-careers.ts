@@ -10,7 +10,7 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
   async discover(context: DiscoveryContext): Promise<void> {
     const { page, keyword, settings, checkpoint, onPageProcessed } = context;
 
-    const registryPath = path.resolve("config/fortune500_registry.json");
+    const registryPath = path.resolve("config/fortune500-registry.json");
     const companies = loadCompanyRegistry(registryPath);
 
     const searches = [

@@ -6,6 +6,7 @@
     "careersUrl": "https://jobs.lever.co/thinkahead",
     "atsType": "lever",
     "atsTenantOrBoardId": "thinkahead",
+    "atsWorkdaySite": null,
     "verificationStatus": "verified",
     "lastVerifiedDate": "2026-07-27"
   },
@@ -16,6 +17,7 @@
     "careersUrl": "https://careers.walmart.com",
     "atsType": "workday",
     "atsTenantOrBoardId": "walmart",
+    "atsWorkdaySite": null,
     "verificationStatus": "verified",
     "lastVerifiedDate": "2026-07-27"
   },
@@ -26,6 +28,7 @@
     "careersUrl": "https://www.amazon.jobs",
     "atsType": "generic",
     "atsTenantOrBoardId": null,
+    "atsWorkdaySite": null,
     "verificationStatus": "verified",
     "lastVerifiedDate": "2026-07-27"
   },
@@ -36,6 +39,7 @@
     "careersUrl": "https://jobs.apple.com",
     "atsType": "generic",
     "atsTenantOrBoardId": null,
+    "atsWorkdaySite": null,
     "verificationStatus": "verified",
     "lastVerifiedDate": "2026-07-27"
   },
@@ -46,6 +50,7 @@
     "careersUrl": "https://www.google.com/about/careers/applications",
     "atsType": "greenhouse",
     "atsTenantOrBoardId": "google",
+    "atsWorkdaySite": null,
     "verificationStatus": "verified",
     "lastVerifiedDate": "2026-07-27"
   }
