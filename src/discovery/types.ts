@@ -23,9 +23,11 @@ export interface DiscoveryCheckpoint {
   lastUpdated: string;
   sourceJobIds: string[];
   // company-careers only: company completion isn't sequential (company 5 can fail while
-  // company 6 succeeds), unlike portal pagination's lastPage cursor, so it tracks done
-  // company indices directly. Optional so portal-adapter checkpoints are unaffected.
-  completedIndices?: number[];
+  // company 6 succeeds), unlike portal pagination's lastPage cursor. Tracked by stable
+  // "company::corporateDomain" identity (not array index -- the registry can grow/reorder
+  // between runs, and a raw index would silently point at the wrong company after that).
+  // Optional so portal-adapter checkpoints are unaffected.
+  completedCompanyKeys?: string[];
 }
 
 import type { Page } from "playwright";

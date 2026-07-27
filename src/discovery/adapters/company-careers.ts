@@ -21,11 +21,16 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
     ];
 
     // Company completion isn't sequential (company 5 can fail while company 6 succeeds), so
-    // unlike portal pagination's lastPage cursor, resume tracks exactly which company indices
-    // are done via checkpoint.completedIndices. Every run considers every company, skipping
-    // only indices already recorded as done; failed indices are retried each run/resume.
-    if (!checkpoint.completedIndices) checkpoint.completedIndices = [];
-    const completedIndices = checkpoint.completedIndices;
+    // unlike portal pagination's lastPage cursor, resume tracks exactly which companies are
+    // done via checkpoint.completedCompanyKeys. Keyed by "company::corporateDomain" (the same
+    // pair Task 2's registry schema already enforces as unique) rather than array index -- the
+    // registry can grow/reorder between runs, and a raw index would silently point at the
+    // wrong company after that. Every run considers every company, skipping only keys already
+    // recorded as done; failed companies are retried each run/resume.
+    if (!checkpoint.completedCompanyKeys) checkpoint.completedCompanyKeys = [];
+    const completedKeys = checkpoint.completedCompanyKeys;
+    const registryKey = (c: { company: string; corporateDomain: string }): string =>
+      `${c.company.toLowerCase()}::${c.corporateDomain.toLowerCase()}`;
 
     // Only greenhouse/lever registry entries carry enough verified data to build a real
     // SiteConfig today (a boardToken/site slug). Workday needs a verified per-company ATS
@@ -38,9 +43,10 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
     const skipped: { company: string; atsType: string; reason: string; missingFields: string[] }[] = [];
 
     for (let i = 0; i < companies.length; i++) {
-      if (completedIndices.includes(i)) continue;
-
       const company = companies[i]!;
+      const companyKey = registryKey(company);
+      if (completedKeys.includes(companyKey)) continue;
+
       const companyName = company.company.toLowerCase();
       console.log(`[company-careers] Processing company: ${company.company} (${company.atsType})`);
 
@@ -53,8 +59,11 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
           missingFields: ["atsWorkdaySite"],
         });
         // A structural skip is a permanent, non-transient outcome (the registry data will
-        // never appear mid-run) -- mark it done so it isn't reattempted every run.
-        completedIndices.push(i);
+        // never appear mid-run) -- mark it done so it isn't reattempted every run. If the
+        // registry is later filled in with real data for this company, a --reset-checkpoint
+        // (or manually clearing this key) is required to retry it -- matches how a completed
+        // success is handled, no separate mechanism invented for this narrower case.
+        completedKeys.push(companyKey);
         await onPageProcessed([], i + 1);
         continue;
       }
@@ -67,7 +76,7 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
           reason: "missing verified generic-portal selectors",
           missingFields: ["genericSelectors"],
         });
-        completedIndices.push(i);
+        completedKeys.push(companyKey);
         await onPageProcessed([], i + 1);
         continue;
       }
@@ -138,7 +147,7 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
         });
 
         readyCount += 1;
-        completedIndices.push(i);
+        completedKeys.push(companyKey);
         await onPageProcessed(newJobs, i + 1);
       } catch (err) {
         console.error(
@@ -164,9 +173,9 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
     // before calling discover()). Throwing here, after every company's real work and
     // checkpointing has already happened via onPageProcessed, keeps `checkpoint.completed`
     // false so a future run retries exactly the still-incomplete companies.
-    if (completedIndices.length < companies.length) {
+    if (completedKeys.length < companies.length) {
       throw new Error(
-        `[company-careers] ${companies.length - completedIndices.length} of ${companies.length} companies not completed this run (failures); will retry on next --resume.`,
+        `[company-careers] ${companies.length - completedKeys.length} of ${companies.length} companies not completed this run (failures); will retry on next --resume.`,
       );
     }
   },

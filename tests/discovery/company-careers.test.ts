@@ -124,7 +124,7 @@ describe("companyCareersDiscoveryAdapter resume behavior", () => {
 
     expect(discoverJobsA).toHaveBeenCalledTimes(1);
     expect(discoverJobsB).toHaveBeenCalledTimes(1);
-    expect(checkpoint.completedIndices).toEqual([0]); // only CompanyA (index 0) marked done
+    expect(checkpoint.completedCompanyKeys).toEqual(["companya::companya.com"]); // only CompanyA marked done
 
     // Run 2 ("--resume"): CompanyB now succeeds.
     discoverJobsB.mockResolvedValueOnce([
@@ -139,7 +139,41 @@ describe("companyCareersDiscoveryAdapter resume behavior", () => {
     expect(discoverJobsA).toHaveBeenCalledTimes(1);
     // CompanyB was retried exactly once more.
     expect(discoverJobsB).toHaveBeenCalledTimes(2);
-    expect(checkpoint.completedIndices).toEqual(expect.arrayContaining([0, 1]));
-    expect(checkpoint.completedIndices).toHaveLength(2);
+    expect(checkpoint.completedCompanyKeys).toEqual(
+      expect.arrayContaining(["companya::companya.com", "companyb::companyb.com"]),
+    );
+    expect(checkpoint.completedCompanyKeys).toHaveLength(2);
+  });
+
+  it("does not silently lose or misattribute progress when the registry array is reordered between runs", async () => {
+    discoverJobsA.mockResolvedValue([
+      { externalId: "a1", title: "SDET", url: "https://companya.com/jobs/a1", matchedProfiles: ["sdet-qa"] },
+    ]);
+    discoverJobsB.mockRejectedValueOnce(new Error("network blip"));
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async () => {});
+
+    // Run 1: CompanyA (index 0) succeeds, CompanyB (index 1) fails.
+    await expect(
+      companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed)),
+    ).rejects.toThrow();
+    expect(checkpoint.completedCompanyKeys).toEqual(["companya::companya.com"]);
+
+    // Simulate the registry being reordered before the next run (e.g. a new company
+    // inserted at the front) -- CompanyB is now at index 0, CompanyA at index 1.
+    loadCompanyRegistryMock.mockReturnValue([...makeRegistry()].reverse());
+    discoverJobsB.mockResolvedValueOnce([
+      { externalId: "b1", title: "SDET", url: "https://companyb.com/jobs/b1", matchedProfiles: ["sdet-qa"] },
+    ]);
+
+    await expect(
+      companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed)),
+    ).resolves.toBeUndefined();
+
+    // Keyed by identity, not position: CompanyA (still completed, now at index 1) must NOT
+    // be re-processed just because it moved; CompanyB (now at index 0) must still be retried.
+    expect(discoverJobsA).toHaveBeenCalledTimes(1);
+    expect(discoverJobsB).toHaveBeenCalledTimes(2);
   });
 });
