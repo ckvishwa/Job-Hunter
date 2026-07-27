@@ -32,6 +32,7 @@ export interface DiscoveryCheckpoint {
 
 import type { Page } from "playwright";
 import type { CollectSettings, SiteConfig } from "../types.js";
+import type { PortalConfig } from "../config/schema.js";
 
 export interface DiscoveryContext {
   page: Page;
@@ -41,6 +42,10 @@ export interface DiscoveryContext {
   checkpoint: DiscoveryCheckpoint;
   onPageProcessed: (jobs: DiscoveredJobLite[], nextPageNum: number) => Promise<void>;
   siteConfig?: SiteConfig;
+  // Populated by the orchestrator for the 5 portal-search adapters (Task 7), from the
+  // matching config/portals.yml entry. Optional because company-careers doesn't use it
+  // (it builds its own synthetic SiteConfig from the Fortune 500 registry instead).
+  portalConfig?: PortalConfig;
   profileIds: string[];
   onVerificationPause?: () => void;
 }

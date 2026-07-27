@@ -1,6 +1,6 @@
 import type { BrowserContext } from "playwright";
 import { launchPersistentChrome } from "../browser/launcher.js";
-import { loadCollectSettings, loadRolesConfig, loadSitesConfig } from "../config/loader.js";
+import { loadCollectSettings, loadPortalsConfig, loadRolesConfig, loadSitesConfig } from "../config/loader.js";
 import { getOrCreateCheckpoint, loadCheckpoints, saveCheckpoints } from "./checkpoints.js";
 import { resolveDiscoveryAdapter } from "./registry.js";
 import { appendDiscoveredJobs, loadJobs, saveJobs } from "../storage/jsonl-store.js";
@@ -35,6 +35,7 @@ export async function runDiscover(
   paths: {
     sitesConfigPath: string;
     rolesConfigPath: string;
+    portalsConfigPath: string;
     discoveredJobsPath: string;
     jobsStorePath: string;
     checkpointsPath: string;
@@ -45,23 +46,36 @@ export async function runDiscover(
   const roles = loadRolesConfig(paths.rolesConfigPath);
   const settings = loadCollectSettings(paths.sitesConfigPath);
   const sites = loadSitesConfig(paths.sitesConfigPath);
+  const portalsConfig = loadPortalsConfig(paths.portalsConfigPath);
 
   const searchLocation = filters.location || "United States";
   const limit = filters.limit;
 
-  // Determine target sources: standard portals + company-careers + generic portals in sites.yml
-  const standardPortals = ["google-jobs", "indeed", "monster", "linkedin-public"];
+  // Determine target sources: config/portals.yml-driven portals (config-driven, not
+  // hardcoded -- an entry only runs if its portals.yml `enabled: true`) + company-careers +
+  // generic portals in sites.yml. Two distinct "generic" concepts exist (see design spec
+  // §11): sites.yml's SiteConfig.generic (company career-page selectors) and portals.yml's
+  // type: "generic" entries (generic job-search portals) are kept as separate source lists
+  // so their resulting `source` strings/config lookups never get conflated, even though both
+  // ultimately resolve to configurableGenericPortalAdapter via registry.ts's unmatched-id
+  // fallback.
+  const standardPortalIds = portalsConfig.filter((p) => p.enabled && p.type !== "generic").map((p) => p.id);
+  const portalsYmlGenericIds = portalsConfig.filter((p) => p.enabled && p.type === "generic").map((p) => p.id);
   const companyCareers = "company-careers";
 
   const genericPortals = sites
     .filter((site) => site.enabled && site.adapter === "generic")
     .map((site) => site.id);
 
-  let targetSources = [...standardPortals, companyCareers, ...genericPortals];
+  let targetSources = [...standardPortalIds, companyCareers, ...genericPortals, ...portalsYmlGenericIds];
 
   if (filters.sources && filters.sources.length > 0) {
     targetSources = targetSources.filter((s) =>
-      filters.sources!.some((fs) => fs.toLowerCase() === s.toLowerCase() || (fs === "generic" && genericPortals.includes(s))),
+      filters.sources!.some(
+        (fs) =>
+          fs.toLowerCase() === s.toLowerCase() ||
+          (fs === "generic" && (genericPortals.includes(s) || portalsYmlGenericIds.includes(s))),
+      ),
     );
   }
 
@@ -114,8 +128,11 @@ export async function runDiscover(
       summary.sourcesAttempted += 1;
       let sourceSuccess = true;
 
-      // Find the site configuration if it's a generic portal
+      // Find the site configuration if it's a generic portal (sites.yml-driven)
       const siteConfig = sites.find((s) => s.id === source);
+      // Find the matching portals.yml entry (standard portal types + portals.yml-driven
+      // generic entries); undefined for company-careers and sites.yml-driven generic portals.
+      const portalConfig = portalsConfig.find((p) => p.id === source);
 
       // Iterate over each target role/keyword
       for (const role of enabledRoles) {
@@ -165,6 +182,7 @@ export async function runDiscover(
                 saveCheckpoints(paths.checkpointsPath, checkpoints);
               },
               siteConfig,
+              portalConfig,
               profileIds: [role.profile],
             };
 

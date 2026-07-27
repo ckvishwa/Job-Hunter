@@ -6,13 +6,25 @@ export const monsterDiscoveryAdapter: PortalDiscoveryAdapter = {
   source: "monster",
 
   async discover(context: DiscoveryContext): Promise<void> {
-    const { page, keyword, location, settings, checkpoint, onPageProcessed } = context;
+    const { page, keyword, location, settings, checkpoint, onPageProcessed, portalConfig } = context;
+    if (!portalConfig) {
+      throw new Error(
+        `monster adapter requires a portalConfig (config/portals.yml entry with id "monster") in the discovery context`,
+      );
+    }
+    if (!portalConfig.jobLinkSelector) {
+      throw new Error(`Portal "${portalConfig.id}" (monster) is missing required "jobLinkSelector"`);
+    }
+    const jobLinkSelector = portalConfig.jobLinkSelector;
     const startPage = checkpoint.lastPage + 1;
     const pace = pacer(settings.delayBetweenRequestsMs);
+    const keywordParam = portalConfig.keywordParam ?? "q";
+    const locationParam = portalConfig.locationParam ?? "where";
 
     for (let pageNum = startPage; pageNum <= settings.maxPagesPerSource; pageNum++) {
-      // Monster allows pagination via page query parameter
-      const url = `https://www.monster.com/jobs/search?q=${encodeURIComponent(keyword)}&where=${encodeURIComponent(location)}&page=${pageNum}`;
+      // Monster allows pagination via page query parameter -- "page" is pagination logic,
+      // not a portal-identity selector, kept hardcoded per adapter.
+      const url = `${portalConfig.baseUrl}?${keywordParam}=${encodeURIComponent(keyword)}&${locationParam}=${encodeURIComponent(location)}&page=${pageNum}`;
 
       await pace(url);
       await withRetry(
@@ -21,9 +33,8 @@ export const monsterDiscoveryAdapter: PortalDiscoveryAdapter = {
       );
       await pauseForVerification(page);
 
-      // Selectors for Monster
-      const cardSelector = "article, [data-testid='job-card'], [class*='JobCard']";
-      const cards = await page.$$(cardSelector);
+      // Selectors for Monster (from config/portals.yml's "monster" entry)
+      const cards = await page.$$(portalConfig.resultCardSelector);
 
       if (cards.length === 0) {
         break;
@@ -31,12 +42,18 @@ export const monsterDiscoveryAdapter: PortalDiscoveryAdapter = {
 
       const jobs: DiscoveredJobLite[] = [];
       for (const card of cards) {
-        const title = await card.$eval("[data-testid='job-title'], [class*='Title'], h2", (el) => el.textContent?.trim() ?? "").catch(() => "");
-        const href = await card.$eval("a", (el) => (el as HTMLAnchorElement).href).catch(() => "");
-        const company = await card.$eval("[data-testid='job-company'], [class*='Company']", (el) => el.textContent?.trim() ?? "").catch(() => "");
-        const loc = await card.$eval("[data-testid='job-location'], [class*='Location']", (el) => el.textContent?.trim() ?? "").catch(() => "");
-        const salary = await card.$eval("[data-testid='job-salary'], [class*='Salary']", (el) => el.textContent?.trim() ?? null).catch(() => null);
-        const age = await card.$eval("[data-testid='job-date'], [class*='Date']", (el) => el.textContent?.trim() ?? null).catch(() => null);
+        const title = await card.$eval(portalConfig.titleSelector, (el) => el.textContent?.trim() ?? "").catch(() => "");
+        const href = await card.$eval(jobLinkSelector, (el) => (el as HTMLAnchorElement).href).catch(() => "");
+        const company = portalConfig.companySelector
+          ? await card.$eval(portalConfig.companySelector, (el) => el.textContent?.trim() ?? "").catch(() => "")
+          : "";
+        const loc = await card.$eval(portalConfig.locationSelector, (el) => el.textContent?.trim() ?? "").catch(() => "");
+        const salary = portalConfig.salarySelector
+          ? await card.$eval(portalConfig.salarySelector, (el) => el.textContent?.trim() ?? null).catch(() => null)
+          : null;
+        const age = portalConfig.dateSelector
+          ? await card.$eval(portalConfig.dateSelector, (el) => el.textContent?.trim() ?? null).catch(() => null)
+          : null;
 
         if (!href || !title) continue;
 

@@ -6,12 +6,20 @@ export const googleJobsDiscoveryAdapter: PortalDiscoveryAdapter = {
   source: "google-jobs",
 
   async discover(context: DiscoveryContext): Promise<void> {
-    const { page, keyword, location, settings, checkpoint, onPageProcessed } = context;
+    const { page, keyword, location, settings, checkpoint, onPageProcessed, portalConfig } = context;
+    if (!portalConfig) {
+      throw new Error(
+        `google-jobs adapter requires a portalConfig (config/portals.yml entry with id "google-jobs") in the discovery context`,
+      );
+    }
     const startPage = checkpoint.lastPage + 1;
     const pace = pacer(settings.delayBetweenRequestsMs);
 
-    // Google Jobs is typically accessed via Google search with "ibp=htl;jobs"
-    const url = `https://www.google.com/search?q=${encodeURIComponent(keyword + " jobs " + location)}&ibp=htl;jobs`;
+    // Google Jobs is typically accessed via Google search with "ibp=htl;jobs" -- that query
+    // param is Google-Jobs-specific URL-building logic, not a portal-identity selector, so
+    // it stays hardcoded here (same as the "start" pagination param in indeed.ts).
+    const keywordParam = portalConfig.keywordParam ?? "q";
+    const url = `${portalConfig.baseUrl}?${keywordParam}=${encodeURIComponent(keyword + " jobs " + location)}&ibp=htl;jobs`;
 
     await pace(url);
     await withRetry(
@@ -29,20 +37,25 @@ export const googleJobsDiscoveryAdapter: PortalDiscoveryAdapter = {
       await page.waitForLoadState("networkidle").catch(() => undefined);
       await pauseForVerification(page);
 
-      // Selectors for Google Jobs
-      // Typical card selector: li, div[role='treeitem'], or .i3PoEe
-      const cards = await page.$$("li[data-job-id], [role='treeitem'], .i3PoEe, [class*='JobCard']");
+      // Selectors for Google Jobs (from config/portals.yml's "google-jobs" entry)
+      const cards = await page.$$(portalConfig.resultCardSelector);
       if (cards.length === 0 || cards.length === previousCount) {
         break;
       }
 
       const jobs: DiscoveredJobLite[] = [];
       for (const card of cards) {
-        const title = await card.$eval("[role='heading'], [class*='Title'], h2, h3", (el) => el.textContent?.trim() ?? "").catch(() => "");
-        const company = await card.$eval(".t7YFBb, .wTabPo, [class*='Company'], [class*='company']", (el) => el.textContent?.trim() ?? "").catch(() => "");
-        const loc = await card.$eval(".SuWscb, .Qk3OTc, [class*='Location'], [class*='location']", (el) => el.textContent?.trim() ?? "").catch(() => "");
-        const salary = await card.$eval("[class*='Salary'], [class*='salary']", (el) => el.textContent?.trim() ?? null).catch(() => null);
-        const age = await card.$eval("[class*='Date'], [class*='date'], span:has-text('ago')", (el) => el.textContent?.trim() ?? null).catch(() => null);
+        const title = await card.$eval(portalConfig.titleSelector, (el) => el.textContent?.trim() ?? "").catch(() => "");
+        const company = portalConfig.companySelector
+          ? await card.$eval(portalConfig.companySelector, (el) => el.textContent?.trim() ?? "").catch(() => "")
+          : "";
+        const loc = await card.$eval(portalConfig.locationSelector, (el) => el.textContent?.trim() ?? "").catch(() => "");
+        const salary = portalConfig.salarySelector
+          ? await card.$eval(portalConfig.salarySelector, (el) => el.textContent?.trim() ?? null).catch(() => null)
+          : null;
+        const age = portalConfig.dateSelector
+          ? await card.$eval(portalConfig.dateSelector, (el) => el.textContent?.trim() ?? null).catch(() => null)
+          : null;
 
         // For Google Jobs, the "Apply on..." links inside the details view contain the redirect URL.
         // We can use the card's data attribute or fallback.
@@ -51,7 +64,7 @@ export const googleJobsDiscoveryAdapter: PortalDiscoveryAdapter = {
                       `${title}::${company}`;
 
         // Construct a pseudo resultUrl using jobId or fallback Google search URL.
-        const resultUrl = `https://www.google.com/search?q=${encodeURIComponent(title + " " + company)}&ibp=htl;jobs#fpstate=tldetail&htidocid=${encodeURIComponent(jobId)}`;
+        const resultUrl = `${portalConfig.baseUrl}?${keywordParam}=${encodeURIComponent(title + " " + company)}&ibp=htl;jobs#fpstate=tldetail&htidocid=${encodeURIComponent(jobId)}`;
 
         if (!title) continue;
 

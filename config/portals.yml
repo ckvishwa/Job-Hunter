@@ -1,12 +1,11 @@
 # Job-search portals config. type must be one of: google-jobs, indeed, monster, linkedin-public, generic
-# Not yet read by any adapter (see note below) -- nothing here is "visited" by its mere presence.
 #
-# Selector/URL values below for the 4 named portals mirror what is currently
-# HARDCODED in the matching src/discovery/adapters/*.ts file (extracted, not
-# invented). They are not yet consumed by those adapters (that wiring is a
-# later task) — this file exists so that config, once wired, replaces the
-# hardcoded literals with the same values. All entries are enabled: false;
-# this file's presence does not make anything run automatically.
+# Loaded by the orchestrator (src/discovery/orchestrator.ts) and read by each matching
+# adapter in src/discovery/adapters/*.ts (selectors/URL param names come from here, not
+# hardcoded literals). Only entries with enabled: true are ever attempted by a bare
+# `npm run discover` -- every entry below ships enabled: false, so this file's presence does
+# not make anything run automatically. Flip an entry to enabled: true (or pass
+# --source <id>) to opt in.
 
 settings:
   maxPagesPerSource: 100

@@ -6,13 +6,26 @@ export const indeedDiscoveryAdapter: PortalDiscoveryAdapter = {
   source: "indeed",
 
   async discover(context: DiscoveryContext): Promise<void> {
-    const { page, keyword, location, settings, checkpoint, onPageProcessed } = context;
+    const { page, keyword, location, settings, checkpoint, onPageProcessed, portalConfig } = context;
+    if (!portalConfig) {
+      throw new Error(
+        `indeed adapter requires a portalConfig (config/portals.yml entry with id "indeed") in the discovery context`,
+      );
+    }
+    if (!portalConfig.jobLinkSelector) {
+      throw new Error(`Portal "${portalConfig.id}" (indeed) is missing required "jobLinkSelector"`);
+    }
+    const jobLinkSelector = portalConfig.jobLinkSelector;
     const startPage = checkpoint.lastPage + 1;
     const pace = pacer(settings.delayBetweenRequestsMs);
+    const keywordParam = portalConfig.keywordParam ?? "q";
+    const locationParam = portalConfig.locationParam ?? "l";
 
     for (let pageNum = startPage; pageNum <= settings.maxPagesPerSource; pageNum++) {
+      // "start" is Indeed's pagination-offset param, not a portal-identity selector -- kept
+      // hardcoded per adapter (pagination logic, not config).
       const startParam = (pageNum - 1) * 10;
-      const url = `https://www.indeed.com/jobs?q=${encodeURIComponent(keyword)}&l=${encodeURIComponent(location)}&start=${startParam}`;
+      const url = `${portalConfig.baseUrl}?${keywordParam}=${encodeURIComponent(keyword)}&${locationParam}=${encodeURIComponent(location)}&start=${startParam}`;
 
       await pace(url);
       await withRetry(
@@ -21,9 +34,8 @@ export const indeedDiscoveryAdapter: PortalDiscoveryAdapter = {
       );
       await pauseForVerification(page);
 
-      // Selectors for Indeed
-      const cardSelector = ".job_seen_beacon";
-      const cards = await page.$$(cardSelector);
+      // Selectors for Indeed (from config/portals.yml's "indeed" entry)
+      const cards = await page.$$(portalConfig.resultCardSelector);
 
       if (cards.length === 0) {
         // No results on this page, or we've reached the end
@@ -32,12 +44,18 @@ export const indeedDiscoveryAdapter: PortalDiscoveryAdapter = {
 
       const jobs: DiscoveredJobLite[] = [];
       for (const card of cards) {
-        const title = await card.$eval("span[id^='jobTitle']", (el) => el.textContent?.trim() ?? "").catch(() => "");
-        const href = await card.$eval("a.jcs-JobTitle", (el) => (el as HTMLAnchorElement).href).catch(() => "");
-        const company = await card.$eval("[data-testid='company-name']", (el) => el.textContent?.trim() ?? "").catch(() => "");
-        const loc = await card.$eval("[data-testid='text-location']", (el) => el.textContent?.trim() ?? "").catch(() => "");
-        const salary = await card.$eval(".salary-snippet-container, .estimated-salary-container", (el) => el.textContent?.trim() ?? null).catch(() => null);
-        const age = await card.$eval("span.date", (el) => el.textContent?.trim() ?? null).catch(() => null);
+        const title = await card.$eval(portalConfig.titleSelector, (el) => el.textContent?.trim() ?? "").catch(() => "");
+        const href = await card.$eval(jobLinkSelector, (el) => (el as HTMLAnchorElement).href).catch(() => "");
+        const company = portalConfig.companySelector
+          ? await card.$eval(portalConfig.companySelector, (el) => el.textContent?.trim() ?? "").catch(() => "")
+          : "";
+        const loc = await card.$eval(portalConfig.locationSelector, (el) => el.textContent?.trim() ?? "").catch(() => "");
+        const salary = portalConfig.salarySelector
+          ? await card.$eval(portalConfig.salarySelector, (el) => el.textContent?.trim() ?? null).catch(() => null)
+          : null;
+        const age = portalConfig.dateSelector
+          ? await card.$eval(portalConfig.dateSelector, (el) => el.textContent?.trim() ?? null).catch(() => null)
+          : null;
 
         if (!href || !title) continue;
 

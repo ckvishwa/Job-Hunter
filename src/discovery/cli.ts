@@ -57,6 +57,7 @@ async function main(): Promise<void> {
     {
       sitesConfigPath: path.resolve("config/sites.yml"),
       rolesConfigPath: path.resolve("config/roles.yml"),
+      portalsConfigPath: path.resolve("config/portals.yml"),
       discoveredJobsPath: path.resolve("data/discovered-jobs.jsonl"),
       jobsStorePath: path.resolve("data/jobs.jsonl"),
       checkpointsPath: path.resolve("data/checkpoints.json"),
