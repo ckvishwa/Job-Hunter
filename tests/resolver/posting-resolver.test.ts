@@ -138,10 +138,15 @@ describe("PostingResolver", () => {
       matchedProfiles: ["sdet"],
     };
 
-    // No redirect: fetch echoes back the same URL.
+    // No redirect: fetch echoes back the same URL. Includes .text() (the real Workday
+    // adapter's fetchJobDetails calls res.text(), not res.json() -- a mock missing it would
+    // make the buggy ATS path throw and fall through to the same fallback the fix takes,
+    // silently passing either way. The real discriminator below is the fetch call log, not
+    // the resolved output.)
     (fetch as any).mockImplementation(async (url: string) => ({
       url,
       ok: true,
+      text: async () => "{}",
       json: async () => ({}),
     }));
 
@@ -161,8 +166,23 @@ describe("PostingResolver", () => {
     const resolver = new PostingResolver();
     const resolved = await resolver.resolve(job, mockContext as any);
 
-    // Never silently dropped, and never fabricated a "careers" Workday site guess.
+    // The real discriminator: the fixed code must never even ATTEMPT a Workday API call
+    // built from a fabricated "careers" site segment. workday.ts's fetchJobDetails builds
+    // urls like https://{hostname}/wday/cxs/{tenant}/{site}/job/{id} -- the fabricated-site
+    // bug would call fetch() with such a url (and only fail later, on a missing/mismatched
+    // .text() body), so inspecting the actual fetch call log catches the bug regardless of
+    // what the mocked response shape lets the ATS path do afterward. This assertion FAILS
+    // against the pre-fix code (confirmed by temporarily reverting posting-resolver.ts to
+    // its pre-Task-10 version and rerunning this file: fetch was called with a
+    // ".../careers/job/..." url) and PASSES against the fix (that fetch call never happens
+    // at all -- the ATS block is skipped entirely).
+    const fetchedUrls = (fetch as any).mock.calls.map((call: unknown[]) => call[0] as string);
+    expect(fetchedUrls.some((u: string) => u.includes("wday/cxs") && u.includes("careers"))).toBe(false);
+
+    // Never silently dropped, and the generic Playwright fallback (mockPage/mockContext)
+    // genuinely ran to produce the result.
     expect(resolved).not.toBeNull();
+    expect(mockPage.evaluate).toHaveBeenCalled();
     expect(resolved!.descriptionText).toContain("Generic scrape fallback description");
     expect(resolved!.canonicalUrl).not.toContain("careers");
     expect(JSON.stringify(resolved!.rawMetadata)).not.toContain("careers");
