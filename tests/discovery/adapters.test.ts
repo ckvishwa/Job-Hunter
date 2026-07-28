@@ -286,6 +286,44 @@ describe("Indeed Discovery Adapter", () => {
     expect(processed[0]!.company).toBe("Custom Co");
   });
 
+  it("stops pagination when a page returns no NEW job ids (repeated-page detection), not because cards were empty", async () => {
+    // Same card/jobId returned on every page.$$ call -- page 2 finds nothing NEW (it's the
+    // same job as page 1), which must stop the loop via the "no new ids" check, distinct from
+    // the "cards.length === 0" check exercised by the empty-cards tests elsewhere. maxPages is
+    // set well above 2 so that if the repeated-id break didn't fire, the loop would keep going
+    // (proving the break -- not the page-limit -- is what stopped it).
+    const cards = [makeFakeCard({ title: "SDET", company: "Acme", href: "https://indeed.com/viewjob?jk=999", jobId: "999" })];
+    const page = makeFakePage(cards);
+
+    const checkpoint: DiscoveryCheckpoint = {
+      key: "indeed::sdet::us",
+      source: "indeed",
+      keyword: "sdet",
+      location: "us",
+      lastPage: 0,
+      completed: false,
+      lastUpdated: "",
+      sourceJobIds: [],
+    };
+
+    const context: DiscoveryContext = {
+      page: page as any,
+      keyword: "sdet",
+      location: "us",
+      settings: { ...settings, maxPagesPerSource: 5 },
+      checkpoint,
+      onPageProcessed: async () => undefined,
+      profileIds: ["sdet"],
+      portalConfig: indeedPortalConfig,
+    };
+
+    await indeedDiscoveryAdapter.discover(context);
+
+    expect(page.goto).toHaveBeenCalledTimes(2);
+    expect(page.$$).toHaveBeenCalledTimes(2);
+    expect(checkpoint.sourceJobIds).toEqual(["999"]);
+  });
+
   it("calls context.onVerificationPause when pauseForVerification genuinely detects a challenge (Task 15)", async () => {
     const cards = [makeFakeCard({ title: "SDET", company: "Acme", href: "https://indeed.com/viewjob?jk=456", jobId: "456" })];
     // Same reCAPTCHA marker used by tests/verification.test.ts's detectVerification coverage
