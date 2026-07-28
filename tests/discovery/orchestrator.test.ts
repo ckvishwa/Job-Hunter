@@ -3,7 +3,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { BrowserContext, Page } from "playwright";
-import type { DiscoveryContext, PortalDiscoveryAdapter } from "../../src/discovery/types.js";
+import type { DiscoveredJobLite, DiscoveryContext, PortalDiscoveryAdapter } from "../../src/discovery/types.js";
+import { loadDiscoveredJobs } from "../../src/storage/jsonl-store.js";
 
 // Task 12 scope only: verify keyword/profile orchestration wiring against the real
 // config/roles.yml (+ real, all-disabled config/sites.yml and config/portals.yml, which
@@ -21,6 +22,24 @@ vi.mock("../../src/discovery/registry.js", () => ({
     discover: discoverMock,
   }),
 }));
+
+// Any test that pushes a job through onPageProcessed (Task 13's incremental-persistence
+// test) causes runDiscover's Phase 2 to call PostingResolver.resolve() on it for real --
+// that must never make a genuine network call. Stubbed globally (harmless/unused for tests
+// that never discover a job): resolves to a DIFFERENT .invalid url than the request, which
+// makes resolveRedirectsWithPlaywright return via its fast fetch-only path without ever
+// touching the fake Playwright context/page, and makes detectAtsType/matchCompany both miss
+// (an .invalid url matches no ATS pattern), so resolution completes via the placeholder
+// fallback -- fast, deterministic, zero real I/O, zero real retry/backoff delay.
+vi.stubGlobal(
+  "fetch",
+  vi.fn().mockResolvedValue({
+    url: "https://example.invalid/resolved-elsewhere",
+    ok: true,
+    text: async () => "{}",
+    json: async () => ({}),
+  }),
+);
 
 // Imported after the mock above so the orchestrator picks up the mocked registry.
 const { runDiscover } = await import("../../src/discovery/orchestrator.js");
@@ -223,5 +242,93 @@ describe("orchestrator --company filter must not prematurely mark company-career
     discoverMock.mockReset();
     await runDiscover(paths, {}, fakeLaunchFn);
     expect(discoverMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("orchestrator browser context lifecycle (Task 13)", () => {
+  beforeEach(() => {
+    discoverMock.mockReset();
+    discoverMock.mockResolvedValue(undefined);
+  });
+
+  it("launches the shared browser context once and closes it exactly once for a full run, not per-keyword", async () => {
+    const fakePage = { close: vi.fn(async () => {}) } as unknown as Page;
+    const fakeContext = {
+      newPage: vi.fn(async () => fakePage),
+      close: vi.fn(async () => {}),
+    } as unknown as BrowserContext;
+    const launchFn = vi.fn(async () => fakeContext);
+
+    await runDiscover(makePaths(), {}, launchFn);
+
+    // Real config collapses to 1 source x 16 keywords (see the Task 12 comment above), so
+    // 16 discover() calls all share the one lazily-launched context.
+    expect(discoverMock).toHaveBeenCalledTimes(16);
+    expect(launchFn).toHaveBeenCalledTimes(1);
+    expect(fakeContext.close).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("orchestrator incremental checkpoint/discovery persistence (Task 13)", () => {
+  beforeEach(() => {
+    discoverMock.mockReset();
+  });
+
+  it("persists a job and checkpoint progress reported via onPageProcessed before the adapter's own later throw, proving writes happen inside the callback, not batched at the end", async () => {
+    const crashingJob: DiscoveredJobLite = {
+      source: "company-careers",
+      searchKeyword: "SDET",
+      title: "Crash Test Job",
+      company: "Acme",
+      location: "United States",
+      salarySnippet: null,
+      resultUrl: "https://example.invalid/job/1",
+      possibleOfficialUrl: null,
+      postingAgeOrDate: null,
+      sourceJobId: "crash-job-1",
+      discoveredAt: new Date().toISOString(),
+      matchedProfiles: [],
+    };
+
+    // Only the FIRST discover() call reports progress then crashes; every other keyword
+    // call (of the 16 the real config drives) resolves cleanly and does nothing, keeping
+    // this test focused on the one crashing call.
+    discoverMock.mockImplementationOnce(async (context: DiscoveryContext) => {
+      await context.onPageProcessed([crashingJob], 3);
+      throw new Error("adapter crashed after reporting progress");
+    });
+    discoverMock.mockResolvedValue(undefined);
+
+    const paths = makePaths();
+    // Real config/sites.yml's settings.delayBetweenRequestsMs (500) applies as a genuine
+    // setTimeout-based inter-request throttle in Phase 2 after the one resolved job -- fake
+    // timers so this test doesn't burn 500ms of real wall-clock time on it.
+    vi.useFakeTimers();
+    const summaryPromise = runDiscover(paths, {}, fakeLaunchFn);
+    await vi.advanceTimersByTimeAsync(600);
+    const summary = await summaryPromise;
+    vi.useRealTimers();
+
+    // The orchestrator's own per-keyword try/catch absorbs the adapter's throw -- runDiscover
+    // itself must not throw, and the failure shows up as a recorded error, not a crash.
+    expect(summary.errors).toHaveLength(1);
+    expect(summary.errors[0]!.message).toContain("adapter crashed after reporting progress");
+
+    // The job reported via onPageProcessed before the throw must be on disk already --
+    // read straight from discoveredJobsPath, not from the summary/return value.
+    const discovered = loadDiscoveredJobs(paths.discoveredJobsPath);
+    expect(discovered.some((j) => j.sourceJobId === "crash-job-1")).toBe(true);
+
+    // The checkpoint for that specific keyword must reflect the lastPage/lastUpdated
+    // progress saved inside the callback -- and must NOT be marked completed, since the
+    // adapter never returned successfully from discover() for it.
+    const checkpoints = JSON.parse(readFileSync(paths.checkpointsPath, "utf-8")) as Record<
+      string,
+      { lastPage: number; completed: boolean; lastUpdated: string }
+    >;
+    const crashedCheckpoint = Object.values(checkpoints).find((c) => c.lastPage === 3);
+    expect(crashedCheckpoint).toBeDefined();
+    expect(crashedCheckpoint!.completed).toBe(false);
+    expect(typeof crashedCheckpoint!.lastUpdated).toBe("string");
   });
 });
