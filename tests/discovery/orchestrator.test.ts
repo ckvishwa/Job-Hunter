@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { BrowserContext, Page } from "playwright";
 import type { DiscoveredJobLite, DiscoveryContext, PortalDiscoveryAdapter } from "../../src/discovery/types.js";
 import { loadDiscoveredJobs } from "../../src/storage/jsonl-store.js";
@@ -274,6 +274,13 @@ describe("orchestrator incremental checkpoint/discovery persistence (Task 13)", 
     discoverMock.mockReset();
   });
 
+  // beforeEach/afterEach (not an inline vi.useFakeTimers()/useRealTimers() pair inside the
+  // test body) so real timers are guaranteed restored even if an assertion throws before
+  // reaching an inline cleanup call, and regardless of test execution order within this file.
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("persists a job and checkpoint progress reported via onPageProcessed before the adapter's own later throw, proving writes happen inside the callback, not batched at the end", async () => {
     const crashingJob: DiscoveredJobLite = {
       source: "company-careers",
@@ -307,7 +314,6 @@ describe("orchestrator incremental checkpoint/discovery persistence (Task 13)", 
     const summaryPromise = runDiscover(paths, {}, fakeLaunchFn);
     await vi.advanceTimersByTimeAsync(600);
     const summary = await summaryPromise;
-    vi.useRealTimers();
 
     // The orchestrator's own per-keyword try/catch absorbs the adapter's throw -- runDiscover
     // itself must not throw, and the failure shows up as a recorded error, not a crash.
