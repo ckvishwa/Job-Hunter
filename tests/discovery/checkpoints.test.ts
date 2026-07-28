@@ -7,7 +7,9 @@ import {
   saveCheckpoints,
   getOrCreateCheckpoint,
   buildCheckpointKey,
+  resetCheckpoints,
 } from "../../src/discovery/checkpoints.js";
+import type { DiscoveryCheckpoint } from "../../src/discovery/types.js";
 
 function tempFile(name: string, contents: string): string {
   const dir = mkdtempSync(path.join(tmpdir(), "job-hunter-test-checkpoint-"));
@@ -72,5 +74,56 @@ describe("Checkpoints Manager", () => {
     expect(cp.location).toBe("US");
     expect(cp.lastPage).toBe(0);
     expect(cp.completed).toBe(false);
+  });
+
+  describe("resetCheckpoints", () => {
+    function makeCheckpoints(): Record<string, DiscoveryCheckpoint> {
+      const base = {
+        lastPage: 0,
+        completed: true,
+        lastUpdated: "2026-01-01",
+        sourceJobIds: [],
+      };
+      return {
+        "indeed::sdet::us": { key: "indeed::sdet::us", source: "indeed", keyword: "sdet", location: "us", ...base },
+        "company-careers::sdet::us": {
+          key: "company-careers::sdet::us",
+          source: "company-careers",
+          keyword: "sdet",
+          location: "us",
+          ...base,
+        },
+        "company-careers::qa::us": {
+          key: "company-careers::qa::us",
+          source: "company-careers",
+          keyword: "qa",
+          location: "us",
+          ...base,
+        },
+      };
+    }
+
+    it("clears everything when no source is given", () => {
+      const result = resetCheckpoints(makeCheckpoints());
+      expect(result).toEqual({});
+    });
+
+    it("clears only keys matching the given source, leaving others untouched", () => {
+      const original = makeCheckpoints();
+      const result = resetCheckpoints(original, "company-careers");
+      expect(Object.keys(result)).toEqual(["indeed::sdet::us"]);
+      // Does not mutate the input.
+      expect(Object.keys(original)).toHaveLength(3);
+    });
+
+    it("is case-insensitive on the source prefix", () => {
+      const result = resetCheckpoints(makeCheckpoints(), "Company-Careers");
+      expect(Object.keys(result)).toEqual(["indeed::sdet::us"]);
+    });
+
+    it("returns an empty object unchanged when the source matches nothing", () => {
+      const result = resetCheckpoints(makeCheckpoints(), "monster");
+      expect(Object.keys(result).sort()).toEqual(["company-careers::qa::us", "company-careers::sdet::us", "indeed::sdet::us"]);
+    });
   });
 });

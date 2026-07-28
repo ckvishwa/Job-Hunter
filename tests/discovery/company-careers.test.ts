@@ -78,7 +78,11 @@ function makeCheckpoint(): DiscoveryCheckpoint {
   };
 }
 
-function makeContext(checkpoint: DiscoveryCheckpoint, onPageProcessed: (jobs: DiscoveredJobLite[], nextPageNum: number) => Promise<void>) {
+function makeContext(
+  checkpoint: DiscoveryCheckpoint,
+  onPageProcessed: (jobs: DiscoveredJobLite[], nextPageNum: number) => Promise<void>,
+  companyFilter?: string,
+) {
   return {
     page: { context: () => ({}) } as unknown as import("playwright").Page,
     keyword: "sdet",
@@ -87,6 +91,7 @@ function makeContext(checkpoint: DiscoveryCheckpoint, onPageProcessed: (jobs: Di
     checkpoint,
     onPageProcessed,
     profileIds: ["sdet-qa"],
+    companyFilter,
   };
 }
 
@@ -304,5 +309,73 @@ describe("companyCareersDiscoveryAdapter real-data extraction and structural ski
     const [jobs] = onPageProcessed.mock.calls[0] as [DiscoveredJobLite[], number];
     expect(jobs).toEqual([]);
     expect(checkpoint.completedCompanyKeys).toEqual(["companyg::companyg.com"]);
+  });
+});
+
+describe("companyCareersDiscoveryAdapter --company filter", () => {
+  beforeEach(() => {
+    discoverJobsA.mockReset();
+    discoverJobsB.mockReset();
+    resolveAdapterMock.mockReset();
+    loadCompanyRegistryMock.mockReset();
+    loadCompanyRegistryMock.mockReturnValue(makeRegistry());
+
+    resolveAdapterMock.mockImplementation((site: { name: string }) => {
+      if (site.name === "CompanyA") {
+        return fakeAdapter(discoverJobsA);
+      }
+      return fakeAdapter(discoverJobsB);
+    });
+  });
+
+  it("only attempts the matching company, case-insensitively, and doesn't throw for the filtered-out one", async () => {
+    discoverJobsA.mockResolvedValue([
+      { externalId: "a1", title: "SDET", url: "https://companya.com/jobs/a1", matchedProfiles: ["sdet-qa"] },
+    ]);
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async () => {});
+
+    await expect(
+      companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed, "companya")),
+    ).resolves.toBeUndefined();
+
+    // Only CompanyA was attempted; CompanyB was filtered out, never called.
+    expect(discoverJobsA).toHaveBeenCalledTimes(1);
+    expect(discoverJobsB).not.toHaveBeenCalled();
+    // Only the matching company is marked completed -- the filtered-out one is not attempted,
+    // not counted as ready/skipped, and doesn't trigger the "not completed" throw.
+    expect(checkpoint.completedCompanyKeys).toEqual(["companya::companya.com"]);
+  });
+
+  it("processes the previously filtered-out company on a later run with a different --company", async () => {
+    discoverJobsA.mockResolvedValue([
+      { externalId: "a1", title: "SDET", url: "https://companya.com/jobs/a1", matchedProfiles: ["sdet-qa"] },
+    ]);
+    discoverJobsB.mockResolvedValue([
+      { externalId: "b1", title: "SDET", url: "https://companyb.com/jobs/b1", matchedProfiles: ["sdet-qa"] },
+    ]);
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async () => {});
+
+    // Run 1: filter to CompanyA only.
+    await expect(
+      companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed, "CompanyA")),
+    ).resolves.toBeUndefined();
+    expect(checkpoint.completedCompanyKeys).toEqual(["companya::companya.com"]);
+
+    // Run 2 ("--resume"): filter to CompanyB. CompanyA stays completed (not re-attempted);
+    // CompanyB, previously filtered out, is now attempted and completes.
+    await expect(
+      companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed, "CompanyB")),
+    ).resolves.toBeUndefined();
+
+    expect(discoverJobsA).toHaveBeenCalledTimes(1);
+    expect(discoverJobsB).toHaveBeenCalledTimes(1);
+    expect(checkpoint.completedCompanyKeys).toEqual(
+      expect.arrayContaining(["companya::companya.com", "companyb::companyb.com"]),
+    );
+    expect(checkpoint.completedCompanyKeys).toHaveLength(2);
   });
 });

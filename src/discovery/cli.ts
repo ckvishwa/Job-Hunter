@@ -14,6 +14,22 @@ export function parseDiscoverArgs(argv: string[]): DiscoverFilters {
       result.sources = (result.sources ?? []).concat(value.split(",").filter(Boolean));
     } else if (arg === "--location") {
       result.location = argv[++i];
+    } else if (arg === "--company") {
+      result.company = argv[++i];
+    } else if (arg === "--resume") {
+      // Checkpoints are always consulted/retried every run already -- this flag is accepted
+      // as an explicit-intent marker but doesn't change behavior (see DiscoverFilters).
+      result.resume = true;
+    } else if (arg === "--dry-run") {
+      result.dryRun = true;
+    } else if (arg === "--reset-checkpoint") {
+      const next = argv[i + 1];
+      if (next !== undefined && !next.startsWith("--")) {
+        result.resetCheckpoint = next;
+        i += 1;
+      } else {
+        result.resetCheckpoint = true;
+      }
     } else if (arg === "--limit") {
       const value = argv[++i];
       const parsed = Number(value);

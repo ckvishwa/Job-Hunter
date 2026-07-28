@@ -24,6 +24,27 @@ export function saveCheckpoints(filePath: string, checkpoints: Record<string, Di
   }
 }
 
+/**
+ * Returns a new checkpoints object with matching entries removed (does not mutate the input).
+ * No `source` -> clears everything. A `source` -> clears only keys starting with
+ * "<source>::" (the same "source::keyword::location" format buildCheckpointKey produces),
+ * leaving other sources' checkpoints untouched.
+ */
+export function resetCheckpoints(
+  checkpoints: Record<string, DiscoveryCheckpoint>,
+  source?: string,
+): Record<string, DiscoveryCheckpoint> {
+  if (!source) return {};
+  const prefix = `${source.toLowerCase()}::`;
+  const result: Record<string, DiscoveryCheckpoint> = {};
+  for (const [key, checkpoint] of Object.entries(checkpoints)) {
+    if (!key.startsWith(prefix)) {
+      result[key] = checkpoint;
+    }
+  }
+  return result;
+}
+
 export function buildCheckpointKey(source: string, keyword: string, location: string): string {
   return `${source.toLowerCase()}::${keyword.toLowerCase()}::${location.toLowerCase()}`;
 }

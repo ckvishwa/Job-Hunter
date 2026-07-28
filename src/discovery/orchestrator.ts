@@ -1,7 +1,7 @@
 import type { BrowserContext } from "playwright";
 import { launchPersistentChrome } from "../browser/launcher.js";
 import { loadCollectSettings, loadPortalsConfig, loadRolesConfig, loadSitesConfig } from "../config/loader.js";
-import { getOrCreateCheckpoint, loadCheckpoints, saveCheckpoints } from "./checkpoints.js";
+import { getOrCreateCheckpoint, loadCheckpoints, resetCheckpoints, saveCheckpoints } from "./checkpoints.js";
 import { resolveDiscoveryAdapter } from "./registry.js";
 import { appendDiscoveredJobs, loadJobs, saveJobs } from "../storage/jsonl-store.js";
 import { mergeJobs } from "../dedup/deduplicator.js";
@@ -17,6 +17,15 @@ export interface DiscoverFilters {
   sources?: string[];
   location?: string;
   limit?: number;
+  company?: string;
+  // Checkpoints are always consulted/retried on every run already (no non-resuming mode
+  // exists) -- this flag is accepted for explicit-intent CLI callers but doesn't change
+  // orchestrator behavior.
+  resume?: boolean;
+  // true = clear all checkpoints; string = clear only that source's checkpoints. Applied
+  // before the run starts (see below).
+  resetCheckpoint?: string | true;
+  dryRun?: boolean;
 }
 
 export interface DiscoverSummary {
@@ -107,6 +116,16 @@ export async function runDiscover(
     errors: [],
   };
 
+  if (filters.dryRun) {
+    summary.sourcesAttempted = targetSources.length;
+    const totalIterations = targetSources.length * enabledRoles.reduce((n, role) => n + role.keywords.length, 0);
+    console.log(
+      `[orchestrator] Dry run: would attempt ${targetSources.length} source(s) x ${enabledRoles.length} role(s) ` +
+        `(${totalIterations} source/keyword iteration(s) total). No browser launched, no data written.`,
+    );
+    return summary;
+  }
+
   // Launch Playwright Chrome context
   let context: BrowserContext | undefined;
   async function ensureContext(): Promise<BrowserContext> {
@@ -116,7 +135,15 @@ export async function runDiscover(
     return context;
   }
 
-  const checkpoints = loadCheckpoints(paths.checkpointsPath);
+  let checkpoints = loadCheckpoints(paths.checkpointsPath);
+  if (filters.resetCheckpoint) {
+    checkpoints = resetCheckpoints(
+      checkpoints,
+      filters.resetCheckpoint === true ? undefined : filters.resetCheckpoint,
+    );
+    // Save immediately so a crash mid-run doesn't lose the reset.
+    saveCheckpoints(paths.checkpointsPath, checkpoints);
+  }
   const newlyDiscovered: DiscoveredJobLite[] = [];
 
   try {
@@ -184,12 +211,30 @@ export async function runDiscover(
               siteConfig,
               portalConfig,
               profileIds: [role.profile],
+              companyFilter: filters.company,
             };
 
             await adapter.discover(discoveryCtx);
 
-            // Mark completed
-            checkpoint.completed = true;
+            // Mark completed -- except for company-careers under an active --company filter:
+            // a filtered run only ever attempts a subset of the registry, and company-careers
+            // itself deliberately does not throw for companies it merely skipped (not
+            // attempted, not failed). Marking the whole checkpoint completed here regardless
+            // would make the orchestrator's own completed-checkpoint gate (above) skip
+            // company-careers on every future run -- filtered or not -- permanently stranding
+            // every company that was never targeted by this run's filter. Every other source
+            // is unaffected by filters.company (only company-careers reads it at all).
+            // Mark completed -- except for company-careers under an active --company filter:
+            // a filtered run only ever attempts a subset of the registry, and company-careers
+            // itself deliberately does not throw for companies it merely skipped (not
+            // attempted, not failed). Marking the whole checkpoint completed here regardless
+            // would make the orchestrator's own completed-checkpoint gate (above) skip
+            // company-careers on every future run -- filtered or not -- permanently stranding
+            // every company that was never targeted by this run's filter. Every other source
+            // is unaffected by filters.company (only company-careers reads it at all).
+            if (!(source === "company-careers" && filters.company)) {
+              checkpoint.completed = true;
+            }
             saveCheckpoints(paths.checkpointsPath, checkpoints);
 
           } catch (err) {

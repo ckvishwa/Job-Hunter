@@ -48,6 +48,8 @@ export interface DiscoveryContext {
   portalConfig?: PortalConfig;
   profileIds: string[];
   onVerificationPause?: () => void;
+  // --company filter (CLI). Only meaningful to company-careers.ts; other adapters ignore it.
+  companyFilter?: string;
 }
 
 export interface PortalDiscoveryAdapter {

@@ -121,3 +121,83 @@ describe("orchestrator keyword/profile wiring (Task 12)", () => {
     }
   });
 });
+
+describe("orchestrator --dry-run (Task 14)", () => {
+  beforeEach(() => {
+    discoverMock.mockReset();
+  });
+
+  it("never launches the browser or calls any adapter, but still reports sourcesAttempted", async () => {
+    const launchFn = vi.fn(fakeLaunchFn);
+
+    const summary = await runDiscover(makePaths(), { dryRun: true }, launchFn);
+
+    expect(launchFn).not.toHaveBeenCalled();
+    expect(discoverMock).not.toHaveBeenCalled();
+    // Real, all-disabled config/sites.yml + config/portals.yml collapse targetSources down to
+    // just ["company-careers"] (see the Task 12 comment above) -- so a dry run should report
+    // exactly 1 source attempted, 0 of everything else since nothing actually ran.
+    expect(summary.sourcesAttempted).toBe(1);
+    expect(summary.sourcesSucceeded).toBe(0);
+    expect(summary.sourcesFailed).toBe(0);
+    expect(summary.listingsDiscovered).toBe(0);
+    expect(summary.jobsWritten).toBe(0);
+    expect(summary.errors).toEqual([]);
+  });
+
+  it("respects --profile filtering in the dry-run sourcesAttempted computation (still 1, since targetSources doesn't depend on profile)", async () => {
+    const launchFn = vi.fn(fakeLaunchFn);
+
+    const summary = await runDiscover(makePaths(), { dryRun: true, profileIds: ["sdet"] }, launchFn);
+
+    expect(launchFn).not.toHaveBeenCalled();
+    expect(summary.sourcesAttempted).toBe(1);
+  });
+});
+
+describe("orchestrator --company filter must not prematurely mark company-careers completed (Task 14)", () => {
+  beforeEach(() => {
+    discoverMock.mockReset();
+  });
+
+  // Regression coverage for a bug found during Task 14 review: company-careers.ts
+  // deliberately does NOT throw when a --company filter causes it to only attempt a subset
+  // of the registry (a narrow, legitimate success). But if the orchestrator unconditionally
+  // marked checkpoint.completed = true on any non-throwing discover() call, that success
+  // would permanently mark the WHOLE checkpoint (this source::keyword::location) done --
+  // and the orchestrator skips calling discover() again for any already-completed
+  // checkpoint, filtered or not -- silently stranding every company the filter excluded,
+  // forever, until a manual --reset-checkpoint. This only shows up at the orchestrator
+  // level: tests/discovery/company-careers.test.ts calls discover() directly and never
+  // exercises the orchestrator's own completed-checkpoint gate.
+  it("does not mark the checkpoint completed after a successful --company-filtered run, so a later unfiltered run still invokes discover() again", async () => {
+    discoverMock.mockResolvedValue(undefined); // simulates company-careers resolving cleanly under a --company filter
+
+    const paths = makePaths();
+    await runDiscover(paths, { company: "Google" }, fakeLaunchFn);
+
+    expect(discoverMock).toHaveBeenCalledTimes(16); // once per role/keyword, per Task 12
+
+    // A second, unfiltered run must still call discover() for every keyword again -- proving
+    // the checkpoint was NOT marked completed by the filtered run above.
+    discoverMock.mockReset();
+    discoverMock.mockResolvedValue(undefined);
+    await runDiscover(paths, {}, fakeLaunchFn);
+
+    expect(discoverMock).toHaveBeenCalledTimes(16);
+  });
+
+  it("still marks the checkpoint completed normally for a run with no --company filter", async () => {
+    discoverMock.mockResolvedValue(undefined);
+
+    const paths = makePaths();
+    await runDiscover(paths, {}, fakeLaunchFn);
+    expect(discoverMock).toHaveBeenCalledTimes(16);
+
+    // Second run, still no filter: every checkpoint should now be completed, so discover()
+    // must NOT be called again.
+    discoverMock.mockReset();
+    await runDiscover(paths, {}, fakeLaunchFn);
+    expect(discoverMock).not.toHaveBeenCalled();
+  });
+});

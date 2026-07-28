@@ -42,10 +42,21 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
     let readyCount = 0;
     const skipped: { company: string; atsType: string; reason: string; missingFields: string[] }[] = [];
 
+    // --company filter: companies that don't match are neither attempted nor marked
+    // completed, so a later run with a different (or no) --company can still process them.
+    // filteredOutCount tracks how many were excluded *this run* so the end-of-run
+    // completeness check below doesn't wrongly demand they be completed too.
+    let filteredOutCount = 0;
+
     for (let i = 0; i < companies.length; i++) {
       const company = companies[i]!;
       const companyKey = registryKey(company);
       if (completedKeys.includes(companyKey)) continue;
+
+      if (context.companyFilter && company.company.toLowerCase() !== context.companyFilter.toLowerCase()) {
+        filteredOutCount += 1;
+        continue;
+      }
 
       const companyName = company.company.toLowerCase();
       console.log(`[company-careers] Processing company: ${company.company} (${company.atsType})`);
@@ -158,7 +169,8 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
     }
 
     console.log(
-      `[company-careers] Registry coverage: ${readyCount} ready, ${skipped.length} skipped, ${companies.length} total. ` +
+      `[company-careers] Registry coverage: ${readyCount} ready, ${skipped.length} skipped, ` +
+        `${filteredOutCount} excluded by --company filter, ${companies.length} total. ` +
         (skipped.length > 0
           ? `Skipped: ${skipped.map((s) => `${s.company} (${s.reason})`).join("; ")}`
           : "No skips."),
@@ -173,9 +185,19 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
     // before calling discover()). Throwing here, after every company's real work and
     // checkpointing has already happened via onPageProcessed, keeps `checkpoint.completed`
     // false so a future run retries exactly the still-incomplete companies.
-    if (completedKeys.length < companies.length) {
+    // Companies filtered out by --company were never attempted this run -- they don't count
+    // toward "not completed" (only ATTEMPTED-and-failed companies should trigger a retry).
+    // A --company run that legitimately finished its narrower scope should not itself throw
+    // (that would misreport a clean success as a failure at the orchestrator level). The
+    // separate hazard this could otherwise cause -- the orchestrator marking the WHOLE
+    // checkpoint completed: true after a merely-narrow success, permanently skipping every
+    // other company forever -- is guarded at the orchestrator layer instead (it owns
+    // filters.company and only suppresses completion for company-careers specifically when a
+    // filter is active), not here.
+    const expectedCompleted = companies.length - filteredOutCount;
+    if (completedKeys.length < expectedCompleted) {
       throw new Error(
-        `[company-careers] ${companies.length - completedKeys.length} of ${companies.length} companies not completed this run (failures); will retry on next --resume.`,
+        `[company-careers] ${expectedCompleted - completedKeys.length} of ${expectedCompleted} companies not completed this run (failures); will retry on next --resume.`,
       );
     }
   },
