@@ -18,6 +18,7 @@ const {
   registerShutdownOnSignal,
   uniqueChromeProfileDir,
   ChromeProfileInUseError,
+  commandLineOwnsProfile,
 } = await import("../../src/browser/launcher.js");
 
 function makeFakeDeps(overrides: Partial<ChromeProcessDeps> = {}): ChromeProcessDeps {
@@ -41,6 +42,41 @@ function makeFakeContext(pages: Partial<Page>[] = []): BrowserContext {
 beforeEach(() => {
   launchPersistentContextMock.mockReset();
   launchPersistentContextMock.mockResolvedValue(makeFakeContext());
+});
+
+describe("commandLineOwnsProfile", () => {
+  const dir = "F:\\work\\.chrome-profile";
+
+  it("matches an unquoted --user-data-dir followed by a space (next arg)", () => {
+    expect(commandLineOwnsProfile(`chrome.exe --user-data-dir=${dir} --headless`, dir)).toBe(true);
+  });
+
+  it("matches an unquoted --user-data-dir at the very end of the command line", () => {
+    expect(commandLineOwnsProfile(`chrome.exe --user-data-dir=${dir}`, dir)).toBe(true);
+  });
+
+  it("matches a quoted --user-data-dir", () => {
+    expect(commandLineOwnsProfile(`chrome.exe --user-data-dir="${dir}" --headless`, dir)).toBe(true);
+  });
+
+  // Regression coverage: reproduced against real PowerShell -like semantics during review that
+  // a plain substring/wildcard match here would let uniqueChromeProfileDir's own
+  // "<dir>-run-<timestamp>" isolated profiles collide with a lookup for the shared "<dir>"
+  // profile -- which would force-kill an unrelated, live Chrome process under an isolated
+  // profile whenever the shared profile's ownership was being checked.
+  it("does NOT match a longer directory that merely starts with the same prefix (isolated-profile collision)", () => {
+    const isolatedDir = `${dir}-run-1785212977890-3uj1sz`;
+    expect(commandLineOwnsProfile(`chrome.exe --user-data-dir=${isolatedDir} --headless`, dir)).toBe(false);
+    expect(commandLineOwnsProfile(`chrome.exe --user-data-dir="${isolatedDir}"`, dir)).toBe(false);
+  });
+
+  it("does not match a completely unrelated directory", () => {
+    expect(commandLineOwnsProfile(`chrome.exe --user-data-dir=C:\\other\\profile`, dir)).toBe(false);
+  });
+
+  it("does not match when --user-data-dir is absent entirely", () => {
+    expect(commandLineOwnsProfile(`chrome.exe --headless --no-sandbox`, dir)).toBe(false);
+  });
 });
 
 describe("launchPersistentChrome", () => {

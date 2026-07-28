@@ -41,7 +41,7 @@ export interface ChromeProcessDeps {
 
 function execFileText(file: string, args: string[]): Promise<string> {
   return new Promise((resolve) => {
-    execFile(file, args, { windowsHide: true }, (err, stdout) => {
+    execFile(file, args, { windowsHide: true, maxBuffer: 8 * 1024 * 1024 }, (err, stdout) => {
       // Any failure (command missing, non-zero exit, no matches) is treated as "found
       // nothing" -- callers only use this to decide whether a live process exists, and a
       // failed lookup must never be mistaken for "confirmed empty."
@@ -50,25 +50,74 @@ function execFileText(file: string, args: string[]): Promise<string> {
   });
 }
 
-async function findOwningProcessIdsReal(absoluteUserDataDir: string): Promise<number[]> {
+/**
+ * Boundary-anchored check that `commandLine` genuinely launched Chrome against
+ * `absoluteUserDataDir` -- not merely a command line whose --user-data-dir value happens to
+ * start with that string. Exported and unit-tested directly (not just indirectly through a
+ * real subprocess) because a plain substring/wildcard match here is exactly what let
+ * uniqueChromeProfileDir's own "<dir>-run-<timestamp>" profiles collide with the shared
+ * "<dir>" profile in an earlier version of this file (confirmed by reproducing it against
+ * real PowerShell -like semantics during review) -- the isolated-profile feature would have
+ * force-killed an unrelated, live Chrome process. The match requires the directory value to
+ * be followed by a double-quote, a space, or the end of the command line -- never another
+ * path character.
+ */
+export function commandLineOwnsProfile(commandLine: string, absoluteUserDataDir: string): boolean {
+  // Real Chrome quotes BOTH sides of the value when quoting at all:
+  // --user-data-dir="<dir>" -- not just a trailing quote after an otherwise-unquoted value.
+  if (commandLine.includes(`--user-data-dir="${absoluteUserDataDir}"`)) return true;
+  const marker = `--user-data-dir=${absoluteUserDataDir}`;
+  const idx = commandLine.indexOf(marker);
+  if (idx === -1) return false;
+  const nextChar = commandLine[idx + marker.length];
+  return nextChar === undefined || nextChar === " ";
+}
+
+async function listChromeProcesses(): Promise<{ pid: number; commandLine: string }[]> {
   if (process.platform === "win32") {
-    // Embedded single-quotes in the path would break the PowerShell -like pattern below.
-    const escaped = absoluteUserDataDir.replace(/'/g, "''");
+    // No filtering in the script itself -- every chrome.exe pid+commandline is returned
+    // as-is, and the boundary-anchored match above (plain string ops, no shell wildcard
+    // escaping to get subtly wrong) decides ownership entirely in TypeScript.
+    // [char]9 (tab) avoids PowerShell's own backtick-escape syntax entirely -- no backtick
+    // has to be embedded inside this JS template literal.
     const script =
       `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" | ` +
-      `Where-Object { $_.CommandLine -like '*${escaped}*' } | ` +
-      `Select-Object -ExpandProperty ProcessId`;
+      `ForEach-Object { "$($_.ProcessId)$([char]9)$($_.CommandLine)" }`;
     const stdout = await execFileText("powershell", ["-NoProfile", "-NonInteractive", "-Command", script]);
     return stdout
       .split(/\r?\n/)
-      .map((line) => Number(line.trim()))
-      .filter((n) => Number.isInteger(n) && n > 0);
+      .map((line) => {
+        const tabIndex = line.indexOf("\t");
+        if (tabIndex === -1) return null;
+        const pid = Number(line.slice(0, tabIndex).trim());
+        const commandLine = line.slice(tabIndex + 1);
+        return Number.isInteger(pid) && pid > 0 ? { pid, commandLine } : null;
+      })
+      .filter((entry): entry is { pid: number; commandLine: string } => entry !== null);
   }
-  const stdout = await execFileText("pgrep", ["-f", absoluteUserDataDir]);
+  // `ps -eo pid=,args=`: leading whitespace-padded pid, then the full command line for the
+  // rest of the line -- no shell/regex involved, same plain-string ownership check applies.
+  const stdout = await execFileText("ps", ["-eo", "pid=,args="]);
   return stdout
     .split(/\r?\n/)
-    .map((line) => Number(line.trim()))
-    .filter((n) => Number.isInteger(n) && n > 0);
+    .map((line) => {
+      const trimmed = line.trimStart();
+      const spaceIndex = trimmed.indexOf(" ");
+      if (spaceIndex === -1) return null;
+      const pid = Number(trimmed.slice(0, spaceIndex));
+      const commandLine = trimmed.slice(spaceIndex + 1);
+      return Number.isInteger(pid) && pid > 0 && commandLine.includes("chrome")
+        ? { pid, commandLine }
+        : null;
+    })
+    .filter((entry): entry is { pid: number; commandLine: string } => entry !== null);
+}
+
+async function findOwningProcessIdsReal(absoluteUserDataDir: string): Promise<number[]> {
+  const processes = await listChromeProcesses();
+  return processes
+    .filter((p) => commandLineOwnsProfile(p.commandLine, absoluteUserDataDir))
+    .map((p) => p.pid);
 }
 
 async function killProcessTreeReal(pid: number): Promise<void> {

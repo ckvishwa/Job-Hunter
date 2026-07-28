@@ -1,6 +1,6 @@
 import type { BrowserContext } from "playwright";
 import { loadCollectSettings, loadRolesConfig, loadSitesConfig } from "../config/loader.js";
-import { closePersistentChrome, launchPersistentChrome } from "../browser/launcher.js";
+import { closePersistentChrome, launchPersistentChrome, registerShutdownOnSignal } from "../browser/launcher.js";
 import { resolveAdapter } from "../adapters/registry.js";
 import { loadJobs, saveJobs } from "../storage/jsonl-store.js";
 import { mergeJobs } from "../dedup/deduplicator.js";
@@ -81,8 +81,12 @@ export async function runCollect(
   );
 
   let context: BrowserContext | undefined;
+  let unregisterShutdown: (() => void) | undefined;
   async function ensureContext(): Promise<BrowserContext> {
-    if (!context) context = await launchFn();
+    if (!context) {
+      context = await launchFn();
+      unregisterShutdown = registerShutdownOnSignal(context);
+    }
     return context;
   }
 
@@ -148,6 +152,7 @@ export async function runCollect(
 
     return summary;
   } finally {
+    unregisterShutdown?.();
     if (context) {
       await closeFn(context);
     }
