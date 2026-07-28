@@ -254,4 +254,39 @@ describe("registerShutdownOnSignal", () => {
     unregister();
     expect(process.listenerCount("SIGINT")).toBe(before);
   });
+
+  // SIGTERM/uncaughtException/unhandledRejection: same registration-count pattern as SIGINT
+  // above, deliberately never actually emitted -- the real handler calls process.exit(), which
+  // would kill the test runner itself. Registration/unregistration is what's under test here;
+  // the handler's own close-then-exit behavior is exercised indirectly via closePersistentChrome's
+  // own dedicated tests above (same function, just invoked directly instead of through a signal).
+  it("also registers SIGTERM, uncaughtException, and unhandledRejection listeners, all removed together", () => {
+    const context = makeFakeContext();
+    const before = {
+      sigterm: process.listenerCount("SIGTERM"),
+      uncaught: process.listenerCount("uncaughtException"),
+      unhandledRejection: process.listenerCount("unhandledRejection"),
+    };
+
+    const unregister = registerShutdownOnSignal(context, "./.fake-profile", makeFakeDeps());
+    expect(process.listenerCount("SIGTERM")).toBe(before.sigterm + 1);
+    expect(process.listenerCount("uncaughtException")).toBe(before.uncaught + 1);
+    expect(process.listenerCount("unhandledRejection")).toBe(before.unhandledRejection + 1);
+
+    unregister();
+    expect(process.listenerCount("SIGTERM")).toBe(before.sigterm);
+    expect(process.listenerCount("uncaughtException")).toBe(before.uncaught);
+    expect(process.listenerCount("unhandledRejection")).toBe(before.unhandledRejection);
+  });
+
+  it("never touches an unrelated Chrome process -- registration alone launches/closes nothing", () => {
+    const deps = makeFakeDeps();
+    const context = makeFakeContext();
+
+    const unregister = registerShutdownOnSignal(context, "./.fake-profile", deps);
+    unregister();
+
+    expect(deps.findOwningProcessIds).not.toHaveBeenCalled();
+    expect(deps.killProcessTree).not.toHaveBeenCalled();
+  });
 });

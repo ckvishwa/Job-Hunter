@@ -252,22 +252,51 @@ export async function closePersistentChrome(
 }
 
 /**
- * Registers a one-shot SIGINT handler that closes the given context (via closePersistentChrome)
- * before the process exits, so Ctrl-C during a live run doesn't leave an orphaned Chrome
- * process behind. Returns an unregister function -- call it once the context is closed through
- * the normal code path, so a later SIGINT (after this run is already done) doesn't try to
- * close an already-closed context.
+ * Registers one-shot handlers that close the given context (via closePersistentChrome) before
+ * the process exits abnormally, so Ctrl-C, a `kill`/SIGTERM, or a genuinely uncaught error/
+ * rejection during a live run doesn't leave an orphaned Chrome process behind. Returns an
+ * unregister function -- call it once the context is closed through the normal code path
+ * (runDiscover's own try/finally already covers that), so a later signal/crash (after this
+ * run is already done) doesn't try to close an already-closed context.
+ *
+ * Known limitation (confirmed during Task 17 live validation, not something this function can
+ * fix): none of this fires on an external, forceful process termination (Windows
+ * TerminateProcess -- what a job runner's "stop task" typically does under the hood, or
+ * `taskkill /F`) -- that tears the process down at the OS level without running any JS handler
+ * at all, signal or otherwise. The orphan it can leave behind still has to be cleaned up
+ * externally by PID, same as any other abrupt kill. This only covers crashes/signals the
+ * process itself gets a chance to react to.
  */
 export function registerShutdownOnSignal(
   context: BrowserContext,
   userDataDir: string = DEFAULT_USER_DATA_DIR,
   deps: ChromeProcessDeps = realChromeProcessDeps,
 ): () => void {
-  const handler = () => {
+  let handled = false;
+  const shutdown = (exitCode: number, err?: unknown) => {
+    if (handled) return;
+    handled = true;
+    if (err !== undefined) {
+      console.error("[launcher] Uncaught error -- closing browser before exit:", err);
+    }
     void closePersistentChrome(context, userDataDir, deps).finally(() => {
-      process.exit(130); // 128 + SIGINT(2), conventional exit code for signal termination
+      process.exit(exitCode);
     });
   };
-  process.once("SIGINT", handler);
-  return () => process.removeListener("SIGINT", handler);
+
+  const onSigint = () => shutdown(130); // 128 + SIGINT(2), conventional exit code for signal termination
+  const onSigterm = () => shutdown(143); // 128 + SIGTERM(15)
+  const onUncaught = (err: unknown) => shutdown(1, err);
+
+  process.once("SIGINT", onSigint);
+  process.once("SIGTERM", onSigterm);
+  process.once("uncaughtException", onUncaught);
+  process.once("unhandledRejection", onUncaught);
+
+  return () => {
+    process.removeListener("SIGINT", onSigint);
+    process.removeListener("SIGTERM", onSigterm);
+    process.removeListener("uncaughtException", onUncaught);
+    process.removeListener("unhandledRejection", onUncaught);
+  };
 }
