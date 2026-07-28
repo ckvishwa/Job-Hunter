@@ -141,6 +141,37 @@ describe("orchestrator keyword/profile wiring (Task 12)", () => {
   });
 });
 
+describe("orchestrator reporting counters (Task 15)", () => {
+  beforeEach(() => {
+    discoverMock.mockReset();
+  });
+
+  it("keywordsSearched matches the real 16-keyword count from config/roles.yml (Task-12-style setup)", async () => {
+    discoverMock.mockResolvedValue(undefined);
+
+    const summary = await runDiscover(makePaths(), {}, fakeLaunchFn);
+
+    expect(summary.keywordsSearched).toBe(16);
+  });
+
+  it("companiesAttempted increments once per onCompanyProcessed() call the discovery adapter makes", async () => {
+    // Simulates company-careers.ts attempting a fixed, known number of companies (3) on every
+    // keyword call it receives -- lets this test assert an exact companiesAttempted total
+    // without needing the real Fortune 500 registry involved at all.
+    discoverMock.mockImplementation(async (context: DiscoveryContext) => {
+      context.onCompanyProcessed?.();
+      context.onCompanyProcessed?.();
+      context.onCompanyProcessed?.();
+    });
+
+    // Filtered to the sdet profile only -- 4 keywords (see ROLE_KEYWORDS.sdet above) x 3
+    // onCompanyProcessed() calls each = 12.
+    const summary = await runDiscover(makePaths(), { profileIds: ["sdet"] }, fakeLaunchFn);
+
+    expect(summary.companiesAttempted).toBe(12);
+  });
+});
+
 describe("orchestrator --dry-run (Task 14)", () => {
   beforeEach(() => {
     discoverMock.mockReset();

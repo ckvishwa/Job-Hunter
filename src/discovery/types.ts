@@ -48,6 +48,11 @@ export interface DiscoveryContext {
   portalConfig?: PortalConfig;
   profileIds: string[];
   onVerificationPause?: () => void;
+  // Reporting (Task 15): called once per company actually attempted by company-careers.ts
+  // (including structural skips -- those ARE attempts, just not full ATS-adapter runs) but
+  // NOT for companies excluded by an active --company filter (never attempted at all). Only
+  // meaningful to company-careers.ts; other adapters have no per-company concept.
+  onCompanyProcessed?: () => void;
   // --company filter (CLI). Only meaningful to company-careers.ts; other adapters ignore it.
   companyFilter?: string;
 }

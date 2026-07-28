@@ -1,6 +1,7 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { runDiscover, type DiscoverFilters, type DiscoverSummary } from "./orchestrator.js";
+import { runDiscover, type DiscoverFilters } from "./orchestrator.js";
+import type { DiscoveryRunSummary } from "./report.js";
 
 export function parseDiscoverArgs(argv: string[]): DiscoverFilters {
   const result: DiscoverFilters = {};
@@ -45,18 +46,29 @@ export function parseDiscoverArgs(argv: string[]): DiscoverFilters {
   return result;
 }
 
-function printDiscoverSummary(summary: DiscoverSummary): void {
+function printDiscoverSummary(summary: DiscoveryRunSummary): void {
   console.log("\n=== Discovery & Orchestration Summary ===");
   console.log(`Sources attempted: ${summary.sourcesAttempted}`);
   console.log(`Sources succeeded: ${summary.sourcesSucceeded}`);
   console.log(`Sources failed: ${summary.sourcesFailed}`);
+  console.log(`Companies attempted: ${summary.companiesAttempted}`);
+  console.log(`Keywords searched: ${summary.keywordsSearched}`);
+  console.log(`Pages processed: ${summary.pagesProcessed}`);
   console.log(`Listings discovered: ${summary.listingsDiscovered}`);
+  console.log(`Discoveries rejected: ${summary.discoveriesRejected}`);
+  console.log(`Official postings resolved: ${summary.officialPostingsResolved}`);
+  console.log(`Unresolved discoveries: ${summary.unresolvedDiscoveries}`);
+  console.log(`Duplicates merged: ${summary.duplicatesMerged}`);
   console.log(`Full JDs extracted/resolved: ${summary.jdsExtracted}`);
-  console.log(`Duplicates removed: ${summary.duplicatesRemoved}`);
+  console.log(`Verification pauses: ${summary.verificationPauses}`);
   console.log(`Jobs written to jobs.jsonl: ${summary.jobsWritten}`);
-  console.log("Totals by matched profile:");
-  for (const [profile, count] of Object.entries(summary.totalsByProfile)) {
+  console.log("Jobs by matched profile:");
+  for (const [profile, count] of Object.entries(summary.jobsByProfile)) {
     console.log(`  ${profile}: ${count}`);
+  }
+  console.log("Jobs by source:");
+  for (const [source, count] of Object.entries(summary.jobsBySource)) {
+    console.log(`  ${source}: ${count}`);
   }
   if (summary.errors.length) {
     console.log("Errors:");

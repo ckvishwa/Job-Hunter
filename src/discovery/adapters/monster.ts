@@ -31,7 +31,10 @@ export const monsterDiscoveryAdapter: PortalDiscoveryAdapter = {
         () => page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs }),
         { retries: 2, backoffMs: 500 },
       );
-      await pauseForVerification(page);
+      const verification = await pauseForVerification(page);
+      if (verification.detected) {
+        context.onVerificationPause?.();
+      }
 
       // Selectors for Monster (from config/portals.yml's "monster" entry)
       const cards = await page.$$(portalConfig.resultCardSelector);

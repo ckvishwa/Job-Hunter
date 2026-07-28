@@ -26,7 +26,10 @@ export const googleJobsDiscoveryAdapter: PortalDiscoveryAdapter = {
       () => page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs }),
       { retries: 2, backoffMs: 500 },
     );
-    await pauseForVerification(page);
+    const initialVerification = await pauseForVerification(page);
+    if (initialVerification.detected) {
+      context.onVerificationPause?.();
+    }
 
     // Google Jobs uses an infinite scrolling list of jobs on the left.
     // We scroll the container to load more results.
@@ -35,7 +38,10 @@ export const googleJobsDiscoveryAdapter: PortalDiscoveryAdapter = {
 
     while (pageNum <= settings.maxPagesPerSource) {
       await page.waitForLoadState("networkidle").catch(() => undefined);
-      await pauseForVerification(page);
+      const verification = await pauseForVerification(page);
+      if (verification.detected) {
+        context.onVerificationPause?.();
+      }
 
       // Selectors for Google Jobs (from config/portals.yml's "google-jobs" entry)
       const cards = await page.$$(portalConfig.resultCardSelector);

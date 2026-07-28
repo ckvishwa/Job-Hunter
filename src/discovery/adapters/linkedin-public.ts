@@ -32,7 +32,10 @@ export const linkedinPublicDiscoveryAdapter: PortalDiscoveryAdapter = {
         () => page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs }),
         { retries: 2, backoffMs: 500 },
       );
-      await pauseForVerification(page);
+      const verification = await pauseForVerification(page);
+      if (verification.detected) {
+        context.onVerificationPause?.();
+      }
 
       // Selectors for LinkedIn public (from config/portals.yml's "linkedin-public" entry)
       const cards = await page.$$(portalConfig.resultCardSelector);

@@ -10,7 +10,14 @@ import type { DiscoveredJobLite, DiscoveryContext } from "./types.js";
 import type { JobPosting } from "../adapters/types.js";
 import type { SiteConfig } from "../types.js";
 import { matchProfiles } from "../adapters/match-profiles.js";
+import { buildSummary, type DiscoveryRunSummary, type RawDiscoveryCounters } from "./report.js";
 import path from "node:path";
+
+// The resolver's own placeholder-fallback string (posting-resolver.ts's final `details` when
+// neither the ATS adapter path nor the DOM-scrape fallback produced anything) -- the only
+// current, honest signal that a discovery could not be properly resolved. Kept here as a
+// single source of truth for the officialPostingsResolved/unresolvedDiscoveries split below.
+const UNRESOLVED_PLACEHOLDER_PREFIX = "Job posting found on ";
 
 export interface DiscoverFilters {
   profileIds?: string[];
@@ -28,16 +35,25 @@ export interface DiscoverFilters {
   dryRun?: boolean;
 }
 
-export interface DiscoverSummary {
-  sourcesAttempted: number;
-  sourcesSucceeded: number;
-  sourcesFailed: number;
-  listingsDiscovered: number;
-  jdsExtracted: number;
-  duplicatesRemoved: number;
-  jobsWritten: number;
-  totalsByProfile: Record<string, number>;
-  errors: { source: string; message: string }[];
+function emptyCounters(): RawDiscoveryCounters {
+  return {
+    sourcesAttempted: 0,
+    sourcesSucceeded: 0,
+    sourcesFailed: 0,
+    companiesAttempted: 0,
+    keywordsSearched: 0,
+    pagesProcessed: 0,
+    listingsDiscovered: 0,
+    officialPostingsResolved: 0,
+    unresolvedDiscoveries: 0,
+    duplicatesMerged: 0,
+    jdsExtracted: 0,
+    verificationPauses: 0,
+    jobsByProfile: {},
+    jobsBySource: {},
+    jobsWritten: 0,
+    errors: [],
+  };
 }
 
 export async function runDiscover(
@@ -51,7 +67,7 @@ export async function runDiscover(
   },
   filters: DiscoverFilters = {},
   launchFn: typeof launchPersistentChrome = launchPersistentChrome,
-): Promise<DiscoverSummary> {
+): Promise<DiscoveryRunSummary> {
   const roles = loadRolesConfig(paths.rolesConfigPath);
   const settings = loadCollectSettings(paths.sitesConfigPath);
   const sites = loadSitesConfig(paths.sitesConfigPath);
@@ -103,21 +119,13 @@ export async function runDiscover(
     profileIds: [role.profile],
   }));
 
-  // Summary object
-  const summary: DiscoverSummary = {
-    sourcesAttempted: 0,
-    sourcesSucceeded: 0,
-    sourcesFailed: 0,
-    listingsDiscovered: 0,
-    jdsExtracted: 0,
-    duplicatesRemoved: 0,
-    jobsWritten: 0,
-    totalsByProfile: {},
-    errors: [],
-  };
+  // Raw counters, accumulated through the run and assembled into the reporting shape via
+  // buildSummary() (Task 15) -- once at the very end of a full run, or immediately below for
+  // the dry-run early return, so both paths produce the same DiscoveryRunSummary shape.
+  const counters = emptyCounters();
 
   if (filters.dryRun) {
-    summary.sourcesAttempted = targetSources.length;
+    counters.sourcesAttempted = targetSources.length;
     const totalIterations = targetSources.length * enabledRoles.reduce((n, role) => n + role.keywords.length, 0);
     console.log(
       `[orchestrator] Dry run: would attempt ${targetSources.length} source(s) x ${enabledRoles.length} role(s) ` +
@@ -130,7 +138,10 @@ export async function runDiscover(
       // surprise: rerun without --dry-run to actually apply the reset.
       console.log(`[orchestrator] Dry run: --reset-checkpoint was NOT applied (dry runs never write to disk). Rerun without --dry-run to apply it.`);
     }
-    return summary;
+    // Dry run never attempts anything else -- keywordsSearched/pagesProcessed/etc. stay at
+    // their zero defaults from emptyCounters(). Routed through buildSummary anyway (rather
+    // than a hand-built shape) so both return paths always produce the same structure.
+    return buildSummary(counters);
   }
 
   // Launch Playwright Chrome context
@@ -159,7 +170,7 @@ export async function runDiscover(
 
     // PHASE 1: Portal Job Discovery
     for (const source of targetSources) {
-      summary.sourcesAttempted += 1;
+      counters.sourcesAttempted += 1;
       let sourceSuccess = true;
 
       // Find the site configuration if it's a generic portal (sites.yml-driven)
@@ -179,10 +190,11 @@ export async function runDiscover(
           }
 
           console.log(`[orchestrator] Starting discovery for source="${source}", keyword="${keyword}", location="${searchLocation}"`);
+          counters.keywordsSearched += 1;
 
           try {
             const adapter = resolveDiscoveryAdapter(source);
-            
+
             // Build the DiscoveryContext
             const discoveryCtx: DiscoveryContext = {
               page,
@@ -208,7 +220,11 @@ export async function runDiscover(
 
                 // Append newly discovered jobs page-by-page
                 appendDiscoveredJobs(paths.discoveredJobsPath, jobs);
-                summary.listingsDiscovered += jobs.length;
+                counters.listingsDiscovered += jobs.length;
+                // Fires once per portal page AND once per company in company-careers.ts --
+                // an honest, already-existing "processing unit" signal, not literally a
+                // count of browser pages navigated.
+                counters.pagesProcessed += 1;
 
                 // Update checkpoint
                 checkpoint.lastPage = nextPageNum;
@@ -219,6 +235,12 @@ export async function runDiscover(
               portalConfig,
               profileIds: [role.profile],
               companyFilter: filters.company,
+              onVerificationPause: () => {
+                counters.verificationPauses += 1;
+              },
+              onCompanyProcessed: () => {
+                counters.companiesAttempted += 1;
+              },
             };
 
             await adapter.discover(discoveryCtx);
@@ -239,15 +261,15 @@ export async function runDiscover(
           } catch (err) {
             sourceSuccess = false;
             console.error(`[orchestrator] Failure on ${source} for keyword "${keyword}": ${(err as Error).message}`);
-            summary.errors.push({ source: `${source}::${keyword}`, message: (err as Error).message });
+            counters.errors.push({ source: `${source}::${keyword}`, message: (err as Error).message });
           }
         }
       }
 
       if (sourceSuccess) {
-        summary.sourcesSucceeded += 1;
+        counters.sourcesSucceeded += 1;
       } else {
-        summary.sourcesFailed += 1;
+        counters.sourcesFailed += 1;
       }
     }
 
@@ -269,7 +291,16 @@ export async function runDiscover(
         const resolved = await resolver.resolve(job, playwrightContext);
         if (resolved) {
           resolvedJobs.push(resolved);
-          summary.jdsExtracted += 1;
+          counters.jdsExtracted += 1;
+
+          // resolve() itself never returns null (confirmed Task 10) -- the only current,
+          // honest signal that a discovery could not be properly resolved is whether the
+          // resolver fell all the way through to its own placeholder-fallback descriptionText.
+          if (resolved.descriptionText.startsWith(UNRESOLVED_PLACEHOLDER_PREFIX)) {
+            counters.unresolvedDiscoveries += 1;
+          } else {
+            counters.officialPostingsResolved += 1;
+          }
 
           // Apply delay between requests to avoid rate limits
           if (settings.delayBetweenRequestsMs > 0) {
@@ -278,6 +309,9 @@ export async function runDiscover(
         }
       } catch (err) {
         console.error(`[orchestrator] Error resolving job "${job.title}": ${(err as Error).message}`);
+        // A resolve() call that itself throws (caught here) also counts as unresolved --
+        // the discovery exists but nothing usable came out of resolution.
+        counters.unresolvedDiscoveries += 1;
       }
     }
 
@@ -286,15 +320,16 @@ export async function runDiscover(
     const now = new Date().toISOString();
     const merged = mergeJobs(existingJobs, resolvedJobs, now);
 
-    summary.duplicatesRemoved = existingJobs.length + resolvedJobs.length - merged.length;
+    counters.duplicatesMerged = existingJobs.length + resolvedJobs.length - merged.length;
     saveJobs(paths.jobsStorePath, merged);
-    summary.jobsWritten = merged.length;
+    counters.jobsWritten = merged.length;
 
-    // Track profile totals for the newly written jobs
+    // Track profile/source totals for the newly written jobs
     for (const job of resolvedJobs) {
       for (const profile of job.matchedProfiles) {
-        summary.totalsByProfile[profile] = (summary.totalsByProfile[profile] ?? 0) + 1;
+        counters.jobsByProfile[profile] = (counters.jobsByProfile[profile] ?? 0) + 1;
       }
+      counters.jobsBySource[job.source] = (counters.jobsBySource[job.source] ?? 0) + 1;
     }
 
   } finally {
@@ -303,5 +338,5 @@ export async function runDiscover(
     }
   }
 
-  return summary;
+  return buildSummary(counters);
 }

@@ -1,4 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
+
+// pauseForVerification() runs for real in these tests (its own detectVerification heuristic
+// is never mocked) -- but when it detects a challenge, its default codepath waits on real
+// stdin via node:readline/promises, which would hang a non-interactive test run. Mocked here
+// so a genuinely-detected challenge resolves instantly instead of blocking, without touching
+// detectVerification's real pattern-matching logic at all.
+vi.mock("node:readline/promises", () => ({
+  createInterface: () => ({
+    question: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn(),
+  }),
+}));
+
 import { indeedDiscoveryAdapter } from "../../src/discovery/adapters/indeed.js";
 import { monsterDiscoveryAdapter } from "../../src/discovery/adapters/monster.js";
 import { linkedinPublicDiscoveryAdapter } from "../../src/discovery/adapters/linkedin-public.js";
@@ -271,6 +284,41 @@ describe("Indeed Discovery Adapter", () => {
     expect(processed).toHaveLength(1);
     expect(processed[0]!.title).toBe("Custom Title");
     expect(processed[0]!.company).toBe("Custom Co");
+  });
+
+  it("calls context.onVerificationPause when pauseForVerification genuinely detects a challenge (Task 15)", async () => {
+    const cards = [makeFakeCard({ title: "SDET", company: "Acme", href: "https://indeed.com/viewjob?jk=456", jobId: "456" })];
+    // Same reCAPTCHA marker used by tests/verification.test.ts's detectVerification coverage
+    // -- this page content genuinely trips the real (unmocked) detection heuristic.
+    const page = makeFakePage(cards, `<div class="g-recaptcha" data-sitekey="abc"></div>`);
+
+    const checkpoint: DiscoveryCheckpoint = {
+      key: "indeed::sdet::us",
+      source: "indeed",
+      keyword: "sdet",
+      location: "us",
+      lastPage: 0,
+      completed: false,
+      lastUpdated: "",
+      sourceJobIds: [],
+    };
+
+    const onVerificationPause = vi.fn();
+    const context: DiscoveryContext = {
+      page: page as any,
+      keyword: "sdet",
+      location: "us",
+      settings,
+      checkpoint,
+      onPageProcessed: async () => undefined,
+      profileIds: ["sdet"],
+      portalConfig: indeedPortalConfig,
+      onVerificationPause,
+    };
+
+    await indeedDiscoveryAdapter.discover(context);
+
+    expect(onVerificationPause).toHaveBeenCalled();
   });
 });
 

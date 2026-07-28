@@ -76,6 +76,9 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
         // success is handled, no separate mechanism invented for this narrower case.
         completedKeys.push(companyKey);
         await onPageProcessed([], i + 1);
+        // Structural skips ARE company-level attempts (this company was considered this run,
+        // just couldn't proceed past the ATS-adapter step) -- reported same as a full attempt.
+        context.onCompanyProcessed?.();
         continue;
       }
 
@@ -89,6 +92,7 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
         });
         completedKeys.push(companyKey);
         await onPageProcessed([], i + 1);
+        context.onCompanyProcessed?.();
         continue;
       }
 
@@ -160,11 +164,15 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
         readyCount += 1;
         completedKeys.push(companyKey);
         await onPageProcessed(newJobs, i + 1);
+        context.onCompanyProcessed?.();
       } catch (err) {
         console.error(
           `[company-careers] Error processing company ${company.company}: ${(err as Error).message}. Not marked complete -- will retry on next --resume.`,
         );
         await onPageProcessed([], i + 1);
+        // Still an attempt -- it just failed. Only the --company-filtered exclusion above
+        // (never attempted at all) skips this callback.
+        context.onCompanyProcessed?.();
       }
     }
 

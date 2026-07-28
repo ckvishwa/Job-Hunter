@@ -109,7 +109,10 @@ export const configurableGenericPortalAdapter: PortalDiscoveryAdapter = {
             () => page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs }),
             { retries: 2, backoffMs: 500 },
           );
-          await pauseForVerification(page);
+          const initialVerification = await pauseForVerification(page);
+          if (initialVerification.detected) {
+            context.onVerificationPause?.();
+          }
           if (keyword && gp.searchInputSelector && gp.searchButtonSelector) {
             await page.fill(gp.searchInputSelector, keyword);
             await page.click(gp.searchButtonSelector);
@@ -126,7 +129,10 @@ export const configurableGenericPortalAdapter: PortalDiscoveryAdapter = {
         }
       }
 
-      await pauseForVerification(page);
+      const verification = await pauseForVerification(page);
+      if (verification.detected) {
+        context.onVerificationPause?.();
+      }
 
       const cards = await page.$$(gp.resultCardSelector);
       if (cards.length === 0) {
