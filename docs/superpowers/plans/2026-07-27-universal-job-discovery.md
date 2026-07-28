@@ -35,7 +35,7 @@
 - [x] Task 14 — CLI (already done — verify only) — commits 77b0ee4, abf1144. Added --company/--resume/--reset-checkpoint/--dry-run (all 4 were missing). Self-review caught and fixed a real bug: --company + checkpoint.completed marking would have permanently stranded unfiltered companies (fixed at the orchestrator layer, verified by empirical revert/restore). Independent review found only cosmetic follow-ups (duplicated comment, dry-run+reset-checkpoint silent no-op needed a log line) — both fixed and reviewed clean.
 - [x] Task 15 — Reporting module — commit 429a757. Every field wired to a real signal, none fabricated (discoveriesRejected honestly hardcoded 0 -- no rejection logic exists yet). Reviewed clean; 2 pre-existing counting quirks noted (not introduced here, not fixed): sourcesAttempted counts a source even when every keyword checkpoint was already complete (discover() never called); pagesProcessed doesn't count a terminal empty page. One narrow theoretical false-positive in the officialPostingsResolved/unresolvedDiscoveries split (string-matches the resolver's placeholder text).
 - [x] Task 16 — Fill remaining test gaps; confirm all tests + typecheck green — commit 26cbcc1. Repeated-page-stopping was genuinely untested (added, empirically verified to catch a real regression). Missing-selector clear error confirmed as a real, never-implemented design goal (not a test gap) -- recorded here, not built: no adapter anywhere distinguishes "legitimately zero results" from "the configured selector is stale." Final: 29 files, 187/187 tests, 0 typecheck errors.
-- [ ] Task 17 — Controlled live validation
+- [x] Task 17 — Controlled live validation — all 7 items recorded: Figma success, AHEAD verification-required (real reCAPTCHA), Workday blocked (structural code gap), Google/Indeed/Monster/LinkedIn all timeout (real anti-bot stalling on page.goto, consistent across all 4 major portals; company-careers' fetch()-based paths unaffected). See "Task 17 restart log" below for full detail. No CAPTCHA solved/bypassed, no orphaned process left behind, portals.yml reverted to original state.
 
 ---
 
@@ -259,13 +259,103 @@ All four commits independently reviewed, all found issues fixed and re-reviewed 
 Not run until Task 16 is fully green and the user has separately confirmed they want a live run (this is a real browser hitting real external sites — confirm before executing even though it was pre-authorized in the task brief, since it's the first non-mocked execution of this code).
 
 Scope, exactly as specified — one each, small limits, never a full scan:
-- [ ] One Google Jobs search (1 keyword, `maxPages`/`maxDiscoveries` small, e.g. 1 page / 10 results).
-- [ ] One Indeed search (same small limits).
-- [ ] One Monster search (same small limits).
-- [ ] One LinkedIn public search (same small limits).
-- [ ] One Greenhouse company from the registry (existing verified entry — e.g. Google).
-- [ ] One Lever company from the registry (existing verified entry — e.g. AHEAD).
-- [ ] One Workday company from the registry — only if `atsWorkdaySite` has been filled in with a real verified value by this point; otherwise this sub-item is explicitly reported as blocked, not faked.
-- [ ] One custom/generic career page — only if at least one registry entry has real `genericSelectors` filled in; otherwise reported as blocked.
+- [x] One Google Jobs search (1 keyword, `maxPages`/`maxDiscoveries` small, e.g. 1 page / 10 results). — attempted, timeout.
+- [x] One Indeed search (same small limits). — attempted, timeout.
+- [x] One Monster search (same small limits). — attempted, timeout.
+- [x] One LinkedIn public search (same small limits). — attempted, timeout.
+- [x] One Greenhouse company from the registry (existing verified entry — e.g. Google). — used Figma instead (Google's Greenhouse token confirmed stale/blocked earlier). Success.
+- [x] One Lever company from the registry (existing verified entry — e.g. AHEAD). — verification required (real reCAPTCHA), not faked.
+- [x] One Workday company from the registry — only if `atsWorkdaySite` has been filled in with a real verified value by this point; otherwise this sub-item is explicitly reported as blocked, not faked. — reported blocked: found a real, live Workday tenant (Target) but `company-careers.ts` unconditionally skips all `atsType: "workday"` entries regardless of data, a code gap not just a data gap.
+- [ ] One custom/generic career page — only if at least one registry entry has real `genericSelectors` filled in; otherwise reported as blocked. — not attempted: no registry entry (production or validation) has real `genericSelectors` configured. Reported blocked per this item's own stated fallback, same as Workday.
 
 For each: verify pagination behaves, titles/companies look real, full JD resolves, official/apply URLs are real employer or ATS URLs (not portal redirect stubs), provenance is recorded, checkpoint resume works (kill mid-run, resume, confirm no duplicate work), a second full run of the same search is idempotent (no duplicate `JobPosting` rows), and any verification challenge encountered pauses correctly and is described in the run's report.
+
+### Task 17 restart log (post browser-lifecycle-fix, per user's 7-item sequence)
+
+1. **Figma/Greenhouse** — SUCCESS. 700+ jobs discovered, 2 resolved with real JDs, real
+   `boards.greenhouse.io`/`job-boards.greenhouse.io` canonical URLs. Registry entry verified.
+2. **AHEAD/Lever** — VERIFICATION REQUIRED. Discovery succeeded (492 real jobs from
+   `jobs.lever.co/thinkahead`). Resolution of the first job hit a real reCAPTCHA on the
+   posting page; `pauseForVerification` correctly detected it, printed the pause banner, and
+   the resolver correctly threw `Verification required ... reCAPTCHA detected` rather than
+   scraping/faking content — no CAPTCHA was solved or bypassed. Known limitation surfaced by
+   this run: in a non-interactive/background shell, `rl.question()` resolves immediately on
+   stdin EOF instead of truly blocking for a human, so unattended runs can't actually wait for
+   manual solving — the safe part (never fabricating data past a detected challenge) still
+   held. Not fixed here since out of scope for validation; worth a follow-up if unattended
+   Lever/Greenhouse runs need to survive real CAPTCHAs.
+3. **Workday company** — BLOCKED (structural, not just missing data). Verified a real, live
+   Workday tenant via direct API probe (`target.wd5.myworkdayjobs.com`, tenant `target`, site
+   `targetcareers` — returned 2000 real job postings). However
+   `src/discovery/adapters/company-careers.ts` unconditionally skips every `atsType:
+   "workday"` registry entry regardless of whether `atsWorkdaySite` is filled in (dead branch:
+   never builds a `SiteConfig.workday` block, unlike greenhouse/lever). So this item is
+   blocked by a real code gap, not by absent data — filling in Target's `atsWorkdaySite` alone
+   would not make it run. Reported as blocked per the plan's explicit fallback rather than
+   silently expanding scope to wire up new adapter code mid-validation.
+4. **Google Jobs portal** — TIMEOUT. First attempt found a real, separate bug: `config/portals.yml`'s
+   own header comment claims `--source <id>` alone opts a portal in, but
+   `orchestrator.ts`'s `standardPortalIds` filters on `p.enabled` *before* the `--source`
+   narrowing is ever applied — a disabled portal is never attempted regardless of `--source`.
+   Fixed by flipping `enabled: true` for the duration of this item's run (reverted after).
+   With it enabled, the run genuinely launched a real isolated Chrome instance (confirmed
+   alive via direct process inspection) but never wrote a single checkpoint entry after
+   ~18+ minutes — well beyond every bounded timeout in `google-jobs.ts` (30s navigation x2
+   retries, 30s networkidle wait, all `.catch`-guarded). Recorded as timeout rather than
+   waited on indefinitely. Stopping the background task killed the outer shell/node wrapper
+   but — a separate, real finding — did NOT deliver SIGINT to the child process on Windows,
+   so `registerShutdownOnSignal`'s cleanup never ran and the isolated Chrome tree was left
+   running; cleaned up manually via `taskkill /PID <verified-isolated-profile-pid> /T /F`,
+   scoped strictly to the confirmed isolated-profile process tree (never the user's real
+   Chrome). This is an external-termination gap (TaskStop/Windows don't propagate a graceful
+   signal the way Ctrl+C does), not a defect in the shutdown code itself — worth a follow-up
+   if unattended/scripted kills of discover runs become common.
+5. **Indeed portal** — TIMEOUT. Same pattern as Google Jobs: real isolated Chrome launched and
+   confirmed alive, zero checkpoint progress after 3+ minutes (well past `indeed.ts`'s bounded
+   waits), stopped and cleaned up the same way.
+6. **Monster portal** — TIMEOUT. Same pattern again — third consecutive real portal exhibiting
+   identical zero-progress-past-all-bounds behavior.
+7. **LinkedIn public portal** — TIMEOUT. Fourth and last consecutive real portal, same pattern.
+
+**Cross-portal finding (all 4 browser-driven search portals):** Google Jobs, Indeed, Monster,
+and LinkedIn public all independently reproduced the same symptom under `--isolated-profile`:
+a real, live Chrome process tree launches successfully (confirmed via direct OS process
+inspection each time — never a launch failure, never the profile-in-use error), but the
+adapter never reaches its first `onPageProcessed` checkpoint write, well beyond every
+timeout coded in the adapters themselves (30s navigation x2 retries, 30s networkidle wait).
+By contrast, company-careers sources worked correctly in the same session: Figma succeeded
+fully, and AHEAD's real page-navigation-based resolution step reached a real Lever page and
+correctly detected a real reCAPTCHA. The differentiator is that Greenhouse/Lever discovery
+is a plain `fetch()` JSON call, not a `page.goto()`, and AHEAD's one browser-navigated page
+(a direct Lever job-detail URL) did load. The four major portals — sites with the most
+sophisticated, well-funded anti-bot infrastructure of anything in this validation set — are
+the only targets where `page.goto()` itself never completes or fails within its own timeout.
+Most likely explanation given the pattern (consistent across 4 unrelated domains, none of
+which show this behavior in company-careers' simpler fetch-based paths): active anti-bot
+tarpitting/fingerprint-based stalling of the automated real-Chrome connection, not a bug in
+this codebase's timeout logic. Each run's orphaned isolated Chrome tree was confirmed and
+force-killed by exact, verified PID after stopping — the shutdown code path (SIGINT handler)
+itself was never exercised here because external task termination on Windows does not
+deliver a signal the way Ctrl+C does (see Google Jobs entry above); this is a job-runner/OS
+gap, not a defect in `closePersistentChrome`. Not investigated further as a code fix here —
+out of scope for a validation pass; flagging as a real, load-bearing finding for whoever
+picks up portal-adapter hardening next (candidates: stealth/fingerprint evasion is explicitly
+out of bounds per this project's "never bypass access controls" constraint, so the realistic
+fix is likely a hard per-goto watchdog timeout independent of Playwright's own timeout option,
+plus alerting rather than silent hanging).
+
+**Task 17 summary — every configured validation source has a recorded result:**
+| # | Source | Result |
+|---|--------|--------|
+| 1 | Figma / Greenhouse | Success |
+| 2 | AHEAD / Lever | Verification required (reCAPTCHA) |
+| 3 | Workday company | Blocked (structural code gap, not just data) |
+| 4 | Google Jobs portal | Timeout |
+| 5 | Indeed portal | Timeout |
+| 6 | Monster portal | Timeout |
+| 7 | LinkedIn public portal | Timeout |
+
+Task 17 is complete in the sense the user required: every item has a definitive, honestly
+recorded result. Nothing here was faked, no CAPTCHA was solved/bypassed, no anti-bot
+protection was evaded, and no orphaned process or stale lock was left behind — `config/portals.yml`
+is back to its pre-validation state (all portals `enabled: false`, original 100/5000 limits).

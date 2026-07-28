@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .chrome-profile/
+.chrome-profile-run-*/
 data/*.sqlite
 data/*.jsonl
 output/*.html
