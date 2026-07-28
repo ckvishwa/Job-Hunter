@@ -1,6 +1,6 @@
 import type { BrowserContext } from "playwright";
 import { loadCollectSettings, loadRolesConfig, loadSitesConfig } from "../config/loader.js";
-import { launchPersistentChrome } from "../browser/launcher.js";
+import { closePersistentChrome, launchPersistentChrome } from "../browser/launcher.js";
 import { resolveAdapter } from "../adapters/registry.js";
 import { loadJobs, saveJobs } from "../storage/jsonl-store.js";
 import { mergeJobs } from "../dedup/deduplicator.js";
@@ -56,6 +56,7 @@ export async function runCollect(
   paths: CollectPaths,
   filters: CollectFilters = {},
   launchFn: typeof launchPersistentChrome = launchPersistentChrome,
+  closeFn: typeof closePersistentChrome = closePersistentChrome,
 ): Promise<CollectSummary> {
   const sites = loadSitesConfig(paths.sitesConfigPath);
   const roles = loadRolesConfig(paths.rolesConfigPath);
@@ -148,7 +149,7 @@ export async function runCollect(
     return summary;
   } finally {
     if (context) {
-      await context.close();
+      await closeFn(context);
     }
   }
 }

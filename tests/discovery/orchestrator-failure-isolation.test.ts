@@ -94,6 +94,11 @@ function fakeLaunchFn(): Promise<BrowserContext> {
   return Promise.resolve(fakeContext);
 }
 
+// Real closePersistentChrome spawns a real subprocess to confirm OS process exit -- never
+// acceptable in a test. Shutdown mechanics are covered in isolation by
+// tests/browser/launcher.test.ts.
+const fakeCloseFn = vi.fn(async () => {});
+
 function makePaths() {
   const dir = mkdtempSync(path.join(tmpdir(), "job-hunter-orchestrator-failure-"));
   return {
@@ -137,7 +142,7 @@ describe("orchestrator cross-source failure isolation (Task 13)", () => {
   it("keeps running monster's real work after indeed throws, and persists monster's discoveries to disk", async () => {
     const paths = makePaths();
 
-    const summary = await runDiscover(paths, {}, fakeLaunchFn);
+    const summary = await runDiscover(paths, {}, fakeLaunchFn, fakeCloseFn);
 
     expect(discoverIndeedMock).toHaveBeenCalledTimes(1);
     expect(discoverMonsterMock).toHaveBeenCalledTimes(1);

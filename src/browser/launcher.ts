@@ -1,24 +1,212 @@
 import { chromium, type BrowserContext, type LaunchOptions } from "playwright";
+import { execFile } from "node:child_process";
+import { existsSync, rmSync } from "node:fs";
+import path from "node:path";
 
 export interface LaunchPersistentChromeOptions extends LaunchOptions {
   headless?: boolean;
 }
 
 const DEFAULT_USER_DATA_DIR = "./.chrome-profile";
+// Bounded wait for the OS Chrome process to exit after context.close() before we force-kill
+// it. Playwright's own close() is supposed to tear the process down, but on Windows with a
+// real (channel: "chrome") browser this isn't always reliable -- confirmed during Task 17
+// live validation, where the process survived both a normal completion and an errored launch.
+const SHUTDOWN_WAIT_TIMEOUT_MS = 10_000;
+const POST_KILL_WAIT_TIMEOUT_MS = 5_000;
+const LOCK_FILE_NAMES = ["lockfile", "SingletonLock", "SingletonSocket", "SingletonCookie"];
+
+export class ChromeProfileInUseError extends Error {
+  constructor(userDataDir: string, pids: number[]) {
+    super(
+      `Chrome profile "${userDataDir}" is already in use by a live Chrome process (pid ${pids.join(", ")}). ` +
+        `Close it (or wait for that run to finish) before starting a new one against the same profile.`,
+    );
+    this.name = "ChromeProfileInUseError";
+  }
+}
+
+// Injectable so tests never spawn a real process or touch the real filesystem. Real
+// implementations are the defaults every production call site gets for free.
+export interface ChromeProcessDeps {
+  // Finds OS Chrome processes whose command line references the given absolute
+  // user-data-dir. Scoped strictly to that exact path string -- must never match or affect
+  // any OTHER Chrome process (the user's own browser, a different profile, a different run).
+  findOwningProcessIds(absoluteUserDataDir: string): Promise<number[]>;
+  killProcessTree(pid: number): Promise<void>;
+  lockFileExists(absoluteUserDataDir: string, name: string): boolean;
+  removeLockFile(absoluteUserDataDir: string, name: string): void;
+  sleep(ms: number): Promise<void>;
+}
+
+function execFileText(file: string, args: string[]): Promise<string> {
+  return new Promise((resolve) => {
+    execFile(file, args, { windowsHide: true }, (err, stdout) => {
+      // Any failure (command missing, non-zero exit, no matches) is treated as "found
+      // nothing" -- callers only use this to decide whether a live process exists, and a
+      // failed lookup must never be mistaken for "confirmed empty."
+      resolve(err ? "" : stdout);
+    });
+  });
+}
+
+async function findOwningProcessIdsReal(absoluteUserDataDir: string): Promise<number[]> {
+  if (process.platform === "win32") {
+    // Embedded single-quotes in the path would break the PowerShell -like pattern below.
+    const escaped = absoluteUserDataDir.replace(/'/g, "''");
+    const script =
+      `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" | ` +
+      `Where-Object { $_.CommandLine -like '*${escaped}*' } | ` +
+      `Select-Object -ExpandProperty ProcessId`;
+    const stdout = await execFileText("powershell", ["-NoProfile", "-NonInteractive", "-Command", script]);
+    return stdout
+      .split(/\r?\n/)
+      .map((line) => Number(line.trim()))
+      .filter((n) => Number.isInteger(n) && n > 0);
+  }
+  const stdout = await execFileText("pgrep", ["-f", absoluteUserDataDir]);
+  return stdout
+    .split(/\r?\n/)
+    .map((line) => Number(line.trim()))
+    .filter((n) => Number.isInteger(n) && n > 0);
+}
+
+async function killProcessTreeReal(pid: number): Promise<void> {
+  if (process.platform === "win32") {
+    await execFileText("taskkill", ["/PID", String(pid), "/T", "/F"]);
+    return;
+  }
+  try {
+    process.kill(pid, "SIGKILL");
+  } catch {
+    // Already gone -- fine.
+  }
+}
+
+export const realChromeProcessDeps: ChromeProcessDeps = {
+  findOwningProcessIds: findOwningProcessIdsReal,
+  killProcessTree: killProcessTreeReal,
+  lockFileExists: (dir, name) => existsSync(path.join(dir, name)),
+  removeLockFile: (dir, name) => {
+    try {
+      rmSync(path.join(dir, name), { force: true });
+    } catch {
+      // Best-effort -- if this fails, launchPersistentContext will surface a clearer error.
+    }
+  },
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+};
+
+async function waitUntilNoOwningProcess(
+  absoluteUserDataDir: string,
+  timeoutMs: number,
+  deps: ChromeProcessDeps,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const pids = await deps.findOwningProcessIds(absoluteUserDataDir);
+    if (pids.length === 0) return true;
+    if (Date.now() >= deadline) return false;
+    await deps.sleep(250);
+  }
+}
 
 /**
- * Launches a persistent Chrome context so cookies/logins survive across runs.
- * Headless defaults to false — never bypass the visible-browser requirement
- * unless a caller explicitly overrides it.
+ * Generates a fresh, unused profile directory path (never a shared one) so independent runs
+ * -- e.g. sequential controlled live-validation checks -- can each get their own Chrome
+ * process without contending for the same profile lock. Not the default: normal usage keeps
+ * the single persistent, shared profile so cookies/logins survive across runs (manual
+ * verification depends on that persistence). Opt in explicitly per run.
+ */
+export function uniqueChromeProfileDir(baseDir: string = DEFAULT_USER_DATA_DIR): string {
+  return `${baseDir}-run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Launches a persistent Chrome context so cookies/logins survive across runs. Headless
+ * defaults to false — never bypass the visible-browser requirement unless a caller
+ * explicitly overrides it.
+ *
+ * Before launching: checks whether a live OS process already owns this exact user-data-dir.
+ * If so, throws ChromeProfileInUseError immediately rather than hanging or silently trying to
+ * attach to it (launchPersistentContext's own "Opening in existing browser session" failure
+ * mode was observed to leave an orphaned process behind during live validation). If no live
+ * process owns it, any lock file left behind is stale from an unclean prior shutdown and is
+ * removed — safe, since we've just confirmed nothing is actually using it.
  */
 export async function launchPersistentChrome(
   userDataDir: string = DEFAULT_USER_DATA_DIR,
   options: LaunchPersistentChromeOptions = {},
+  deps: ChromeProcessDeps = realChromeProcessDeps,
 ): Promise<BrowserContext> {
+  const absoluteUserDataDir = path.resolve(userDataDir);
+
+  const owningPids = await deps.findOwningProcessIds(absoluteUserDataDir);
+  if (owningPids.length > 0) {
+    throw new ChromeProfileInUseError(absoluteUserDataDir, owningPids);
+  }
+
+  for (const lockName of LOCK_FILE_NAMES) {
+    if (deps.lockFileExists(absoluteUserDataDir, lockName)) {
+      deps.removeLockFile(absoluteUserDataDir, lockName);
+    }
+  }
+
   const { headless = false, ...rest } = options;
-  return chromium.launchPersistentContext(userDataDir, {
+  return chromium.launchPersistentContext(absoluteUserDataDir, {
     channel: "chrome",
     headless,
     ...rest,
   });
+}
+
+/**
+ * Closes every page, then the context, then bounded-waits for the underlying OS Chrome
+ * process (matched strictly by user-data-dir, never a broader process match) to actually
+ * exit — force-killing it if Playwright's own close() didn't fully tear it down within the
+ * timeout. Call this from every code path that opened a context: normal completion, a caught
+ * error, a timeout, and process signals (see registerShutdownOnSignal). Never touches a
+ * process it can't confirm owns this exact profile directory.
+ */
+export async function closePersistentChrome(
+  context: BrowserContext,
+  userDataDir: string = DEFAULT_USER_DATA_DIR,
+  deps: ChromeProcessDeps = realChromeProcessDeps,
+): Promise<void> {
+  const absoluteUserDataDir = path.resolve(userDataDir);
+
+  for (const page of context.pages()) {
+    await page.close().catch(() => undefined);
+  }
+  await context.close().catch(() => undefined);
+
+  const exitedCleanly = await waitUntilNoOwningProcess(absoluteUserDataDir, SHUTDOWN_WAIT_TIMEOUT_MS, deps);
+  if (exitedCleanly) return;
+
+  const survivors = await deps.findOwningProcessIds(absoluteUserDataDir);
+  for (const pid of survivors) {
+    await deps.killProcessTree(pid);
+  }
+  await waitUntilNoOwningProcess(absoluteUserDataDir, POST_KILL_WAIT_TIMEOUT_MS, deps);
+}
+
+/**
+ * Registers a one-shot SIGINT handler that closes the given context (via closePersistentChrome)
+ * before the process exits, so Ctrl-C during a live run doesn't leave an orphaned Chrome
+ * process behind. Returns an unregister function -- call it once the context is closed through
+ * the normal code path, so a later SIGINT (after this run is already done) doesn't try to
+ * close an already-closed context.
+ */
+export function registerShutdownOnSignal(
+  context: BrowserContext,
+  userDataDir: string = DEFAULT_USER_DATA_DIR,
+  deps: ChromeProcessDeps = realChromeProcessDeps,
+): () => void {
+  const handler = () => {
+    void closePersistentChrome(context, userDataDir, deps).finally(() => {
+      process.exit(130); // 128 + SIGINT(2), conventional exit code for signal termination
+    });
+  };
+  process.once("SIGINT", handler);
+  return () => process.removeListener("SIGINT", handler);
 }

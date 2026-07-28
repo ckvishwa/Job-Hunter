@@ -282,15 +282,23 @@ roles:
       close: contextClose,
     };
     const launchFn = vi.fn().mockResolvedValue(context);
+    // Real closePersistentChrome spawns a real subprocess to confirm OS process exit, and
+    // expects a real BrowserContext shape (context.pages()) this fake object doesn't have --
+    // never acceptable in a test. Shutdown mechanics are covered in isolation by
+    // tests/browser/launcher.test.ts; this test only needs to prove runCollect calls its
+    // close function exactly once with the launched context.
+    const closeFn = vi.fn().mockResolvedValue(undefined);
 
     const summary = await runCollect(
       { sitesConfigPath: sitesPath, rolesConfigPath: rolesPath, jobsStorePath: jobsPath },
       {},
       launchFn as never,
+      closeFn as never,
     );
 
     expect(launchFn).toHaveBeenCalledTimes(1);
-    expect(contextClose).toHaveBeenCalledTimes(1);
+    expect(closeFn).toHaveBeenCalledTimes(1);
+    expect(closeFn).toHaveBeenCalledWith(context);
     expect(summary.sitesSucceeded).toBe(1);
     expect(summary.jobsWritten).toBe(1);
   });

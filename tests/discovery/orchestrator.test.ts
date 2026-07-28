@@ -53,6 +53,16 @@ function fakeLaunchFn(): Promise<BrowserContext> {
   return Promise.resolve(fakeContext);
 }
 
+// Real closePersistentChrome spawns a real subprocess (findOwningProcessIds) to confirm the
+// OS Chrome process actually exited -- never acceptable in a test. A no-op stands in
+// everywhere runDiscover is called in this file; actual close-mechanics are covered in
+// isolation by tests/browser/launcher.test.ts.
+const fakeCloseFn = vi.fn(async () => {});
+
+beforeEach(() => {
+  fakeCloseFn.mockClear();
+});
+
 function makePaths() {
   const dir = mkdtempSync(path.join(tmpdir(), "job-hunter-orchestrator-"));
   return {
@@ -106,7 +116,7 @@ describe("orchestrator keyword/profile wiring (Task 12)", () => {
   });
 
   it("runs all 4 profiles' full keyword sets when no profile filter is given", async () => {
-    await runDiscover(makePaths(), {}, fakeLaunchFn);
+    await runDiscover(makePaths(), {}, fakeLaunchFn, fakeCloseFn);
 
     expect(calls).toHaveLength(16);
 
@@ -123,7 +133,7 @@ describe("orchestrator keyword/profile wiring (Task 12)", () => {
   });
 
   it("runs only the requested profile's keywords when filters.profileIds is set", async () => {
-    await runDiscover(makePaths(), { profileIds: ["sdet"] }, fakeLaunchFn);
+    await runDiscover(makePaths(), { profileIds: ["sdet"] }, fakeLaunchFn, fakeCloseFn);
 
     expect(calls).toHaveLength(4);
 
@@ -149,7 +159,7 @@ describe("orchestrator reporting counters (Task 15)", () => {
   it("keywordsSearched matches the real 16-keyword count from config/roles.yml (Task-12-style setup)", async () => {
     discoverMock.mockResolvedValue(undefined);
 
-    const summary = await runDiscover(makePaths(), {}, fakeLaunchFn);
+    const summary = await runDiscover(makePaths(), {}, fakeLaunchFn, fakeCloseFn);
 
     expect(summary.keywordsSearched).toBe(16);
   });
@@ -166,7 +176,7 @@ describe("orchestrator reporting counters (Task 15)", () => {
 
     // Filtered to the sdet profile only -- 4 keywords (see ROLE_KEYWORDS.sdet above) x 3
     // onCompanyProcessed() calls each = 12.
-    const summary = await runDiscover(makePaths(), { profileIds: ["sdet"] }, fakeLaunchFn);
+    const summary = await runDiscover(makePaths(), { profileIds: ["sdet"] }, fakeLaunchFn, fakeCloseFn);
 
     expect(summary.companiesAttempted).toBe(12);
   });
@@ -180,7 +190,7 @@ describe("orchestrator --dry-run (Task 14)", () => {
   it("never launches the browser or calls any adapter, but still reports sourcesAttempted", async () => {
     const launchFn = vi.fn(fakeLaunchFn);
 
-    const summary = await runDiscover(makePaths(), { dryRun: true }, launchFn);
+    const summary = await runDiscover(makePaths(), { dryRun: true }, launchFn, fakeCloseFn);
 
     expect(launchFn).not.toHaveBeenCalled();
     expect(discoverMock).not.toHaveBeenCalled();
@@ -198,7 +208,7 @@ describe("orchestrator --dry-run (Task 14)", () => {
   it("respects --profile filtering in the dry-run sourcesAttempted computation (still 1, since targetSources doesn't depend on profile)", async () => {
     const launchFn = vi.fn(fakeLaunchFn);
 
-    const summary = await runDiscover(makePaths(), { dryRun: true, profileIds: ["sdet"] }, launchFn);
+    const summary = await runDiscover(makePaths(), { dryRun: true, profileIds: ["sdet"] }, launchFn, fakeCloseFn);
 
     expect(launchFn).not.toHaveBeenCalled();
     expect(summary.sourcesAttempted).toBe(1);
@@ -221,7 +231,7 @@ describe("orchestrator --dry-run (Task 14)", () => {
     };
     writeFileSync(paths.checkpointsPath, JSON.stringify(existingCheckpoints), "utf-8");
 
-    await runDiscover(paths, { dryRun: true, resetCheckpoint: true }, launchFn);
+    await runDiscover(paths, { dryRun: true, resetCheckpoint: true }, launchFn, fakeCloseFn);
 
     // Untouched: dry runs return before checkpoint loading/reset ever happens.
     expect(existsSync(paths.checkpointsPath)).toBe(true);
@@ -248,7 +258,7 @@ describe("orchestrator --company filter must not prematurely mark company-career
     discoverMock.mockResolvedValue(undefined); // simulates company-careers resolving cleanly under a --company filter
 
     const paths = makePaths();
-    await runDiscover(paths, { company: "Google" }, fakeLaunchFn);
+    await runDiscover(paths, { company: "Google" }, fakeLaunchFn, fakeCloseFn);
 
     expect(discoverMock).toHaveBeenCalledTimes(16); // once per role/keyword, per Task 12
 
@@ -256,7 +266,7 @@ describe("orchestrator --company filter must not prematurely mark company-career
     // the checkpoint was NOT marked completed by the filtered run above.
     discoverMock.mockReset();
     discoverMock.mockResolvedValue(undefined);
-    await runDiscover(paths, {}, fakeLaunchFn);
+    await runDiscover(paths, {}, fakeLaunchFn, fakeCloseFn);
 
     expect(discoverMock).toHaveBeenCalledTimes(16);
   });
@@ -265,13 +275,13 @@ describe("orchestrator --company filter must not prematurely mark company-career
     discoverMock.mockResolvedValue(undefined);
 
     const paths = makePaths();
-    await runDiscover(paths, {}, fakeLaunchFn);
+    await runDiscover(paths, {}, fakeLaunchFn, fakeCloseFn);
     expect(discoverMock).toHaveBeenCalledTimes(16);
 
     // Second run, still no filter: every checkpoint should now be completed, so discover()
     // must NOT be called again.
     discoverMock.mockReset();
-    await runDiscover(paths, {}, fakeLaunchFn);
+    await runDiscover(paths, {}, fakeLaunchFn, fakeCloseFn);
     expect(discoverMock).not.toHaveBeenCalled();
   });
 });
@@ -290,13 +300,18 @@ describe("orchestrator browser context lifecycle (Task 13)", () => {
     } as unknown as BrowserContext;
     const launchFn = vi.fn(async () => fakeContext);
 
-    await runDiscover(makePaths(), {}, launchFn);
+    await runDiscover(makePaths(), {}, launchFn, fakeCloseFn);
 
     // Real config collapses to 1 source x 16 keywords (see the Task 12 comment above), so
-    // 16 discover() calls all share the one lazily-launched context.
+    // 16 discover() calls all share the one lazily-launched context. Shutdown mechanics
+    // themselves (closing pages, bounded-waiting for the OS process, force-kill fallback) are
+    // exercised in isolation by tests/browser/launcher.test.ts -- this test only proves the
+    // orchestrator calls its close function exactly once, with the actual launched context,
+    // not once per keyword.
     expect(discoverMock).toHaveBeenCalledTimes(16);
     expect(launchFn).toHaveBeenCalledTimes(1);
-    expect(fakeContext.close).toHaveBeenCalledTimes(1);
+    expect(fakeCloseFn).toHaveBeenCalledTimes(1);
+    expect(fakeCloseFn).toHaveBeenCalledWith(fakeContext, undefined);
   });
 });
 
@@ -342,7 +357,7 @@ describe("orchestrator incremental checkpoint/discovery persistence (Task 13)", 
     // setTimeout-based inter-request throttle in Phase 2 after the one resolved job -- fake
     // timers so this test doesn't burn 500ms of real wall-clock time on it.
     vi.useFakeTimers();
-    const summaryPromise = runDiscover(paths, {}, fakeLaunchFn);
+    const summaryPromise = runDiscover(paths, {}, fakeLaunchFn, fakeCloseFn);
     await vi.advanceTimersByTimeAsync(600);
     const summary = await summaryPromise;
 

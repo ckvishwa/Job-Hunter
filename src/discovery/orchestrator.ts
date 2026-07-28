@@ -1,5 +1,10 @@
 import type { BrowserContext } from "playwright";
-import { launchPersistentChrome } from "../browser/launcher.js";
+import {
+  closePersistentChrome,
+  launchPersistentChrome,
+  registerShutdownOnSignal,
+  uniqueChromeProfileDir,
+} from "../browser/launcher.js";
 import { loadCollectSettings, loadPortalsConfig, loadRolesConfig, loadSitesConfig } from "../config/loader.js";
 import { getOrCreateCheckpoint, loadCheckpoints, resetCheckpoints, saveCheckpoints } from "./checkpoints.js";
 import { resolveDiscoveryAdapter } from "./registry.js";
@@ -33,6 +38,11 @@ export interface DiscoverFilters {
   // before the run starts (see below).
   resetCheckpoint?: string | true;
   dryRun?: boolean;
+  // Launch a fresh, unused Chrome profile for this run instead of the shared persistent one
+  // -- for controlled live-validation runs that need to avoid contending with another run's
+  // profile lock. Not for normal usage: the shared profile's persistence (cookies/logins) is
+  // what makes manual-verification runs useful across invocations.
+  isolatedProfile?: boolean;
 }
 
 function emptyCounters(): RawDiscoveryCounters {
@@ -67,6 +77,7 @@ export async function runDiscover(
   },
   filters: DiscoverFilters = {},
   launchFn: typeof launchPersistentChrome = launchPersistentChrome,
+  closeFn: typeof closePersistentChrome = closePersistentChrome,
 ): Promise<DiscoveryRunSummary> {
   const roles = loadRolesConfig(paths.rolesConfigPath);
   const settings = loadCollectSettings(paths.sitesConfigPath);
@@ -144,11 +155,18 @@ export async function runDiscover(
     return buildSummary(counters);
   }
 
-  // Launch Playwright Chrome context
+  // Launch Playwright Chrome context. isolatedProfile picks a fresh, unused profile dir
+  // (avoids contending with another run's profile lock); omitted (undefined) uses the shared
+  // persistent profile, launchPersistentChrome's own default. Whichever value is chosen here
+  // is reused for closePersistentChrome below -- both must agree on the exact profile so
+  // shutdown matches the process that was actually launched.
+  const profileDir = filters.isolatedProfile ? uniqueChromeProfileDir() : undefined;
   let context: BrowserContext | undefined;
+  let unregisterShutdown: (() => void) | undefined;
   async function ensureContext(): Promise<BrowserContext> {
     if (!context) {
-      context = await launchFn(undefined, { headless: false });
+      context = await launchFn(profileDir, { headless: false });
+      unregisterShutdown = registerShutdownOnSignal(context, profileDir);
     }
     return context;
   }
@@ -333,8 +351,14 @@ export async function runDiscover(
     }
 
   } finally {
+    // Runs on normal completion, a caught error, or any other exit from the try block above.
+    // closePersistentChrome closes pages/context and bounded-waits for the OS process to
+    // actually exit (force-killing it if needed) rather than trusting context.close() alone --
+    // see launcher.ts for why. unregisterShutdown avoids a stale SIGINT handler trying to
+    // close an already-closed context if the process later receives one.
+    unregisterShutdown?.();
     if (context) {
-      await context.close();
+      await closeFn(context, profileDir);
     }
   }
 
