@@ -32,7 +32,7 @@
 - [x] Task 11 — Cross-source dedup (already done — verify only) — test-only commit closing the malformed-URL-in-mixed-batch gap. Reviewed clean.
 - [x] Task 12 — Keyword orchestration (already done — verify only) — new tests/discovery/orchestrator.test.ts (first coverage of runDiscover), verified against real config/roles.yml. Reviewed clean. Note: found `--dry-run` doesn't exist anywhere yet (not in cli.ts, not in DiscoverFilters) — Task 13's dry-run test needs Task 14 to land first; doing Task 14 next, out of numeric order.
 - [ ] Task 13 — Orchestrator: dedicated test coverage
-- [ ] Task 14 — CLI (already done — verify only)
+- [x] Task 14 — CLI (already done — verify only) — commits 77b0ee4, abf1144. Added --company/--resume/--reset-checkpoint/--dry-run (all 4 were missing). Self-review caught and fixed a real bug: --company + checkpoint.completed marking would have permanently stranded unfiltered companies (fixed at the orchestrator layer, verified by empirical revert/restore). Independent review found only cosmetic follow-ups (duplicated comment, dry-run+reset-checkpoint silent no-op needed a log line) — both fixed and reviewed clean.
 - [ ] Task 15 — Reporting module
 - [ ] Task 16 — Fill remaining test gaps; confirm all tests + typecheck green
 - [ ] Task 17 — Controlled live validation
