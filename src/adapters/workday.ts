@@ -78,7 +78,12 @@ export const workdayAdapter: SourceAdapter = {
     const config = requireWorkdayConfig(site);
     const byPath = new Map<string, DiscoveredJob>();
     const effectiveSearches = searches.length ? searches : [{ keyword: "", profileIds: [] }];
-    const limit = 50;
+    // Workday's cxs/jobs endpoint enforces a per-tenant page-size ceiling that isn't uniform:
+    // confirmed live against a real tenant (target.wd5.myworkdayjobs.com) that 50 gets a flat
+    // HTTP_400 while 20 succeeds. 20 is Workday's common default result-page size across many
+    // tenants, so it's used as the safe floor here rather than guessing a larger number that
+    // works for some tenants and hard-fails others.
+    const limit = 20;
 
     for (const search of effectiveSearches) {
       let offset = 0;
@@ -97,7 +102,10 @@ export const workdayAdapter: SourceAdapter = {
           byPath.set(posting.externalPath, {
             externalId: posting.externalPath,
             title: posting.title,
-            url: `https://${config.hostname}/${config.site}/job/${posting.externalPath}`,
+            // posting.externalPath already starts with "/job/..." (confirmed against real
+            // API responses) -- appending it after a literal "/job/" produced a real,
+            // non-canonical "job//job/" URL, still resolved by Workday's server but wrong.
+            url: `https://${config.hostname}/${config.site}${posting.externalPath}`,
             matchedProfiles: [...profiles],
           });
           jobsInSearch += 1;
@@ -117,8 +125,10 @@ export const workdayAdapter: SourceAdapter = {
     site: SiteConfig,
   ): Promise<RawJobDetail> {
     const config = requireWorkdayConfig(site);
+    // job.externalId is posting.externalPath from discoverJobs, already "/job/..." -- same
+    // double-segment fix as the browsable url above.
     const parsed = await fetchJson(
-      `https://${config.hostname}/wday/cxs/${config.tenant}/${config.site}/job/${job.externalId}`,
+      `https://${config.hostname}/wday/cxs/${config.tenant}/${config.site}${job.externalId}`,
       { method: "GET" },
       `Workday job detail "${job.externalId}"`,
     );

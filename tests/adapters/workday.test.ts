@@ -90,6 +90,45 @@ describe("workdayAdapter", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  it("builds the canonical url from hostname+site+externalPath without a duplicated /job/ segment (real API externalPath already starts with /job/...)", async () => {
+    const onlyPage = {
+      total: 1,
+      jobPostings: [{ title: "Cloud Engineer", externalPath: "/job/Some-Location/Cloud-Engineer_R0001" }],
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(onlyPage)));
+
+    const discovered = await workdayAdapter.discoverJobs(
+      site,
+      [{ keyword: "cloud", profileIds: ["cloud"] }],
+      settings,
+    );
+
+    expect(discovered).toHaveLength(1);
+    expect(discovered[0]!.url).toBe(
+      "https://acme.wd1.myworkdayjobs.com/External/job/Some-Location/Cloud-Engineer_R0001",
+    );
+    expect(discovered[0]!.url).not.toContain("job//job");
+  });
+
+  it("fetches job details from a url built the same way, without a duplicated /job/ segment", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ jobPostingInfo: { title: "X" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const job = {
+      externalId: "/job/Some-Location/Cloud-Engineer_R0001",
+      title: "Cloud Engineer",
+      url: "https://acme.wd1.myworkdayjobs.com/External/job/Some-Location/Cloud-Engineer_R0001",
+      matchedProfiles: ["cloud"],
+    };
+    await workdayAdapter.fetchJobDetails(job, site, settings);
+
+    const [calledUrl] = fetchMock.mock.calls[0] as [string];
+    expect(calledUrl).toBe(
+      "https://acme.wd1.myworkdayjobs.com/wday/cxs/acme/External/job/Some-Location/Cloud-Engineer_R0001",
+    );
+    expect(calledUrl).not.toContain("job//job");
+  });
+
   it("throws a clear error on an unrecognized response shape", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => jsonResponse({ unexpected: true })));
     await expect(
