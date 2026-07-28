@@ -201,6 +201,7 @@ describe("loadCompanyRegistry", () => {
           atsType: "lever",
           atsTenantOrBoardId: "thinkahead",
           atsWorkdaySite: null,
+          atsWorkdayHostname: null,
           verificationStatus: "verified",
           lastVerifiedDate: "2026-07-27"
         }
@@ -216,6 +217,7 @@ describe("loadCompanyRegistry", () => {
         atsType: "lever",
         atsTenantOrBoardId: "thinkahead",
         atsWorkdaySite: null,
+        atsWorkdayHostname: null,
         verificationStatus: "verified",
         lastVerifiedDate: "2026-07-27"
       }

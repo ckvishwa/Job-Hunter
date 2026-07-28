@@ -20,6 +20,7 @@ function entry(overrides: Record<string, unknown> = {}) {
     atsType: "greenhouse",
     atsTenantOrBoardId: "acme",
     atsWorkdaySite: null,
+    atsWorkdayHostname: null,
     verificationStatus: "verified",
     lastVerifiedDate: "2026-07-27",
     ...overrides,
@@ -92,11 +93,15 @@ describe("loadCompanyRegistry", () => {
     JSON.parse(readFileSync(validationPath, "utf-8"));
 
     const registry = loadCompanyRegistry(validationPath);
-    expect(registry).toHaveLength(3);
-    expect(registry.map((e) => e.company).sort()).toEqual(["AHEAD", "Figma", "Stripe"].sort());
+    expect(registry).toHaveLength(4);
+    expect(registry.map((e) => e.company).sort()).toEqual(["AHEAD", "Figma", "Stripe", "Target"].sort());
     // Every validation entry is deliberately NOT Fortune-ranked -- these exist only to give
     // controlled live-validation runs (Task 17) real, working companies per ATS type without
-    // fabricating or guessing details about an actual Fortune 500 member.
+    // fabricating or guessing details about an actual Fortune 500 member. Target IS a genuine
+    // Fortune 500 company with a real, verified Workday tenant (Task 2 restart) -- kept here
+    // rather than in production because its exact current Fortune rank number was never
+    // independently confirmed, and fabricating one would violate the same "never guess" rule
+    // this file's own production/validation split exists to enforce.
     for (const e of registry) {
       expect(e.fortuneRank).toBeNull();
     }

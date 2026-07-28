@@ -7,6 +7,7 @@
     "atsType": "lever",
     "atsTenantOrBoardId": "thinkahead",
     "atsWorkdaySite": null,
+    "atsWorkdayHostname": null,
     "verificationStatus": "verified",
     "lastVerifiedDate": "2026-07-27"
   },
@@ -18,6 +19,7 @@
     "atsType": "greenhouse",
     "atsTenantOrBoardId": "stripe",
     "atsWorkdaySite": null,
+    "atsWorkdayHostname": null,
     "verificationStatus": "blocked",
     "lastVerifiedDate": "2026-07-27"
   },
@@ -29,7 +31,20 @@
     "atsType": "greenhouse",
     "atsTenantOrBoardId": "figma",
     "atsWorkdaySite": null,
+    "atsWorkdayHostname": null,
     "verificationStatus": "verified",
     "lastVerifiedDate": "2026-07-27"
+  },
+  {
+    "company": "Target",
+    "fortuneRank": null,
+    "corporateDomain": "target.com",
+    "careersUrl": "https://target.wd5.myworkdayjobs.com/targetcareers",
+    "atsType": "workday",
+    "atsTenantOrBoardId": "target",
+    "atsWorkdaySite": "targetcareers",
+    "atsWorkdayHostname": "target.wd5.myworkdayjobs.com",
+    "verificationStatus": "verified",
+    "lastVerifiedDate": "2026-07-28"
   }
 ]

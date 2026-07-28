@@ -33,6 +33,7 @@ function makeRegistry(): CompanyRegistryEntry[] {
       atsType: "greenhouse",
       atsTenantOrBoardId: "companya",
       atsWorkdaySite: null,
+      atsWorkdayHostname: null,
       verificationStatus: "verified",
       lastVerifiedDate: "2026-01-01",
     },
@@ -44,6 +45,7 @@ function makeRegistry(): CompanyRegistryEntry[] {
       atsType: "greenhouse",
       atsTenantOrBoardId: "companyb",
       atsWorkdaySite: null,
+      atsWorkdayHostname: null,
       verificationStatus: "verified",
       lastVerifiedDate: "2026-01-01",
     },
@@ -203,6 +205,7 @@ describe("companyCareersDiscoveryAdapter real-data extraction and structural ski
         atsType: "greenhouse",
         atsTenantOrBoardId: "companya",
         atsWorkdaySite: null,
+        atsWorkdayHostname: null,
         verificationStatus: "verified",
         lastVerifiedDate: "2026-01-01",
       },
@@ -254,19 +257,25 @@ describe("companyCareersDiscoveryAdapter real-data extraction and structural ski
     expect(jobs[0]!.location).toBe("Austin, TX");
   });
 
-  it("skips a workday entry with atsWorkdaySite: null without calling any adapter, and marks it completed", async () => {
+  function makeWorkdayEntry(overrides: Partial<CompanyRegistryEntry> = {}): CompanyRegistryEntry {
+    return {
+      company: "CompanyW",
+      fortuneRank: null,
+      corporateDomain: "companyw.com",
+      careersUrl: "https://companyw.com/careers",
+      atsType: "workday",
+      atsTenantOrBoardId: "companyw",
+      atsWorkdaySite: "companywcareers",
+      atsWorkdayHostname: "companyw.wd1.myworkdayjobs.com",
+      verificationStatus: "verified",
+      lastVerifiedDate: "2026-01-01",
+      ...overrides,
+    };
+  }
+
+  it("skips a workday entry with every field null, without calling any adapter, and marks it completed", async () => {
     const registry: CompanyRegistryEntry[] = [
-      {
-        company: "CompanyW",
-        fortuneRank: null,
-        corporateDomain: "companyw.com",
-        careersUrl: "https://companyw.com/careers",
-        atsType: "workday",
-        atsTenantOrBoardId: null,
-        atsWorkdaySite: null,
-        verificationStatus: "unverified",
-        lastVerifiedDate: null,
-      },
+      makeWorkdayEntry({ atsTenantOrBoardId: null, atsWorkdaySite: null, atsWorkdayHostname: null, verificationStatus: "unverified", lastVerifiedDate: null }),
     ];
     loadCompanyRegistryMock.mockReturnValue(registry);
 
@@ -283,6 +292,128 @@ describe("companyCareersDiscoveryAdapter real-data extraction and structural ski
     expect(checkpoint.completedCompanyKeys).toEqual(["companyw::companyw.com"]);
   });
 
+  it("skips a workday entry missing only atsWorkdayHostname, naming exactly that field", async () => {
+    const registry: CompanyRegistryEntry[] = [makeWorkdayEntry({ atsWorkdayHostname: null })];
+    loadCompanyRegistryMock.mockReturnValue(registry);
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async () => {});
+
+    await companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed));
+
+    expect(resolveAdapterMock).not.toHaveBeenCalled();
+  });
+
+  it("skips a workday entry missing only atsTenantOrBoardId (tenant), naming exactly that field", async () => {
+    const registry: CompanyRegistryEntry[] = [makeWorkdayEntry({ atsTenantOrBoardId: null })];
+    loadCompanyRegistryMock.mockReturnValue(registry);
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async () => {});
+
+    await companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed));
+
+    expect(resolveAdapterMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a guessed atsWorkdaySite value of \"careers\" instead of trusting it", async () => {
+    const registry: CompanyRegistryEntry[] = [makeWorkdayEntry({ atsWorkdaySite: "careers" })];
+    loadCompanyRegistryMock.mockReturnValue(registry);
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async () => {});
+
+    await companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed));
+
+    expect(resolveAdapterMock).not.toHaveBeenCalled();
+    expect(checkpoint.completedCompanyKeys).toEqual(["companyw::companyw.com"]);
+  });
+
+  it("delegates a fully-verified workday entry to the real adapter with a SiteConfig built exclusively from registry values", async () => {
+    const registry: CompanyRegistryEntry[] = [makeWorkdayEntry()];
+    loadCompanyRegistryMock.mockReturnValue(registry);
+
+    const discoverJobsW = vi.fn().mockResolvedValue([
+      { externalId: "w1", title: "SDET", url: "https://companyw.wd1.myworkdayjobs.com/companywcareers/job/w1", matchedProfiles: ["sdet-qa"] },
+    ]);
+    resolveAdapterMock.mockImplementation(() => fakeAdapter(discoverJobsW));
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async () => {});
+
+    await companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed));
+
+    expect(resolveAdapterMock).toHaveBeenCalledTimes(1);
+    const [siteArg] = resolveAdapterMock.mock.calls[0] as [{ workday?: { hostname: string; tenant: string; site: string } }];
+    expect(siteArg.workday).toEqual({
+      hostname: "companyw.wd1.myworkdayjobs.com",
+      tenant: "companyw",
+      site: "companywcareers",
+    });
+    expect(checkpoint.completedCompanyKeys).toEqual(["companyw::companyw.com"]);
+  });
+
+  it("isolates a workday company's failure from other companies -- one throw doesn't block the rest", async () => {
+    const registry: CompanyRegistryEntry[] = [
+      makeWorkdayEntry(),
+      makeWorkdayEntry({ company: "CompanyW2", corporateDomain: "companyw2.com" }),
+    ];
+    loadCompanyRegistryMock.mockReturnValue(registry);
+
+    const discoverJobsFail = vi.fn().mockRejectedValue(new Error("workday API 500"));
+    const discoverJobsOk = vi.fn().mockResolvedValue([]);
+    resolveAdapterMock
+      .mockImplementationOnce(() => fakeAdapter(discoverJobsFail))
+      .mockImplementationOnce(() => fakeAdapter(discoverJobsOk));
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async () => {});
+
+    // Not expected to throw for the WHOLE run -- per-company failures are caught internally;
+    // discover() only throws afterward if any company is still incomplete (existing Task 9
+    // behavior), which is exactly what we're confirming here still holds for workday too.
+    await expect(
+      companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed)),
+    ).rejects.toThrow();
+
+    expect(discoverJobsFail).toHaveBeenCalledTimes(1);
+    expect(discoverJobsOk).toHaveBeenCalledTimes(1);
+    // Only the successful company is marked done -- the failed one stays eligible for retry.
+    expect(checkpoint.completedCompanyKeys).toEqual(["companyw2::companyw2.com"]);
+  });
+
+  it("retries only the previously-failed workday company on a checkpoint resume, not the one that already succeeded", async () => {
+    const registry: CompanyRegistryEntry[] = [
+      makeWorkdayEntry(),
+      makeWorkdayEntry({ company: "CompanyW2", corporateDomain: "companyw2.com" }),
+    ];
+    loadCompanyRegistryMock.mockReturnValue(registry);
+
+    const discoverJobsFail = vi.fn().mockRejectedValueOnce(new Error("transient")).mockResolvedValue([]);
+    const discoverJobsOk = vi.fn().mockResolvedValue([]);
+    resolveAdapterMock.mockImplementation((site: { name: string }) =>
+      site.name === "CompanyW" ? fakeAdapter(discoverJobsFail) : fakeAdapter(discoverJobsOk),
+    );
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async () => {});
+
+    await expect(
+      companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed)),
+    ).rejects.toThrow();
+    expect(checkpoint.completedCompanyKeys).toEqual(["companyw2::companyw2.com"]);
+
+    // Resume: same checkpoint object carries completedCompanyKeys forward, same as a real
+    // --resume run would (checkpoints are persisted/reloaded between invocations).
+    discoverJobsFail.mockClear();
+    discoverJobsOk.mockClear();
+    await companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed));
+
+    expect(discoverJobsFail).toHaveBeenCalledTimes(1); // only the failed one retried
+    expect(discoverJobsOk).not.toHaveBeenCalled(); // already-done company not reattempted
+    expect(checkpoint.completedCompanyKeys!.sort()).toEqual(["companyw2::companyw2.com", "companyw::companyw.com"].sort());
+  });
+
   it("skips a generic entry with no genericSelectors without calling any adapter, and marks it completed", async () => {
     const registry: CompanyRegistryEntry[] = [
       {
@@ -293,6 +424,7 @@ describe("companyCareersDiscoveryAdapter real-data extraction and structural ski
         atsType: "generic",
         atsTenantOrBoardId: null,
         atsWorkdaySite: null,
+        atsWorkdayHostname: null,
         // genericSelectors intentionally omitted
         verificationStatus: "unverified",
         lastVerifiedDate: null,

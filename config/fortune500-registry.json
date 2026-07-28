@@ -7,6 +7,7 @@
     "atsType": "workday",
     "atsTenantOrBoardId": "walmart",
     "atsWorkdaySite": null,
+    "atsWorkdayHostname": null,
     "verificationStatus": "verified",
     "lastVerifiedDate": "2026-07-27"
   },
@@ -18,6 +19,7 @@
     "atsType": "generic",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
+    "atsWorkdayHostname": null,
     "verificationStatus": "verified",
     "lastVerifiedDate": "2026-07-27"
   },
@@ -29,6 +31,7 @@
     "atsType": "generic",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
+    "atsWorkdayHostname": null,
     "verificationStatus": "verified",
     "lastVerifiedDate": "2026-07-27"
   },
@@ -40,6 +43,7 @@
     "atsType": "greenhouse",
     "atsTenantOrBoardId": "google",
     "atsWorkdaySite": null,
+    "atsWorkdayHostname": null,
     "verificationStatus": "blocked",
     "lastVerifiedDate": "2026-07-27"
   }

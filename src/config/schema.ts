@@ -112,12 +112,21 @@ export const companyRegistryEntrySchema = z.object({
   corporateDomain: z.string().min(1),
   careersUrl: z.string().url(),
   atsType: z.enum(["greenhouse", "lever", "workday", "generic"]),
+  // For atsType: "workday" entries, doubles as the Workday tenant id (e.g. "target") --
+  // the same "this company's identifier within its ATS" role it already plays for
+  // greenhouse (board token) and lever (site slug). Present-and-null on all others.
   atsTenantOrBoardId: z.string().min(1).nullable(),
   // Required (not optional) so every entry states explicitly whether a
   // verified Workday site segment exists (a value) or doesn't (null) —
   // never silently absent. Only meaningful for atsType: "workday" entries;
   // present-and-null on all others for schema uniformity.
   atsWorkdaySite: z.string().min(1).nullable(),
+  // Workday's hostname carries an unguessable per-tenant shard (e.g. "target.wd5.myworkday
+  // jobs.com" -- the "wd5" cannot be derived from the company name or corporateDomain), so
+  // unlike posting-resolver.ts's resolve() (which reads it straight off an already-known job
+  // URL) company-careers.ts's discovery phase has no URL yet to derive it from and needs it
+  // stored explicitly. Present-and-null on all others, same convention as atsWorkdaySite.
+  atsWorkdayHostname: z.string().min(1).nullable(),
   // Reuses the existing genericSelectorsSchema (SiteConfig.generic) — no new
   // selector shape. Absent = "not yet configured", never fabricated.
   genericSelectors: genericSelectorsSchema.optional(),

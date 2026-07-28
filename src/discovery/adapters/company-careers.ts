@@ -62,24 +62,38 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
       console.log(`[company-careers] Processing company: ${company.company} (${company.atsType})`);
 
       if (company.atsType === "workday") {
-        console.log(`[company-careers] Skipping ${company.company}: workday requires a verified per-company ATS site identifier not yet stored in the registry. No site value guessed.`);
-        skipped.push({
-          company: company.company,
-          atsType: company.atsType,
-          reason: "missing verified Workday ATS site identifier",
-          missingFields: ["atsWorkdaySite"],
-        });
-        // A structural skip is a permanent, non-transient outcome (the registry data will
-        // never appear mid-run) -- mark it done so it isn't reattempted every run. If the
-        // registry is later filled in with real data for this company, a --reset-checkpoint
-        // (or manually clearing this key) is required to retry it -- matches how a completed
-        // success is handled, no separate mechanism invented for this narrower case.
-        completedKeys.push(companyKey);
-        await onPageProcessed([], i + 1);
-        // Structural skips ARE company-level attempts (this company was considered this run,
-        // just couldn't proceed past the ATS-adapter step) -- reported same as a full attempt.
-        context.onCompanyProcessed?.();
-        continue;
+        const missingFields: string[] = [];
+        if (!company.atsWorkdayHostname) missingFields.push("atsWorkdayHostname");
+        if (!company.atsTenantOrBoardId) missingFields.push("atsTenantOrBoardId");
+        if (!company.atsWorkdaySite) missingFields.push("atsWorkdaySite");
+        // "careers" is the generic guessed default an earlier version of this adapter used to
+        // fabricate when no real site segment was known -- explicitly rejected here so a
+        // stale/guessed value left in the registry can never silently pass validation just
+        // because the field happens to be non-empty.
+        if (company.atsWorkdaySite === "careers") missingFields.push('atsWorkdaySite (guessed value "careers" rejected)');
+
+        if (missingFields.length > 0) {
+          console.log(`[company-careers] Skipping ${company.company}: workday requires verified registry fields not yet present: ${missingFields.join(", ")}. No value guessed.`);
+          skipped.push({
+            company: company.company,
+            atsType: company.atsType,
+            reason: "missing or guessed Workday ATS fields",
+            missingFields,
+          });
+          // A structural skip is a permanent, non-transient outcome (the registry data will
+          // never appear mid-run) -- mark it done so it isn't reattempted every run. If the
+          // registry is later filled in with real data for this company, a --reset-checkpoint
+          // (or manually clearing this key) is required to retry it -- matches how a completed
+          // success is handled, no separate mechanism invented for this narrower case.
+          completedKeys.push(companyKey);
+          await onPageProcessed([], i + 1);
+          // Structural skips ARE company-level attempts (this company was considered this run,
+          // just couldn't proceed past the ATS-adapter step) -- reported same as a full attempt.
+          context.onCompanyProcessed?.();
+          continue;
+        }
+        // Falls through to the shared try/catch below, which builds site.workday from these
+        // exact verified fields (no guessing) and delegates to the real workday adapter.
       }
 
       if (company.atsType === "generic") {
@@ -109,6 +123,14 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
           site.greenhouse = { boardToken: company.atsTenantOrBoardId || undefined };
         } else if (company.atsType === "lever") {
           site.lever = { site: company.atsTenantOrBoardId || undefined };
+        } else if (company.atsType === "workday") {
+          // All three fields were already confirmed present (non-null, non-guessed) by the
+          // validation above -- built exclusively from verified registry values, never guessed.
+          site.workday = {
+            hostname: company.atsWorkdayHostname!,
+            tenant: company.atsTenantOrBoardId!,
+            site: company.atsWorkdaySite!,
+          };
         }
 
         const genericDeps = {
