@@ -100,24 +100,51 @@ export async function runDiscover(
   // so their resulting `source` strings/config lookups never get conflated, even though both
   // ultimately resolve to configurableGenericPortalAdapter via registry.ts's unmatched-id
   // fallback.
-  const standardPortalIds = portalsConfig.filter((p) => p.enabled && p.type !== "generic").map((p) => p.id);
-  const portalsYmlGenericIds = portalsConfig.filter((p) => p.enabled && p.type === "generic").map((p) => p.id);
+  const allPortalIds = portalsConfig.filter((p) => p.type !== "generic").map((p) => p.id);
+  const allPortalsYmlGenericIds = portalsConfig.filter((p) => p.type === "generic").map((p) => p.id);
+  const enabledPortalIds = portalsConfig.filter((p) => p.enabled && p.type !== "generic").map((p) => p.id);
+  const enabledPortalsYmlGenericIds = portalsConfig.filter((p) => p.enabled && p.type === "generic").map((p) => p.id);
   const companyCareers = "company-careers";
 
-  const genericPortals = sites
+  const allGenericPortals = sites.filter((site) => site.adapter === "generic").map((site) => site.id);
+  const enabledGenericPortals = sites
     .filter((site) => site.enabled && site.adapter === "generic")
     .map((site) => site.id);
 
-  let targetSources = [...standardPortalIds, companyCareers, ...genericPortals, ...portalsYmlGenericIds];
+  let targetSources: string[];
 
   if (filters.sources && filters.sources.length > 0) {
-    targetSources = targetSources.filter((s) =>
+    // Every known source id, regardless of its portals.yml/sites.yml `enabled` flag -- an
+    // explicit --source is how a controlled/validation run opts a disabled entry in without
+    // permanently flipping the config file. Unknown ids fail loudly instead of silently
+    // running nothing (the previous behavior: an unrecognized/disabled id just vanished from
+    // targetSources with no signal at all).
+    const allKnownSourceIds = new Set([
+      ...allPortalIds,
+      companyCareers,
+      ...allGenericPortals,
+      ...allPortalsYmlGenericIds,
+    ]);
+    for (const requested of filters.sources) {
+      const isKnown = [...allKnownSourceIds].some((id) => id.toLowerCase() === requested.toLowerCase());
+      if (!isKnown && requested.toLowerCase() !== "generic") {
+        throw new Error(
+          `Unknown --source "${requested}". Known sources: ${[...allKnownSourceIds].sort().join(", ")} ` +
+            `(or "generic" to match every generic-portal entry).`,
+        );
+      }
+    }
+    const everyKnownSource = [...allPortalIds, companyCareers, ...allGenericPortals, ...allPortalsYmlGenericIds];
+    targetSources = everyKnownSource.filter((s) =>
       filters.sources!.some(
         (fs) =>
           fs.toLowerCase() === s.toLowerCase() ||
-          (fs === "generic" && (genericPortals.includes(s) || portalsYmlGenericIds.includes(s))),
+          (fs.toLowerCase() === "generic" && (allGenericPortals.includes(s) || allPortalsYmlGenericIds.includes(s))),
       ),
     );
+  } else {
+    // No explicit --source: only ever run what portals.yml/sites.yml itself opts in.
+    targetSources = [...enabledPortalIds, companyCareers, ...enabledGenericPortals, ...enabledPortalsYmlGenericIds];
   }
 
   // Determine target keywords and profiles

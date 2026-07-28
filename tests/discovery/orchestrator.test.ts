@@ -286,6 +286,117 @@ describe("orchestrator --company filter must not prematurely mark company-career
   });
 });
 
+describe("orchestrator --source semantics (Task 1 restart)", () => {
+  beforeEach(() => {
+    discoverMock.mockReset();
+    discoverMock.mockResolvedValue(undefined);
+  });
+
+  // Real config/portals.yml ships every entry disabled -- fine for the "default only runs
+  // enabled sources" half of this suite, but "an explicitly-selected disabled source still
+  // runs" and "enabled-by-default" both need a portal that's actually enabled. A small,
+  // schema-valid fixture file (not the real config) keeps this independent of whatever real
+  // config/portals.yml happens to contain.
+  function makePathsWithPortals(portalsYaml: string) {
+    const paths = makePaths();
+    const dir = path.dirname(paths.checkpointsPath);
+    const portalsConfigPath = path.join(dir, "portals.yml");
+    writeFileSync(portalsConfigPath, portalsYaml, "utf-8");
+    return { ...paths, portalsConfigPath };
+  }
+
+  const MIXED_PORTALS_YAML = `
+settings:
+  maxPagesPerSource: 1
+  maxJobsPerSource: 5
+  navigationTimeoutMs: 30000
+  delayBetweenRequestsMs: 0
+portals:
+  - id: test-enabled
+    type: indeed
+    enabled: true
+    baseUrl: "https://example.invalid/enabled"
+    resultCardSelector: ".card"
+    titleSelector: ".title"
+    locationSelector: ".loc"
+  - id: test-disabled
+    type: monster
+    enabled: false
+    baseUrl: "https://example.invalid/disabled"
+    resultCardSelector: ".card"
+    titleSelector: ".title"
+    locationSelector: ".loc"
+`;
+
+  it("runs an enabled: true portal by default, with no --source given", async () => {
+    const paths = makePathsWithPortals(MIXED_PORTALS_YAML);
+    await runDiscover(paths, { profileIds: ["sdet"] }, fakeLaunchFn, fakeCloseFn);
+
+    // company-careers (always present) + test-enabled x 4 sdet keywords = 8 calls; test-disabled never runs.
+    expect(discoverMock).toHaveBeenCalledTimes(8);
+  });
+
+  it("skips an enabled: false portal by default", async () => {
+    const paths = makePathsWithPortals(MIXED_PORTALS_YAML);
+    await runDiscover(paths, { profileIds: ["sdet"] }, fakeLaunchFn, fakeCloseFn);
+
+    // Only company-careers + test-enabled ran (8 calls total, asserted above) -- if
+    // test-disabled had also run that would be 12. Cross-checked here via a dedicated run
+    // scoped to --source test-disabled below, which proves it CAN run when asked.
+    expect(discoverMock).toHaveBeenCalledTimes(8);
+  });
+
+  it("runs an enabled: false portal when explicitly selected via --source, without mutating portals.yml", async () => {
+    const paths = makePathsWithPortals(MIXED_PORTALS_YAML);
+    const before = readFileSync(paths.portalsConfigPath, "utf-8");
+
+    await runDiscover(paths, { profileIds: ["sdet"], sources: ["test-disabled"] }, fakeLaunchFn, fakeCloseFn);
+
+    // Only test-disabled x 4 sdet keywords -- company-careers and test-enabled are excluded
+    // by the explicit --source filter, same as before this fix.
+    expect(discoverMock).toHaveBeenCalledTimes(4);
+
+    const after = readFileSync(paths.portalsConfigPath, "utf-8");
+    expect(after).toBe(before);
+  });
+
+  it("runs multiple explicitly-selected sources together, including a disabled one and company-careers", async () => {
+    const paths = makePathsWithPortals(MIXED_PORTALS_YAML);
+
+    await runDiscover(
+      paths,
+      { profileIds: ["sdet"], sources: ["test-disabled", "company-careers"] },
+      fakeLaunchFn,
+      fakeCloseFn,
+    );
+
+    // test-disabled (4) + company-careers (4) = 8; test-enabled excluded since it wasn't named.
+    expect(discoverMock).toHaveBeenCalledTimes(8);
+  });
+
+  it("rejects an unknown --source with a clear error and never launches the browser", async () => {
+    const paths = makePathsWithPortals(MIXED_PORTALS_YAML);
+    const launchFn = vi.fn(fakeLaunchFn);
+
+    await expect(
+      runDiscover(paths, { sources: ["totally-not-a-real-source"] }, launchFn, fakeCloseFn),
+    ).rejects.toThrow(/Unknown --source "totally-not-a-real-source"/);
+
+    expect(launchFn).not.toHaveBeenCalled();
+    expect(discoverMock).not.toHaveBeenCalled();
+  });
+
+  it("still accepts the special \"generic\" wildcard alongside real ids", async () => {
+    const paths = makePathsWithPortals(MIXED_PORTALS_YAML);
+
+    // "generic" matches zero entries in this fixture (neither portal is type: generic) but
+    // must not itself be rejected as unknown.
+    await expect(
+      runDiscover(paths, { sources: ["generic", "company-careers"] }, fakeLaunchFn, fakeCloseFn),
+    ).resolves.toBeDefined();
+  });
+});
+
 describe("orchestrator browser context lifecycle (Task 13)", () => {
   beforeEach(() => {
     discoverMock.mockReset();
