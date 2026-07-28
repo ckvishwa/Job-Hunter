@@ -76,4 +76,16 @@ describe("parseDiscoverArgs", () => {
       resetCheckpoint: "indeed",
     });
   });
+
+  it("parses --registry with a path", () => {
+    expect(parseDiscoverArgs(["--registry", "config/fortune500-registry.validation.json"]).registryPath).toBe(
+      "config/fortune500-registry.validation.json",
+    );
+  });
+
+  it("parses bare --isolated-profile as a boolean, no value consumed", () => {
+    const result = parseDiscoverArgs(["--isolated-profile", "--company", "Figma"]);
+    expect(result.isolatedProfile).toBe(true);
+    expect(result.company).toBe("Figma");
+  });
 });

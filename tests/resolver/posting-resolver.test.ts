@@ -67,7 +67,11 @@ describe("PostingResolver", () => {
       newPage: vi.fn().mockResolvedValue(mockPage),
     };
 
-    const resolver = new PostingResolver();
+    // AHEAD is a validation-only registry entry (fortuneRank: null), not a real Fortune 500
+    // company -- lives in the separate validation registry (Task 14), never mixed into
+    // production config/fortune500-registry.json. Point this resolver at it explicitly via
+    // the constructor override, same mechanism a controlled live-validation run (Task 17) uses.
+    const resolver = new PostingResolver(path.resolve("config/fortune500-registry.validation.json"));
     const resolved = await resolver.resolve(job, mockContext as any);
 
     expect(resolved).not.toBeNull();

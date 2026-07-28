@@ -17,6 +17,10 @@ export function parseDiscoverArgs(argv: string[]): DiscoverFilters {
       result.location = argv[++i];
     } else if (arg === "--company") {
       result.company = argv[++i];
+    } else if (arg === "--registry") {
+      result.registryPath = argv[++i];
+    } else if (arg === "--isolated-profile") {
+      result.isolatedProfile = true;
     } else if (arg === "--resume") {
       // Checkpoints are always consulted/retried every run already -- this flag is accepted
       // as an explicit-intent marker but doesn't change behavior (see DiscoverFilters).

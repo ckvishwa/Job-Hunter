@@ -68,18 +68,44 @@ describe("loadCompanyRegistry", () => {
     expect(loadCompanyRegistry(filePath)).toHaveLength(2);
   });
 
-  it("loads the real config/fortune500-registry.json cleanly", () => {
+  it("loads the real config/fortune500-registry.json cleanly -- production, real ranked companies only", () => {
     const realPath = path.resolve("config/fortune500-registry.json");
     // Sanity-check the fixture itself parses as JSON before handing it to the loader.
     JSON.parse(readFileSync(realPath, "utf-8"));
 
     const registry = loadCompanyRegistry(realPath);
-    expect(registry).toHaveLength(5);
+    expect(registry).toHaveLength(4);
     expect(registry.map((e) => e.company).sort()).toEqual(
-      ["AHEAD", "Amazon", "Apple", "Google", "Walmart"].sort(),
+      ["Amazon", "Apple", "Google", "Walmart"].sort(),
     );
+    // Every production entry is a genuinely Fortune-ranked company -- validation-only
+    // companies (fortuneRank: null) belong in config/fortune500-registry.validation.json,
+    // never mixed into this file (see the sibling test below).
     for (const e of registry) {
+      expect(e.fortuneRank).not.toBeNull();
       expect(e.atsWorkdaySite).toBeNull();
     }
+  });
+
+  it("loads the real config/fortune500-registry.validation.json cleanly -- validation-only companies, never mixed into production", () => {
+    const validationPath = path.resolve("config/fortune500-registry.validation.json");
+    JSON.parse(readFileSync(validationPath, "utf-8"));
+
+    const registry = loadCompanyRegistry(validationPath);
+    expect(registry).toHaveLength(3);
+    expect(registry.map((e) => e.company).sort()).toEqual(["AHEAD", "Figma", "Stripe"].sort());
+    // Every validation entry is deliberately NOT Fortune-ranked -- these exist only to give
+    // controlled live-validation runs (Task 17) real, working companies per ATS type without
+    // fabricating or guessing details about an actual Fortune 500 member.
+    for (const e of registry) {
+      expect(e.fortuneRank).toBeNull();
+    }
+
+    const productionCompanies = loadCompanyRegistry(path.resolve("config/fortune500-registry.json")).map(
+      (e) => e.company,
+    );
+    const validationCompanies = registry.map((e) => e.company);
+    const overlap = validationCompanies.filter((c) => productionCompanies.includes(c));
+    expect(overlap).toEqual([]);
   });
 });

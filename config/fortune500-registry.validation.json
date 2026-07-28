@@ -1,0 +1,35 @@
+[
+  {
+    "company": "AHEAD",
+    "fortuneRank": null,
+    "corporateDomain": "thinkahead.com",
+    "careersUrl": "https://jobs.lever.co/thinkahead",
+    "atsType": "lever",
+    "atsTenantOrBoardId": "thinkahead",
+    "atsWorkdaySite": null,
+    "verificationStatus": "verified",
+    "lastVerifiedDate": "2026-07-27"
+  },
+  {
+    "company": "Stripe",
+    "fortuneRank": null,
+    "corporateDomain": "stripe.com",
+    "careersUrl": "https://stripe.com/jobs",
+    "atsType": "greenhouse",
+    "atsTenantOrBoardId": "stripe",
+    "atsWorkdaySite": null,
+    "verificationStatus": "blocked",
+    "lastVerifiedDate": "2026-07-27"
+  },
+  {
+    "company": "Figma",
+    "fortuneRank": null,
+    "corporateDomain": "figma.com",
+    "careersUrl": "https://www.figma.com/careers/",
+    "atsType": "greenhouse",
+    "atsTenantOrBoardId": "figma",
+    "atsWorkdaySite": null,
+    "verificationStatus": "verified",
+    "lastVerifiedDate": "2026-07-27"
+  }
+]

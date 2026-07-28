@@ -55,6 +55,12 @@ export interface DiscoveryContext {
   onCompanyProcessed?: () => void;
   // --company filter (CLI). Only meaningful to company-careers.ts; other adapters ignore it.
   companyFilter?: string;
+  // Overrides which registry file company-careers.ts reads (defaults to the production
+  // config/fortune500-registry.json). Used to point a controlled live-validation run at a
+  // separate validation-only registry (e.g. config/fortune500-registry.validation.json) --
+  // real Fortune 500 companies and validation-only test companies are never mixed in the same
+  // file, so a run only ever sees one or the other, never both.
+  companyRegistryPath?: string;
 }
 
 export interface PortalDiscoveryAdapter {

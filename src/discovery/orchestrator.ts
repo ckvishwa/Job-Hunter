@@ -43,6 +43,11 @@ export interface DiscoverFilters {
   // profile lock. Not for normal usage: the shared profile's persistence (cookies/logins) is
   // what makes manual-verification runs useful across invocations.
   isolatedProfile?: boolean;
+  // Overrides the Fortune 500 registry file company-careers.ts and the resolver's
+  // company-matching both read (defaults to config/fortune500-registry.json). Points a
+  // controlled live-validation run at a separate validation-only registry instead --
+  // real ranked companies and validation-only test companies are never mixed in one file.
+  registryPath?: string;
 }
 
 function emptyCounters(): RawDiscoveryCounters {
@@ -253,6 +258,7 @@ export async function runDiscover(
               portalConfig,
               profileIds: [role.profile],
               companyFilter: filters.company,
+              companyRegistryPath: filters.registryPath,
               onVerificationPause: () => {
                 counters.verificationPauses += 1;
               },
@@ -300,7 +306,7 @@ export async function runDiscover(
     const jobsToResolve = typeof limit === "number" ? newlyDiscovered.slice(0, limit) : newlyDiscovered;
     console.log(`[orchestrator] Resolving details for ${jobsToResolve.length} job(s) (Limit: ${limit ?? "None"}).`);
 
-    const resolver = new PostingResolver();
+    const resolver = filters.registryPath ? new PostingResolver(filters.registryPath) : new PostingResolver();
     const resolvedJobs: JobPosting[] = [];
 
     for (const job of jobsToResolve) {

@@ -1,16 +1,5 @@
 [
   {
-    "company": "AHEAD",
-    "fortuneRank": null,
-    "corporateDomain": "thinkahead.com",
-    "careersUrl": "https://jobs.lever.co/thinkahead",
-    "atsType": "lever",
-    "atsTenantOrBoardId": "thinkahead",
-    "atsWorkdaySite": null,
-    "verificationStatus": "verified",
-    "lastVerifiedDate": "2026-07-27"
-  },
-  {
     "company": "Walmart",
     "fortuneRank": 1,
     "corporateDomain": "walmart.com",
@@ -51,7 +40,7 @@
     "atsType": "greenhouse",
     "atsTenantOrBoardId": "google",
     "atsWorkdaySite": null,
-    "verificationStatus": "verified",
+    "verificationStatus": "blocked",
     "lastVerifiedDate": "2026-07-27"
   }
 ]

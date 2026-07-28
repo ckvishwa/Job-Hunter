@@ -133,8 +133,7 @@ export class PostingResolver {
   // test cases, or any future multi-run process) never share pacing state by accident.
   private pace = pacer(500);
 
-  constructor() {
-    const registryPath = path.resolve("config/fortune500-registry.json");
+  constructor(registryPath: string = path.resolve("config/fortune500-registry.json")) {
     this.registry = loadCompanyRegistry(registryPath);
   }
 

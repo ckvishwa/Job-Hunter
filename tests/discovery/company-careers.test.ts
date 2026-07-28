@@ -82,6 +82,7 @@ function makeContext(
   checkpoint: DiscoveryCheckpoint,
   onPageProcessed: (jobs: DiscoveredJobLite[], nextPageNum: number) => Promise<void>,
   companyFilter?: string,
+  companyRegistryPath?: string,
 ) {
   return {
     page: { context: () => ({}) } as unknown as import("playwright").Page,
@@ -92,6 +93,7 @@ function makeContext(
     onPageProcessed,
     profileIds: ["sdet-qa"],
     companyFilter,
+    companyRegistryPath,
   };
 }
 
@@ -377,5 +379,32 @@ describe("companyCareersDiscoveryAdapter --company filter", () => {
       expect.arrayContaining(["companya::companya.com", "companyb::companyb.com"]),
     );
     expect(checkpoint.completedCompanyKeys).toHaveLength(2);
+  });
+});
+
+describe("companyCareersDiscoveryAdapter registry path override", () => {
+  beforeEach(() => {
+    discoverJobsA.mockReset();
+    loadCompanyRegistryMock.mockReset();
+    loadCompanyRegistryMock.mockReturnValue([]);
+    resolveAdapterMock.mockReset();
+  });
+
+  it("reads the production registry by default when no companyRegistryPath is given", async () => {
+    const checkpoint = makeCheckpoint();
+    await companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, vi.fn(async () => {})));
+
+    const calledPath = loadCompanyRegistryMock.mock.calls[0]![0] as string;
+    expect(calledPath.replace(/\\/g, "/")).toMatch(/config\/fortune500-registry\.json$/);
+  });
+
+  it("reads a validation registry instead when context.companyRegistryPath is set (Task 17 restart)", async () => {
+    const checkpoint = makeCheckpoint();
+    await companyCareersDiscoveryAdapter.discover(
+      makeContext(checkpoint, vi.fn(async () => {}), undefined, "config/fortune500-registry.validation.json"),
+    );
+
+    const calledPath = loadCompanyRegistryMock.mock.calls[0]![0] as string;
+    expect(calledPath.replace(/\\/g, "/")).toMatch(/config\/fortune500-registry\.validation\.json$/);
   });
 });
