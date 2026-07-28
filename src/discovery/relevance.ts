@@ -7,39 +7,64 @@ import type { RoleConfig, ProfileKind } from "../types.js";
 //     descriptionSnippet -- a random company boilerplate paragraph coincidentally containing
 //     an exact multi-word phrase like "Software Development Engineer in Test" is vanishingly
 //     unlikely, so this is safe even against free text.
-//  2. The field's text contains one of a small, curated set of profile-specific DOMAIN_QUALIFIER
-//     words as a whole token. Every word in every list below is inherently profile-specific
-//     (an acronym like "sdet"/"soc"/"noc"/"iam", or a domain noun like "automation"/
-//     "incident"/"cybersecurity") -- generic job-title words that say nothing about domain
-//     (engineer, analyst, specialist, administrator, manager, director, associate,
-//     coordinator, lead, architect, consultant, staff, senior, technician) are deliberately
-//     excluded from every list, so a title/snippet containing ONLY a generic role word can
-//     never match on its own, satisfying the "never treat 'engineer' or 'analyst' as
-//     sufficient" requirement structurally rather than by a separate exclusion check.
-//     Restricted to TITLE and DEPARTMENT only -- NOT descriptionSnippet or location. Found
-//     live: a single-word qualifier like "automation" or "cloud" routinely appears in a
-//     company's generic "About Us" boilerplate that opens every one of its job descriptions
-//     regardless of role (confirmed against a real AHEAD posting: "AI Sales Specialist"
-//     false-matched sdet+cloud purely because AHEAD's boilerplate mentions "cloud
-//     infrastructure, automation and analytics"). Title/department are short, curated,
-//     human-authored classification fields where a stray buzzword match is far less likely.
-const DOMAIN_QUALIFIERS: Record<ProfileKind, string[]> = {
-  sdet: ["sdet", "qa", "quality", "automation", "test", "testing"],
-  security: [
-    "security",
-    "soc",
-    "incident",
-    "cyber",
-    "cybersecurity",
-    "vulnerability",
-    "penetration",
-    "pentest",
-    "infosec",
-    "threat",
-  ],
-  cloud: ["iam", "identity", "cloud"],
-  network: ["network", "networking", "noc"],
+//  2. The field's text contains a profile-specific DOMAIN_QUALIFIER word, restricted to TITLE
+//     and DEPARTMENT only -- NOT descriptionSnippet or location. Found live: a single-word
+//     qualifier like "automation" or "cloud" routinely appears in a company's generic
+//     "About Us" boilerplate that opens every one of its job descriptions regardless of role
+//     (confirmed against a real AHEAD posting: "AI Sales Specialist" false-matched sdet+cloud
+//     purely because AHEAD's boilerplate mentions "cloud infrastructure, automation and
+//     analytics"). Title/department are short, curated, human-authored classification fields
+//     where a stray buzzword match is far less likely -- but even there, a WEAK qualifier
+//     (below) is common enough in non-technical English that it can still false-positive in a
+//     TITLE alone: confirmed live via independent review reproducing "Account Executive,
+//     Cloud Platform Sales" (matches "cloud"), "Corporate Security Guard" (matches
+//     "security"), and "Network Marketing Representative" (matches "network") -- the exact
+//     same class of false positive relevance.ts exists to prevent, just via a domain word
+//     instead of a generic role word. Fixed by splitting qualifiers into two tiers:
+//       - STRONG: acronyms/compounds that are essentially never used non-technically (sdet,
+//         soc, noc, iam, cybersecurity, infosec, pentest) -- sufficient alone in title OR
+//         department, same as before.
+//       - WEAK: common English words that ARE genuinely used outside tech (quality, test,
+//         automation, security, cloud, network, incident, ...) -- in TITLE, only count if
+//         paired with a real tech/professional role word (engineer, developer, architect,
+//         administrator, technician, analyst, specialist, consultant, scientist, programmer).
+//         Deliberately excludes broad-across-every-business-function words (manager, director,
+//         lead, coordinator, associate, executive) from that role-word set -- "Director of
+//         Cloud Sales" must not pair. In DEPARTMENT, a WEAK qualifier still counts alone
+//         (unpaired) -- a department value is a curated organizational category (e.g.
+//         "Quality Assurance", "Security", "Network Operations"), not free English prose, so
+//         the false-positive risk that motivates the title-pairing rule doesn't apply there.
+//     Generic role words (engineer, analyst, specialist, administrator, manager, director,
+//     associate, coordinator, lead, architect, consultant, staff, senior, technician) are
+//     never themselves qualifiers, in either tier -- a title containing ONLY a generic role
+//     word can never match on its own, satisfying "never treat 'engineer' or 'analyst' as
+//     sufficient" structurally.
+const STRONG_QUALIFIERS: Record<ProfileKind, string[]> = {
+  sdet: ["sdet"],
+  security: ["soc", "cybersecurity", "infosec", "pentest"],
+  cloud: ["iam"],
+  network: ["noc"],
 };
+
+const WEAK_QUALIFIERS: Record<ProfileKind, string[]> = {
+  sdet: ["qa", "quality", "automation", "test", "testing"],
+  security: ["security", "incident", "cyber", "vulnerability", "penetration", "threat"],
+  cloud: ["identity", "cloud"],
+  network: ["network", "networking"],
+};
+
+const TECH_ROLE_WORDS = new Set([
+  "engineer",
+  "developer",
+  "architect",
+  "administrator",
+  "technician",
+  "analyst",
+  "specialist",
+  "consultant",
+  "scientist",
+  "programmer",
+]);
 
 export interface RelevanceInput {
   title: string;
@@ -97,14 +122,28 @@ export function evaluateRelevance(input: RelevanceInput, roles: RoleConfig[]): R
     for (const { field, text } of fields) {
       const lower = text.toLowerCase();
       for (const kw of role.keywords) {
+        // ponytail: unanchored substring match, no word-boundary check -- safe today only
+        // because every config/roles.yml keyword is multi-word (verified: no bare short
+        // keyword like "QA" or "IAM" exists there). A future short keyword added to roles.yml
+        // would substring-match inside unrelated words in free-text fields (descriptionSnippet
+        // especially). Add a word-boundary regex check here if that ever changes.
         if (kw && lower.includes(kw.toLowerCase())) {
           recordHit(role.profile, kw, field);
         }
       }
       if (!DOMAIN_QUALIFIER_FIELDS.has(field)) continue;
+
       const tokens = tokenize(text);
-      for (const qualifier of DOMAIN_QUALIFIERS[role.profile] ?? []) {
-        if (tokens.has(qualifier)) {
+      for (const qualifier of STRONG_QUALIFIERS[role.profile] ?? []) {
+        if (tokens.has(qualifier)) recordHit(role.profile, qualifier, field);
+      }
+      for (const qualifier of WEAK_QUALIFIERS[role.profile] ?? []) {
+        if (!tokens.has(qualifier)) continue;
+        // Department is a curated category value, not free prose -- a weak qualifier counts
+        // there unpaired. Title is free-authored English and needs a real tech role word
+        // alongside it (see the file-level comment for the reproduced false positives this
+        // prevents).
+        if (field === "department" || [...tokens].some((t) => TECH_ROLE_WORDS.has(t))) {
           recordHit(role.profile, qualifier, field);
         }
       }

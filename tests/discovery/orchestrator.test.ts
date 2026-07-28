@@ -574,7 +574,10 @@ describe("orchestrator incremental checkpoint/discovery persistence (Task 13)", 
     const crashingJob: DiscoveredJobLite = {
       source: "company-careers",
       searchKeyword: "SDET",
-      title: "Crash Test Job",
+      // Must actually be relevance-eligible (SDET is an exact configured keyword phrase) --
+      // the orchestrator's relevance filter now rejects a bare "test" without a paired tech
+      // role word.
+      title: "SDET Crash Test Job",
       company: "Acme",
       location: "United States",
       salarySnippet: null,

@@ -103,6 +103,62 @@ describe("evaluateRelevance", () => {
     expect(result.matched).toBe(false);
   });
 
+  // Regression coverage for a real false positive found and reproduced by independent review:
+  // a WEAK domain-qualifier word (cloud/security/network/quality/...) appearing in a TITLE
+  // alongside a non-technical role word (sales, guard, representative, inspector) is the exact
+  // same false-positive class this whole module exists to prevent -- just triggered by a
+  // domain word instead of a generic role word. Fixed by requiring a WEAK qualifier in TITLE
+  // to co-occur with a real tech role word (engineer/developer/architect/administrator/
+  // technician/analyst/specialist/consultant/scientist/programmer).
+  it("rejects non-technical titles that merely contain a bare WEAK domain-qualifier word", () => {
+    const cases = [
+      "Account Executive, Cloud Platform Sales",
+      "Corporate Security Guard",
+      "Network Marketing Representative",
+      "Quality Assurance Inspector",
+    ];
+    for (const title of cases) {
+      const result = evaluateRelevance({ title }, ROLES);
+      expect(result.matched, `expected "${title}" to be rejected`).toBe(false);
+    }
+  });
+
+  it("still rejects a WEAK-qualifier title even with an unrelated department -- department alone doesn't rescue a bad title match", () => {
+    const result = evaluateRelevance({ title: "Quality Assurance Inspector", department: "Manufacturing" }, ROLES);
+    expect(result.matched).toBe(false);
+  });
+
+  it("a bare WEAK qualifier in DEPARTMENT (not title) still matches unpaired -- department is a curated category, not free prose", () => {
+    const result = evaluateRelevance({ title: "Engineer II", department: "Security" }, ROLES);
+    expect(result.matched).toBe(true);
+    expect(result.matchedProfiles).toEqual(["security"]);
+  });
+
+  it("a WEAK qualifier DOES match when genuinely paired with a tech role word in the title, even outside an exact configured phrase", () => {
+    for (const [title, profile] of [
+      ["Cloud Solutions Architect", "cloud"],
+      ["Network Systems Administrator", "network"],
+      ["Security Consultant", "security"],
+    ] as const) {
+      const result = evaluateRelevance({ title }, ROLES);
+      expect(result.matched, `expected "${title}" to match`).toBe(true);
+      expect(result.matchedProfiles).toContain(profile);
+    }
+  });
+
+  it("a STRONG qualifier (sdet/soc/noc/iam/cybersecurity/infosec/pentest) still matches title alone, unpaired", () => {
+    for (const [title, profile] of [
+      ["SDET II", "sdet"],
+      ["SOC Coordinator", "security"],
+      ["NOC Associate", "network"],
+      ["IAM Consultant", "cloud"],
+    ] as const) {
+      const result = evaluateRelevance({ title }, ROLES);
+      expect(result.matched, `expected "${title}" to match`).toBe(true);
+      expect(result.matchedProfiles).toContain(profile);
+    }
+  });
+
   it("produces a non-empty relevanceReason string for every match, and a clear rejection reason otherwise", () => {
     const matched = evaluateRelevance({ title: "SDET" }, ROLES);
     expect(matched.relevanceReason.length).toBeGreaterThan(0);
