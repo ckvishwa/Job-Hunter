@@ -124,7 +124,10 @@ describe("orchestrator cross-source failure isolation (Task 13)", () => {
       const job: DiscoveredJobLite = {
         source: "monster",
         searchKeyword: context.keyword,
-        title: "Monster Job",
+        // Title must actually be relevant to the mocked role's profile ("sdet") -- the
+        // orchestrator now rejects (never persists) anything the relevance filter doesn't
+        // match, same as a real "Account Executive" false-positive would be rejected.
+        title: "SDET II",
         company: "Acme",
         location: "United States",
         salarySnippet: null,
@@ -134,6 +137,12 @@ describe("orchestrator cross-source failure isolation (Task 13)", () => {
         sourceJobId: "monster-job-1",
         discoveredAt: new Date().toISOString(),
         matchedProfiles: [],
+        department: null,
+        descriptionSnippet: null,
+        searchedProfile: null,
+        matchedKeywords: [],
+        matchedFields: [],
+        relevanceReason: "",
       };
       await context.onPageProcessed([job], 1);
     });

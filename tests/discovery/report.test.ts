@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildSummary, type RawDiscoveryCounters } from "../../src/discovery/report.js";
 
-// Task 15: buildSummary is a pure assembly function -- these tests feed it a fake raw-counters
-// object and assert the returned DiscoveryRunSummary shape/values, with no orchestrator
-// involved at all.
+// buildSummary is a pure assembly function -- these tests feed it a fake raw-counters object
+// and assert the returned DiscoveryRunSummary shape/values, with no orchestrator involved.
 
 function makeRawCounters(overrides: Partial<RawDiscoveryCounters> = {}): RawDiscoveryCounters {
   return {
@@ -14,6 +13,13 @@ function makeRawCounters(overrides: Partial<RawDiscoveryCounters> = {}): RawDisc
     keywordsSearched: 0,
     pagesProcessed: 0,
     listingsDiscovered: 0,
+    listingsEvaluated: 0,
+    discoveriesRejected: 0,
+    relevantRetained: 0,
+    retainedByProfile: {},
+    resolutionsAttempted: 0,
+    resolutionsSucceeded: 0,
+    resolutionsTimedOut: 0,
     officialPostingsResolved: 0,
     unresolvedDiscoveries: 0,
     duplicatesMerged: 0,
@@ -22,6 +28,8 @@ function makeRawCounters(overrides: Partial<RawDiscoveryCounters> = {}): RawDisc
     jobsByProfile: {},
     jobsBySource: {},
     jobsWritten: 0,
+    discoveryTimeMs: 0,
+    resolutionTimeMs: 0,
     errors: [],
     ...overrides,
   };
@@ -37,14 +45,23 @@ describe("buildSummary", () => {
       keywordsSearched: 16,
       pagesProcessed: 20,
       listingsDiscovered: 87,
-      officialPostingsResolved: 60,
-      unresolvedDiscoveries: 10,
+      listingsEvaluated: 87,
+      discoveriesRejected: 17,
+      relevantRetained: 70,
+      retainedByProfile: { sdet: 70 },
+      resolutionsAttempted: 60,
+      resolutionsSucceeded: 55,
+      resolutionsTimedOut: 2,
+      officialPostingsResolved: 55,
+      unresolvedDiscoveries: 5,
       duplicatesMerged: 3,
-      jdsExtracted: 70,
+      jdsExtracted: 60,
       verificationPauses: 2,
       jobsByProfile: { sdet: 30, security: 15 },
       jobsBySource: { indeed: 25, "company-careers": 20 },
       jobsWritten: 67,
+      discoveryTimeMs: 4200,
+      resolutionTimeMs: 9800,
       errors: [{ source: "indeed::SDET", message: "boom" }],
     });
 
@@ -57,23 +74,31 @@ describe("buildSummary", () => {
     expect(summary.keywordsSearched).toBe(16);
     expect(summary.pagesProcessed).toBe(20);
     expect(summary.listingsDiscovered).toBe(87);
-    expect(summary.officialPostingsResolved).toBe(60);
-    expect(summary.unresolvedDiscoveries).toBe(10);
+    expect(summary.listingsEvaluated).toBe(87);
+    expect(summary.discoveriesRejected).toBe(17);
+    expect(summary.relevantRetained).toBe(70);
+    expect(summary.retainedByProfile).toEqual({ sdet: 70 });
+    expect(summary.resolutionsAttempted).toBe(60);
+    expect(summary.resolutionsSucceeded).toBe(55);
+    expect(summary.resolutionsTimedOut).toBe(2);
+    expect(summary.officialPostingsResolved).toBe(55);
+    expect(summary.unresolvedDiscoveries).toBe(5);
     expect(summary.duplicatesMerged).toBe(3);
-    expect(summary.jdsExtracted).toBe(70);
+    expect(summary.jdsExtracted).toBe(60);
     expect(summary.verificationPauses).toBe(2);
     expect(summary.jobsByProfile).toEqual({ sdet: 30, security: 15 });
     expect(summary.jobsBySource).toEqual({ indeed: 25, "company-careers": 20 });
     expect(summary.jobsWritten).toBe(67);
+    expect(summary.discoveryTimeMs).toBe(4200);
+    expect(summary.resolutionTimeMs).toBe(9800);
     expect(summary.errors).toEqual([{ source: "indeed::SDET", message: "boom" }]);
   });
 
-  it("always reports discoveriesRejected as 0 -- no relevance-filtering logic exists anywhere in the codebase yet", () => {
-    // Note: RawDiscoveryCounters has no discoveriesRejected field at all -- buildSummary sets
-    // the output field itself unconditionally, so there's nothing a caller could even pass in
-    // to make this non-zero. This test documents that as intentional, not an oversight.
-    const summary = buildSummary(makeRawCounters());
-    expect(summary.discoveriesRejected).toBe(0);
+  it("passes discoveriesRejected/relevantRetained/retainedByProfile through as real counters, not a hardcoded 0", () => {
+    const summary = buildSummary(makeRawCounters({ discoveriesRejected: 42, relevantRetained: 8, retainedByProfile: { network: 8 } }));
+    expect(summary.discoveriesRejected).toBe(42);
+    expect(summary.relevantRetained).toBe(8);
+    expect(summary.retainedByProfile).toEqual({ network: 8 });
   });
 
   it("produces a valid, all-zero summary from a run with zero sources attempted, rather than throwing", () => {
@@ -87,7 +112,13 @@ describe("buildSummary", () => {
       keywordsSearched: 0,
       pagesProcessed: 0,
       listingsDiscovered: 0,
+      listingsEvaluated: 0,
       discoveriesRejected: 0,
+      relevantRetained: 0,
+      retainedByProfile: {},
+      resolutionsAttempted: 0,
+      resolutionsSucceeded: 0,
+      resolutionsTimedOut: 0,
       officialPostingsResolved: 0,
       unresolvedDiscoveries: 0,
       duplicatesMerged: 0,
@@ -96,6 +127,8 @@ describe("buildSummary", () => {
       jobsByProfile: {},
       jobsBySource: {},
       jobsWritten: 0,
+      discoveryTimeMs: 0,
+      resolutionTimeMs: 0,
       errors: [],
     });
   });

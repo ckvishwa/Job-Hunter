@@ -99,6 +99,12 @@ function makeDiscoveredJob(overrides: Partial<DiscoveredJobLite> = {}): Discover
     sourceJobId: "123",
     discoveredAt: "2026-01-01T00:00:00.000Z",
     matchedProfiles: ["sdet"],
+    department: null,
+    descriptionSnippet: null,
+    searchedProfile: "sdet",
+    matchedKeywords: [],
+    matchedFields: [],
+    relevanceReason: "",
     ...overrides,
   };
 }

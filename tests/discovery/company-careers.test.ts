@@ -257,6 +257,115 @@ describe("companyCareersDiscoveryAdapter real-data extraction and structural ski
     expect(jobs[0]!.location).toBe("Austin, TX");
   });
 
+  it("populates department and a description snippet from the same already-fetched fetchJobDetails call (Profile Relevance phase) -- never a separate fetch", async () => {
+    const registry: CompanyRegistryEntry[] = [
+      {
+        company: "CompanyA",
+        fortuneRank: null,
+        corporateDomain: "companya.com",
+        careersUrl: "https://companya.com/careers",
+        atsType: "greenhouse",
+        atsTenantOrBoardId: "companya",
+        atsWorkdaySite: null,
+        atsWorkdayHostname: null,
+        verificationStatus: "verified",
+        lastVerifiedDate: "2026-01-01",
+      },
+    ];
+    loadCompanyRegistryMock.mockReturnValue(registry);
+
+    discoverJobsA.mockResolvedValue([
+      { externalId: "a1", title: "SDET", url: "https://companya.com/jobs/a1", matchedProfiles: ["sdet-qa"] },
+    ]);
+    const longDescription = "x".repeat(600); // longer than the 500-char snippet cap
+    const fetchJobDetails = vi.fn(async (): Promise<RawJobDetail> => ({
+      externalId: "a1",
+      title: "SDET",
+      descriptionText: longDescription,
+      descriptionHtml: null,
+      location: "Austin, TX",
+      department: "Quality Engineering",
+      employmentType: null,
+      requisitionId: null,
+      postingDate: null,
+      salaryText: null,
+      canonicalUrl: "https://companya.com/jobs/a1",
+      applyUrl: "https://companya.com/jobs/a1",
+      rawMetadata: {},
+    }));
+
+    resolveAdapterMock.mockImplementation(
+      (): SourceAdapter => ({
+        sourceType: "greenhouse",
+        fetchesPerJob: false,
+        canHandle: () => true,
+        discoverJobs: discoverJobsA as SourceAdapter["discoverJobs"],
+        fetchJobDetails,
+        normalize: () => {
+          throw new Error("normalize not used by company-careers adapter");
+        },
+      }),
+    );
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async (_jobs: DiscoveredJobLite[], _nextPageNum: number) => {});
+
+    await companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed));
+
+    // fetchJobDetails was called exactly once for this job -- department/snippet come from
+    // that SAME call, not a second one.
+    expect(fetchJobDetails).toHaveBeenCalledTimes(1);
+    const [jobs] = onPageProcessed.mock.calls[0] as [DiscoveredJobLite[], number];
+    expect(jobs[0]!.department).toBe("Quality Engineering");
+    expect(jobs[0]!.descriptionSnippet).toHaveLength(500); // capped, not the full 600-char description
+    expect(jobs[0]!.descriptionSnippet).toBe(longDescription.slice(0, 500));
+  });
+
+  it("leaves department and descriptionSnippet null for a fetchesPerJob:true adapter (Workday) -- never fetched just for relevance evaluation", async () => {
+    const registry: CompanyRegistryEntry[] = [
+      {
+        company: "CompanyW",
+        fortuneRank: null,
+        corporateDomain: "companyw.com",
+        careersUrl: "https://companyw.com/careers",
+        atsType: "workday",
+        atsTenantOrBoardId: "companyw",
+        atsWorkdaySite: "companywcareers",
+        atsWorkdayHostname: "companyw.wd1.myworkdayjobs.com",
+        verificationStatus: "verified",
+        lastVerifiedDate: "2026-01-01",
+      },
+    ];
+    loadCompanyRegistryMock.mockReturnValue(registry);
+
+    const discoverJobsW = vi.fn().mockResolvedValue([
+      { externalId: "/job/w1", title: "SDET", url: "https://companyw.wd1.myworkdayjobs.com/companywcareers/job/w1", matchedProfiles: [] },
+    ]);
+    const fetchJobDetails = vi.fn();
+    resolveAdapterMock.mockImplementation(
+      (): SourceAdapter => ({
+        sourceType: "workday",
+        fetchesPerJob: true,
+        canHandle: () => true,
+        discoverJobs: discoverJobsW as SourceAdapter["discoverJobs"],
+        fetchJobDetails,
+        normalize: () => {
+          throw new Error("normalize not used by company-careers adapter");
+        },
+      }),
+    );
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async (_jobs: DiscoveredJobLite[], _nextPageNum: number) => {});
+
+    await companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed));
+
+    expect(fetchJobDetails).not.toHaveBeenCalled();
+    const [jobs] = onPageProcessed.mock.calls[0] as [DiscoveredJobLite[], number];
+    expect(jobs[0]!.department).toBeNull();
+    expect(jobs[0]!.descriptionSnippet).toBeNull();
+  });
+
   function makeWorkdayEntry(overrides: Partial<CompanyRegistryEntry> = {}): CompanyRegistryEntry {
     return {
       company: "CompanyW",

@@ -79,6 +79,12 @@ export const indeedDiscoveryAdapter: PortalDiscoveryAdapter = {
           sourceJobId: jobId,
           discoveredAt: new Date().toISOString(),
           matchedProfiles: [], // Will be resolved by the orchestrator/matcher
+          department: null,
+          descriptionSnippet: null,
+          searchedProfile: null,
+          matchedKeywords: [],
+          matchedFields: [],
+          relevanceReason: "",
         });
       }
 

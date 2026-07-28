@@ -50,10 +50,32 @@ export interface PageLike {
   title(): Promise<string>;
 }
 
-async function defaultWaitForEnter(): Promise<void> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  await rl.question("Press Enter once verification is complete to continue...");
-  rl.close();
+// Serializes real stdin prompts across concurrent callers. Bounded resolution (Task 4) runs
+// multiple jobs concurrently, and more than one can hit a verification pause at once -- without
+// this, each would create its own readline.Interface on the SAME shared process.stdin stream.
+// Confirmed live: that produced a real MaxListenersExceededWarning and, worse, an abandoned
+// interface's later error surfaced as a process-level uncaughtException well after the job that
+// triggered it had already timed out and moved on -- exiting the whole run with a non-zero code
+// despite every job having actually completed. Also just makes real interactive use sane: a
+// human operator sees one prompt at a time instead of several stacked/interleaved ones.
+let waitChain: Promise<void> = Promise.resolve();
+
+// Exported for direct testability (the serialization property below can't be observed through
+// pauseForVerification's public surface without mocking readline itself either way).
+export async function defaultWaitForEnter(): Promise<void> {
+  const previous = waitChain;
+  let release: () => void = () => {};
+  waitChain = new Promise((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    await rl.question("Press Enter once verification is complete to continue...");
+    rl.close();
+  } finally {
+    release();
+  }
 }
 
 /**

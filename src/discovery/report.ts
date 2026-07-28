@@ -10,7 +10,18 @@ export interface DiscoveryRunSummary {
   keywordsSearched: number;
   pagesProcessed: number;
   listingsDiscovered: number;
+  // Profile Relevance phase: listingsEvaluated is every discovered listing that went through
+  // relevance.ts's evaluateRelevance() -- equal to listingsDiscovered in current code (nothing
+  // skips evaluation), kept as its own field because it's a conceptually distinct count (raw
+  // discovery count vs. how many were actually checked for relevance) that a future change
+  // could legitimately make diverge.
+  listingsEvaluated: number;
   discoveriesRejected: number;
+  relevantRetained: number;
+  retainedByProfile: Record<string, number>;
+  resolutionsAttempted: number;
+  resolutionsSucceeded: number;
+  resolutionsTimedOut: number;
   officialPostingsResolved: number;
   unresolvedDiscoveries: number;
   duplicatesMerged: number;
@@ -19,12 +30,14 @@ export interface DiscoveryRunSummary {
   jobsByProfile: Record<string, number>;
   jobsBySource: Record<string, number>;
   jobsWritten: number;
+  discoveryTimeMs: number;
+  resolutionTimeMs: number;
   errors: { source: string; message: string }[];
 }
 
 // Raw counters the orchestrator accumulates through a run. Mirrors DiscoveryRunSummary
-// exactly except for discoveriesRejected, which buildSummary always sets itself (see below)
-// rather than trusting a caller-supplied value.
+// field-for-field -- buildSummary is now a pure passthrough (see the historical note below on
+// what used to differ).
 export interface RawDiscoveryCounters {
   sourcesAttempted: number;
   sourcesSucceeded: number;
@@ -33,6 +46,13 @@ export interface RawDiscoveryCounters {
   keywordsSearched: number;
   pagesProcessed: number;
   listingsDiscovered: number;
+  listingsEvaluated: number;
+  discoveriesRejected: number;
+  relevantRetained: number;
+  retainedByProfile: Record<string, number>;
+  resolutionsAttempted: number;
+  resolutionsSucceeded: number;
+  resolutionsTimedOut: number;
   officialPostingsResolved: number;
   unresolvedDiscoveries: number;
   duplicatesMerged: number;
@@ -41,45 +61,26 @@ export interface RawDiscoveryCounters {
   jobsByProfile: Record<string, number>;
   jobsBySource: Record<string, number>;
   jobsWritten: number;
+  discoveryTimeMs: number;
+  resolutionTimeMs: number;
   errors: { source: string; message: string }[];
 }
 
 /**
- * Pure assembly -- no computation beyond what's noted below. Takes the orchestrator's raw
- * counters and returns the structured summary shape.
+ * Pure assembly -- no computation. Takes the orchestrator's raw counters and returns the
+ * structured summary shape (same shape today; kept as a separate function/type pair rather
+ * than a type alias so a future field that DOES need real computation here, same as
+ * discoveriesRejected used to before the Profile Relevance phase wired it to a real counter,
+ * has somewhere to go without changing every call site).
  *
- * Notes on fields that aren't simple 1:1 passthroughs:
- * - discoveriesRejected: always 0. There is currently no relevance-filtering logic anywhere
- *   in the codebase that discards a discovered job for being off-topic (the design spec's
- *   "don't store unrelated portal results" is aspirational, not implemented). Set to 0 here
- *   rather than inventing filtering logic, which would be scope creep into business logic
- *   this task isn't meant to add.
- * - verificationPauses: undercounts by construction. posting-resolver.ts makes 2 of its own
- *   pauseForVerification() calls (redirect-follow + DOM-scrape fallback) that are NOT
- *   reflected here -- PostingResolver only receives a bare BrowserContext, not a
- *   DiscoveryContext, so it has no onVerificationPause callback to report through. Threading
- *   one in is a larger, separate change (new constructor/resolve() parameter, orchestrator
- *   wiring) out of scope for this task. This count only reflects verification pauses from the
- *   5 portal adapters + company-careers's genericDeps relay.
+ * Note on verificationPauses: still undercounts by construction. posting-resolver.ts makes 2
+ * of its own pauseForVerification() calls (redirect-follow + DOM-scrape fallback) that are NOT
+ * reflected here -- PostingResolver only receives a bare BrowserContext, not a
+ * DiscoveryContext, so it has no onVerificationPause callback to report through. Threading one
+ * in is a larger, separate change (new constructor/resolve() parameter, orchestrator wiring)
+ * out of scope for this task. This count only reflects verification pauses from the 5 portal
+ * adapters + company-careers's genericDeps relay.
  */
 export function buildSummary(raw: RawDiscoveryCounters): DiscoveryRunSummary {
-  return {
-    sourcesAttempted: raw.sourcesAttempted,
-    sourcesSucceeded: raw.sourcesSucceeded,
-    sourcesFailed: raw.sourcesFailed,
-    companiesAttempted: raw.companiesAttempted,
-    keywordsSearched: raw.keywordsSearched,
-    pagesProcessed: raw.pagesProcessed,
-    listingsDiscovered: raw.listingsDiscovered,
-    discoveriesRejected: 0,
-    officialPostingsResolved: raw.officialPostingsResolved,
-    unresolvedDiscoveries: raw.unresolvedDiscoveries,
-    duplicatesMerged: raw.duplicatesMerged,
-    jdsExtracted: raw.jdsExtracted,
-    verificationPauses: raw.verificationPauses,
-    jobsByProfile: raw.jobsByProfile,
-    jobsBySource: raw.jobsBySource,
-    jobsWritten: raw.jobsWritten,
-    errors: raw.errors,
-  };
+  return { ...raw };
 }

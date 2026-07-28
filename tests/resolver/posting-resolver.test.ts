@@ -37,6 +37,12 @@ describe("PostingResolver", () => {
       sourceJobId: "123",
       discoveredAt: "2026-01-01T00:00:00.000Z",
       matchedProfiles: ["sdet"],
+      department: null,
+      descriptionSnippet: null,
+      searchedProfile: "sdet",
+      matchedKeywords: [],
+      matchedFields: [],
+      relevanceReason: "",
     };
 
     // Mock fetch for redirect resolution & API info
@@ -94,6 +100,12 @@ describe("PostingResolver", () => {
       sourceJobId: "456",
       discoveredAt: "2026-01-01T00:00:00.000Z",
       matchedProfiles: ["security"],
+      department: null,
+      descriptionSnippet: null,
+      searchedProfile: "security",
+      matchedKeywords: [],
+      matchedFields: [],
+      relevanceReason: "",
     };
 
     // Mock fetch to return same URL (no redirect)
@@ -140,6 +152,12 @@ describe("PostingResolver", () => {
       sourceJobId: "789",
       discoveredAt: "2026-01-01T00:00:00.000Z",
       matchedProfiles: ["sdet"],
+      department: null,
+      descriptionSnippet: null,
+      searchedProfile: "sdet",
+      matchedKeywords: [],
+      matchedFields: [],
+      relevanceReason: "",
     };
 
     // No redirect: fetch echoes back the same URL. Includes .text() (the real Workday
@@ -207,6 +225,12 @@ describe("PostingResolver", () => {
       sourceJobId: "789",
       discoveredAt: "2026-01-01T00:00:00.000Z",
       matchedProfiles: ["sdet"],
+      department: null,
+      descriptionSnippet: null,
+      searchedProfile: "sdet",
+      matchedKeywords: [],
+      matchedFields: [],
+      relevanceReason: "",
     };
 
     (fetch as any).mockImplementation(async (url: string) => ({

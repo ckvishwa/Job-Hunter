@@ -150,15 +150,31 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
         // is free and gives the real location instead of guessing one. Workday/generic (both
         // skipped above) are the only adapters where fetchesPerJob is true; if that ever
         // changes, this still only fetches real data, never fabricates it.
+        // Snippet length cap for the lightweight relevance-evaluation field -- this is
+        // deliberately NOT the full JD (that's what resolution is for); just enough of the
+        // real, already-fetched description text for relevance.ts to check for domain terms.
+        const SNIPPET_MAX_CHARS = 500;
+
         const jobs: DiscoveredJobLite[] = [];
         for (const job of discovered) {
           let location = "";
           let salarySnippet: string | null = null;
+          let department: string | null = null;
+          let descriptionSnippet: string | null = null;
           if (!adapter.fetchesPerJob) {
+            // Greenhouse/Lever's fetchJobDetails is a pure local transform over data already
+            // fetched by discoverJobs (no extra network call) -- department/description come
+            // along for free here, real data, never a separate detail fetch just for this.
             const raw = await adapter.fetchJobDetails(job, site, settings);
             location = raw.location ?? "";
             salarySnippet = raw.salaryText;
+            department = raw.department;
+            descriptionSnippet = raw.descriptionText ? raw.descriptionText.slice(0, SNIPPET_MAX_CHARS) : null;
           }
+          // Workday (fetchesPerJob: true) has no department/description at discovery time --
+          // its list endpoint only returns title + a path segment. Left null ("when
+          // available") rather than triggering a per-job detail fetch before relevance
+          // filtering has even decided whether this job is worth resolving at all.
           jobs.push({
             source: "company-careers",
             searchKeyword: keyword,
@@ -172,6 +188,15 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
             sourceJobId: job.externalId,
             discoveredAt: new Date().toISOString(),
             matchedProfiles: job.matchedProfiles,
+            department,
+            descriptionSnippet,
+            // Relevance evaluation (evidence + retain/reject) runs centrally in
+            // orchestrator.ts's onPageProcessed, not per-adapter -- these start as neutral
+            // placeholders and are overwritten there before a job is ever written to disk.
+            searchedProfile: null,
+            matchedKeywords: [],
+            matchedFields: [],
+            relevanceReason: "",
           });
         }
 

@@ -10,7 +10,31 @@ export interface DiscoveredJobLite {
   postingAgeOrDate: string | null;
   sourceJobId: string | null;
   discoveredAt: string;
+  // Ordered by src/discovery/relevance.ts's evaluateRelevance(): index 0 is the primary
+  // profile. Empty only transiently during adapter construction, before the orchestrator's
+  // relevance filter runs -- never empty on a job that actually reaches discoveredJobs.jsonl.
   matchedProfiles: string[];
+  // "When available" lightweight fields (Profile Relevance phase) -- populated straight from
+  // data an adapter's discovery-list response already carries (Greenhouse/Lever's board APIs
+  // include department/team and a full description in the same call used to build the rest of
+  // this object), never a separate fetch and never fabricated. null where the adapter's
+  // discovery-list response doesn't carry it (e.g. Workday, whose list endpoint only returns
+  // title + a path segment -- department/description require the per-job detail fetch that
+  // only happens after a job is already retained).
+  department: string | null;
+  descriptionSnippet: string | null;
+  // The --profile filter active for the run that discovered this job, or null if the run
+  // considered all profiles. Distinct from matchedProfiles: this is what was SEARCHED FOR, not
+  // what the relevance evaluation actually found.
+  searchedProfile: string | null;
+  // Evidence from relevance.ts's evaluateRelevance(): which configured keyword phrases /
+  // domain-qualifier tokens matched, which lightweight field(s) they matched in, and a
+  // human-readable summary. Empty/blank only on a job that predates this phase (never written
+  // by current code -- every job that reaches discoveredJobs.jsonl now goes through
+  // evaluateRelevance() first).
+  matchedKeywords: string[];
+  matchedFields: string[];
+  relevanceReason: string;
 }
 
 export interface DiscoveryCheckpoint {

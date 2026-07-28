@@ -172,6 +172,12 @@ export const configurableGenericPortalAdapter: PortalDiscoveryAdapter = {
           sourceJobId: jobId,
           discoveredAt: new Date().toISOString(),
           matchedProfiles: [],
+          department: null,
+          descriptionSnippet: null,
+          searchedProfile: null,
+          matchedKeywords: [],
+          matchedFields: [],
+          relevanceReason: "",
         });
       }
 

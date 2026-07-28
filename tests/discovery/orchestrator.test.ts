@@ -397,6 +397,138 @@ portals:
   });
 });
 
+describe("orchestrator relevance filtering + limit placement (Profile Relevance phase)", () => {
+  function relevantJob(id: string): DiscoveredJobLite {
+    return {
+      source: "company-careers",
+      searchKeyword: "SDET",
+      title: "SDET II",
+      company: "Acme",
+      location: "Remote",
+      salarySnippet: null,
+      resultUrl: `https://example.invalid/job/${id}`,
+      possibleOfficialUrl: null,
+      postingAgeOrDate: null,
+      sourceJobId: id,
+      discoveredAt: new Date().toISOString(),
+      matchedProfiles: [],
+      department: null,
+      descriptionSnippet: null,
+      searchedProfile: null,
+      matchedKeywords: [],
+      matchedFields: [],
+      relevanceReason: "",
+    };
+  }
+
+  // The real, live false-positive this whole phase exists to fix: a company-wide board dump
+  // surfacing something totally unrelated regardless of which keyword search found it.
+  function irrelevantJob(id: string): DiscoveredJobLite {
+    return { ...relevantJob(id), title: "Account Executive, Emerging Enterprise" };
+  }
+
+  beforeEach(() => {
+    discoverMock.mockReset();
+  });
+
+  // Real config/sites.yml's settings.delayBetweenRequestsMs (500ms) applies as a genuine
+  // setTimeout-based inter-job throttle in Phase 2 -- fake timers so these tests don't each
+  // burn real wall-clock time on it (same pattern as the "incremental checkpoint" describe
+  // block below).
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("rejects an irrelevant job and retains a relevant one, with real evidence fields populated on the retained job", async () => {
+    discoverMock.mockImplementationOnce(async (context: DiscoveryContext) => {
+      await context.onPageProcessed([relevantJob("r1"), irrelevantJob("i1")], 1);
+    });
+    discoverMock.mockResolvedValue(undefined);
+
+    const paths = makePaths();
+    vi.useFakeTimers();
+    const summaryPromise = runDiscover(paths, { profileIds: ["sdet"] }, fakeLaunchFn, fakeCloseFn);
+    await vi.advanceTimersByTimeAsync(2000);
+    const summary = await summaryPromise;
+
+    expect(summary.listingsDiscovered).toBe(2);
+    expect(summary.listingsEvaluated).toBe(2);
+    expect(summary.discoveriesRejected).toBe(1);
+    expect(summary.relevantRetained).toBe(1);
+    expect(summary.retainedByProfile).toEqual({ sdet: 1 });
+
+    const discovered = loadDiscoveredJobs(paths.discoveredJobsPath);
+    expect(discovered).toHaveLength(1);
+    expect(discovered[0]!.sourceJobId).toBe("r1");
+    expect(discovered[0]!.matchedProfiles).toContain("sdet");
+    expect(discovered[0]!.matchedKeywords.length).toBeGreaterThan(0);
+    expect(discovered[0]!.matchedFields).toContain("title");
+    expect(discovered[0]!.relevanceReason.length).toBeGreaterThan(0);
+    expect(discovered[0]!.searchedProfile).toBe("sdet");
+  });
+
+  it("never invokes resolution for a rejected job -- rejected discoveries incur zero resolution cost", async () => {
+    discoverMock.mockImplementationOnce(async (context: DiscoveryContext) => {
+      await context.onPageProcessed([irrelevantJob("i1"), irrelevantJob("i2")], 1);
+    });
+    discoverMock.mockResolvedValue(undefined);
+
+    const paths = makePaths();
+    const summary = await runDiscover(paths, { profileIds: ["sdet"] }, fakeLaunchFn, fakeCloseFn);
+
+    expect(summary.discoveriesRejected).toBe(2);
+    expect(summary.relevantRetained).toBe(0);
+    expect(summary.resolutionsAttempted).toBe(0);
+    expect(loadDiscoveredJobs(paths.discoveredJobsPath)).toHaveLength(0);
+  });
+
+  it("applies --limit after relevance filtering, not before -- every retained job is written to discoveredJobs.jsonl regardless of limit, but only `limit` many are resolved", async () => {
+    discoverMock.mockImplementationOnce(async (context: DiscoveryContext) => {
+      const jobs = Array.from({ length: 5 }, (_, i) => relevantJob(`r${i}`));
+      await context.onPageProcessed(jobs, 1);
+    });
+    discoverMock.mockResolvedValue(undefined);
+
+    const paths = makePaths();
+    vi.useFakeTimers();
+    const summaryPromise = runDiscover(paths, { profileIds: ["sdet"], limit: 2 }, fakeLaunchFn, fakeCloseFn);
+    await vi.advanceTimersByTimeAsync(2000);
+    const summary = await summaryPromise;
+
+    expect(summary.relevantRetained).toBe(5);
+    // Limit never truncates discoveredJobs.jsonl -- all 5 retained jobs are on disk.
+    expect(loadDiscoveredJobs(paths.discoveredJobsPath)).toHaveLength(5);
+    // Only the first 2 (the limit) were actually resolved.
+    expect(summary.resolutionsAttempted).toBe(2);
+  });
+
+  it("is deterministic and idempotent: rerunning after a completed run discovers/resolves/writes nothing new", async () => {
+    const paths = makePaths();
+    discoverMock.mockImplementationOnce(async (context: DiscoveryContext) => {
+      await context.onPageProcessed([relevantJob("r1")], 1);
+    });
+    discoverMock.mockResolvedValue(undefined);
+    vi.useFakeTimers();
+    const summary1Promise = runDiscover(paths, { profileIds: ["sdet"] }, fakeLaunchFn, fakeCloseFn);
+    await vi.advanceTimersByTimeAsync(2000);
+    const summary1 = await summary1Promise;
+    expect(summary1.jobsWritten).toBeGreaterThan(0);
+    expect(summary1.relevantRetained).toBe(1);
+
+    discoverMock.mockReset();
+    discoverMock.mockResolvedValue(undefined); // every checkpoint is already completed -> discover() is never even called again
+    const summary2Promise = runDiscover(paths, { profileIds: ["sdet"] }, fakeLaunchFn, fakeCloseFn);
+    await vi.advanceTimersByTimeAsync(2000);
+    const summary2 = await summary2Promise;
+
+    expect(discoverMock).not.toHaveBeenCalled();
+    expect(summary2.listingsDiscovered).toBe(0);
+    expect(summary2.relevantRetained).toBe(0);
+    expect(summary2.jobsWritten).toBe(summary1.jobsWritten); // no growth
+    expect(loadDiscoveredJobs(paths.discoveredJobsPath)).toHaveLength(1); // still exactly the one retained job, no duplicate append
+  });
+});
+
 describe("orchestrator browser context lifecycle (Task 13)", () => {
   beforeEach(() => {
     discoverMock.mockReset();
@@ -452,6 +584,12 @@ describe("orchestrator incremental checkpoint/discovery persistence (Task 13)", 
       sourceJobId: "crash-job-1",
       discoveredAt: new Date().toISOString(),
       matchedProfiles: [],
+      department: null,
+      descriptionSnippet: null,
+      searchedProfile: null,
+      matchedKeywords: [],
+      matchedFields: [],
+      relevanceReason: "",
     };
 
     // Only the FIRST discover() call reports progress then crashes; every other keyword

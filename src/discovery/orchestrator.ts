@@ -13,16 +13,14 @@ import { mergeJobs } from "../dedup/deduplicator.js";
 import { PostingResolver } from "../resolver/posting-resolver.js";
 import type { DiscoveredJobLite, DiscoveryContext } from "./types.js";
 import type { JobPosting } from "../adapters/types.js";
-import type { SiteConfig } from "../types.js";
-import { matchProfiles } from "../adapters/match-profiles.js";
+import { evaluateRelevance } from "./relevance.js";
+import { runResolutionPhase, UNRESOLVED_PLACEHOLDER_PREFIX } from "./resolve-phase.js";
 import { buildSummary, type DiscoveryRunSummary, type RawDiscoveryCounters } from "./report.js";
 import path from "node:path";
 
-// The resolver's own placeholder-fallback string (posting-resolver.ts's final `details` when
-// neither the ATS adapter path nor the DOM-scrape fallback produced anything) -- the only
-// current, honest signal that a discovery could not be properly resolved. Kept here as a
-// single source of truth for the officialPostingsResolved/unresolvedDiscoveries split below.
-const UNRESOLVED_PLACEHOLDER_PREFIX = "Job posting found on ";
+const DEFAULT_RESOLVE_CONCURRENCY = 3;
+const DEFAULT_RESOLVE_JOB_TIMEOUT_MS = 45_000;
+const RESOLVE_PROGRESS_EVERY = 10;
 
 export interface DiscoverFilters {
   profileIds?: string[];
@@ -48,6 +46,11 @@ export interface DiscoverFilters {
   // controlled live-validation run at a separate validation-only registry instead --
   // real ranked companies and validation-only test companies are never mixed in one file.
   registryPath?: string;
+  // Bounded resolution behavior (Profile Relevance phase, Task 4). Undefined = the module's
+  // own defaults (concurrency 3, 45s per-job timeout, no separate total-timeout cap).
+  resolveConcurrency?: number;
+  resolveJobTimeoutMs?: number;
+  resolveTotalTimeoutMs?: number;
 }
 
 function emptyCounters(): RawDiscoveryCounters {
@@ -59,6 +62,13 @@ function emptyCounters(): RawDiscoveryCounters {
     keywordsSearched: 0,
     pagesProcessed: 0,
     listingsDiscovered: 0,
+    listingsEvaluated: 0,
+    discoveriesRejected: 0,
+    relevantRetained: 0,
+    retainedByProfile: {},
+    resolutionsAttempted: 0,
+    resolutionsSucceeded: 0,
+    resolutionsTimedOut: 0,
     officialPostingsResolved: 0,
     unresolvedDiscoveries: 0,
     duplicatesMerged: 0,
@@ -67,6 +77,8 @@ function emptyCounters(): RawDiscoveryCounters {
     jobsByProfile: {},
     jobsBySource: {},
     jobsWritten: 0,
+    discoveryTimeMs: 0,
+    resolutionTimeMs: 0,
     errors: [],
   };
 }
@@ -219,6 +231,7 @@ export async function runDiscover(
     const page = await playwrightContext.newPage();
 
     // PHASE 1: Portal Job Discovery
+    const discoveryStart = Date.now();
     for (const source of targetSources) {
       counters.sourcesAttempted += 1;
       let sourceSuccess = true;
@@ -253,24 +266,60 @@ export async function runDiscover(
               settings,
               checkpoint,
               onPageProcessed: async (jobs, nextPageNum) => {
-                // Populate matchedProfiles
+                counters.listingsDiscovered += jobs.length;
+
+                // Profile Relevance phase: evaluate every discovered listing against ALL 4
+                // profiles' configured keywords + domain terms (relevance.ts) BEFORE it's ever
+                // written to disk or considered for resolution -- an unrelated listing (e.g. an
+                // "Account Executive" role a company-wide board dump surfaces regardless of
+                // which keyword search found it) is rejected here, not silently tagged with
+                // whatever profile happened to be searched at the time.
+                const retained: DiscoveredJobLite[] = [];
                 for (const job of jobs) {
-                  // Profile matching uses the title and the role configurations
-                  const mappedSearches = enabledRoles.map((r) => ({
-                    keyword: keyword,
-                    profileIds: [r.profile],
-                  }));
-                  job.matchedProfiles = matchProfiles(job.title, mappedSearches);
-                  if (job.matchedProfiles.length === 0) {
-                    // Fallback to the current role's profile
-                    job.matchedProfiles = [role.profile];
+                  counters.listingsEvaluated += 1;
+                  const evaluation = evaluateRelevance(
+                    { title: job.title, department: job.department, location: job.location, descriptionSnippet: job.descriptionSnippet },
+                    roles,
+                  );
+
+                  // With an active --profile filter, only retain jobs relevant to one of the
+                  // REQUESTED profiles -- a job that's genuinely relevant to some OTHER profile
+                  // (e.g. "Network Engineer" surfacing during a --profile sdet run) is still
+                  // correctly rejected for this run, matching "retain only <profile>-related
+                  // candidates" rather than "retain anything relevant to any profile."
+                  const requestedMatches = filters.profileIds?.length
+                    ? evaluation.matchedProfiles.filter((p) => filters.profileIds!.includes(p))
+                    : evaluation.matchedProfiles;
+
+                  if (!evaluation.matched || requestedMatches.length === 0) {
+                    counters.discoveriesRejected += 1;
+                    continue; // Never store the full job for a rejected discovery.
                   }
+
+                  // Primary = the first REQUESTED-and-matched profile (if --profile was given,
+                  // so the profile the run was actually searching for is what gets reported as
+                  // primary) else relevance.ts's own config-order primary.
+                  const ordered = filters.profileIds?.length
+                    ? [...requestedMatches, ...evaluation.matchedProfiles.filter((p) => !requestedMatches.includes(p))]
+                    : evaluation.matchedProfiles;
+
+                  job.matchedProfiles = ordered;
+                  job.matchedKeywords = evaluation.matchedKeywords;
+                  job.matchedFields = evaluation.matchedFields;
+                  job.relevanceReason = evaluation.relevanceReason;
+                  job.searchedProfile = filters.profileIds?.length ? filters.profileIds.join(",") : null;
+
+                  counters.relevantRetained += 1;
+                  const primary = ordered[0]!;
+                  counters.retainedByProfile[primary] = (counters.retainedByProfile[primary] ?? 0) + 1;
+
+                  retained.push(job);
                   newlyDiscovered.push(job);
                 }
 
-                // Append newly discovered jobs page-by-page
-                appendDiscoveredJobs(paths.discoveredJobsPath, jobs);
-                counters.listingsDiscovered += jobs.length;
+                // Only retained (relevant) jobs are ever written to discoveredJobs.jsonl --
+                // rejected discoveries leave no trace beyond the rejection counter above.
+                appendDiscoveredJobs(paths.discoveredJobsPath, retained);
                 // Fires once per portal page AND once per company in company-careers.ts --
                 // an honest, already-existing "processing unit" signal, not literally a
                 // count of browser pages navigated.
@@ -325,53 +374,88 @@ export async function runDiscover(
     }
 
     await page.close();
+    counters.discoveryTimeMs = Date.now() - discoveryStart;
 
     // PHASE 2: Official Posting Resolution and JD Extraction
     console.log(`[orchestrator] Discovery phase complete. Discovered ${newlyDiscovered.length} job(s) in this run.`);
 
-    // Slice to the requested limit. Limit applies after discovery, not before searching.
+    // Slice to the requested limit. newlyDiscovered only ever contains RETAINED (relevant)
+    // jobs -- rejected discoveries never reach it (see onPageProcessed above) -- so the limit
+    // is applied after relevance filtering and before resolution, exactly as required: it
+    // bounds this run's candidates, never touches existing JSONL data (jobs.jsonl only ever
+    // grows via mergeJobs below, discoveredJobs.jsonl is append-only), and slicing a
+    // deterministically-ordered array keeps the result deterministic and idempotent across
+    // reruns of the same input.
     const jobsToResolve = typeof limit === "number" ? newlyDiscovered.slice(0, limit) : newlyDiscovered;
     console.log(`[orchestrator] Resolving details for ${jobsToResolve.length} job(s) (Limit: ${limit ?? "None"}).`);
 
     const resolver = filters.registryPath ? new PostingResolver(filters.registryPath) : new PostingResolver();
-    const resolvedJobs: JobPosting[] = [];
 
-    for (const job of jobsToResolve) {
-      try {
+    // Captured ONCE, before any resolution/incremental-saving happens -- the true pre-run
+    // baseline. Reused (never reloaded from disk mid-phase) for every incremental save AND the
+    // final Phase 3 merge below, so duplicatesMerged is computed against what was on disk
+    // BEFORE this run's own resolutions, not re-inflated by this run's own incremental writes
+    // (reloading fresh inside persistIncrementally would make Phase 3 see its own already-
+    // written jobs as "existing," miscounting every one of them as a duplicate).
+    const existingJobsBeforeRun = loadJobs(paths.jobsStorePath);
+
+    // Bounded resolution (Task 4): concurrency-limited, per-job and (optionally) total
+    // timeouts, so one slow/stuck job (a real ~12-minute stall was observed live) can never
+    // block the rest of a run. Incrementally persisted below via onJobResolved -- an interrupt
+    // mid-resolution loses at most the one job in flight past the last completed save, not the
+    // whole phase's progress.
+    const resolvedJobsSoFar: JobPosting[] = [];
+    let saveChain: Promise<void> = Promise.resolve();
+    const persistIncrementally = (): Promise<void> => {
+      // Chained onto the previous save so concurrent workers' onJobResolved calls never
+      // interleave a read-modify-write of jobs.jsonl (an unserialized second save, computed
+      // from a stale read, could silently discard the first save's job).
+      saveChain = saveChain.then(() => {
+        const merged = mergeJobs(existingJobsBeforeRun, resolvedJobsSoFar, new Date().toISOString());
+        saveJobs(paths.jobsStorePath, merged);
+      });
+      return saveChain;
+    };
+
+    const resolutionStart = Date.now();
+    const resolvePhaseResult = await runResolutionPhase(
+      jobsToResolve,
+      (job) => {
         console.log(`[orchestrator] Resolving job: "${job.title}" at "${job.company}" (${job.resultUrl})`);
-        const resolved = await resolver.resolve(job, playwrightContext);
-        if (resolved) {
-          resolvedJobs.push(resolved);
-          counters.jdsExtracted += 1;
+        return resolver.resolve(job, playwrightContext);
+      },
+      {
+        concurrency: filters.resolveConcurrency ?? DEFAULT_RESOLVE_CONCURRENCY,
+        perJobTimeoutMs: filters.resolveJobTimeoutMs ?? DEFAULT_RESOLVE_JOB_TIMEOUT_MS,
+        totalTimeoutMs: filters.resolveTotalTimeoutMs,
+        progressEvery: RESOLVE_PROGRESS_EVERY,
+        delayBetweenRequestsMs: settings.delayBetweenRequestsMs,
+        log: (message) => console.log(message),
+        onJobResolved: async (posting) => {
+          resolvedJobsSoFar.push(posting);
+          await persistIncrementally();
+        },
+      },
+    );
+    await saveChain; // make sure the last incremental save has actually landed before Phase 3
+    counters.resolutionTimeMs = Date.now() - resolutionStart;
+    counters.resolutionsAttempted = resolvePhaseResult.attempted;
+    counters.resolutionsSucceeded = resolvePhaseResult.succeeded;
+    counters.resolutionsTimedOut = resolvePhaseResult.timedOut;
+    counters.unresolvedDiscoveries = resolvePhaseResult.unresolved;
+    counters.officialPostingsResolved = resolvePhaseResult.succeeded;
+    counters.jdsExtracted = resolvePhaseResult.resolvedJobs.length;
+    const resolvedJobs = resolvePhaseResult.resolvedJobs;
 
-          // resolve() itself never returns null (confirmed Task 10) -- the only current,
-          // honest signal that a discovery could not be properly resolved is whether the
-          // resolver fell all the way through to its own placeholder-fallback descriptionText.
-          if (resolved.descriptionText.startsWith(UNRESOLVED_PLACEHOLDER_PREFIX)) {
-            counters.unresolvedDiscoveries += 1;
-          } else {
-            counters.officialPostingsResolved += 1;
-          }
-
-          // Apply delay between requests to avoid rate limits
-          if (settings.delayBetweenRequestsMs > 0) {
-            await new Promise((resolve) => setTimeout(resolve, settings.delayBetweenRequestsMs));
-          }
-        }
-      } catch (err) {
-        console.error(`[orchestrator] Error resolving job "${job.title}": ${(err as Error).message}`);
-        // A resolve() call that itself throws (caught here) also counts as unresolved --
-        // the discovery exists but nothing usable came out of resolution.
-        counters.unresolvedDiscoveries += 1;
-      }
-    }
-
-    // PHASE 3: Deduplication & Saving
-    const existingJobs = loadJobs(paths.jobsStorePath);
+    // PHASE 3: Deduplication & Saving. Authoritative final merge/save/counters, against the
+    // SAME pre-run baseline the incremental saves above used -- idempotent with (and
+    // supersedes) whatever they already wrote, so it's correct whether or not this point is
+    // ever reached, and duplicatesMerged reflects genuine pre-existing duplicates rather than
+    // this run's own incremental writes.
     const now = new Date().toISOString();
-    const merged = mergeJobs(existingJobs, resolvedJobs, now);
+    const merged = mergeJobs(existingJobsBeforeRun, resolvedJobs, now);
 
-    counters.duplicatesMerged = existingJobs.length + resolvedJobs.length - merged.length;
+    counters.duplicatesMerged = existingJobsBeforeRun.length + resolvedJobs.length - merged.length;
     saveJobs(paths.jobsStorePath, merged);
     counters.jobsWritten = merged.length;
 

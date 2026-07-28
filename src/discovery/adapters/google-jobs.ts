@@ -87,6 +87,14 @@ export const googleJobsDiscoveryAdapter: PortalDiscoveryAdapter = {
           sourceJobId: jobId,
           discoveredAt: new Date().toISOString(),
           matchedProfiles: [],
+          // No department/description available at portal-search-result time -- relevance
+          // evaluation (orchestrator.ts) falls back to title/location only for this source.
+          department: null,
+          descriptionSnippet: null,
+          searchedProfile: null,
+          matchedKeywords: [],
+          matchedFields: [],
+          relevanceReason: "",
         });
       }
 

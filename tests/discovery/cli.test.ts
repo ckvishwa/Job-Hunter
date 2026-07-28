@@ -88,4 +88,28 @@ describe("parseDiscoverArgs", () => {
     expect(result.isolatedProfile).toBe(true);
     expect(result.company).toBe("Figma");
   });
+
+  it("parses --resolve-concurrency, --resolve-job-timeout-ms, --resolve-total-timeout-ms as positive integers", () => {
+    const result = parseDiscoverArgs([
+      "--resolve-concurrency",
+      "5",
+      "--resolve-job-timeout-ms",
+      "30000",
+      "--resolve-total-timeout-ms",
+      "600000",
+    ]);
+    expect(result.resolveConcurrency).toBe(5);
+    expect(result.resolveJobTimeoutMs).toBe(30000);
+    expect(result.resolveTotalTimeoutMs).toBe(600000);
+  });
+
+  it("ignores invalid values for the resolution-tuning flags instead of producing NaN/negative/zero", () => {
+    for (const flag of ["--resolve-concurrency", "--resolve-job-timeout-ms", "--resolve-total-timeout-ms"]) {
+      for (const bad of ["abc", "0", "-1", "2.5"]) {
+        const result = parseDiscoverArgs([flag, bad]);
+        expect(Object.values(result).every((v) => v === undefined || typeof v !== "number" || !Number.isNaN(v))).toBe(true);
+      }
+    }
+    expect(parseDiscoverArgs(["--resolve-concurrency", "abc"]).resolveConcurrency).toBeUndefined();
+  });
 });
