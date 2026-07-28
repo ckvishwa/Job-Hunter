@@ -29,7 +29,7 @@
 - [x] Task 8 — Portal adapter registry (already done — add tests) — commit d319ed3c. Reviewed clean.
 - [x] Task 9 — Company-careers runner: stop fabricating data — test coverage added, commit closing the 3 remaining gaps from the Task 9 checklist. Reviewed clean.
 - [x] Task 10 — Posting resolver: fix typecheck + add verification-pause — commits 7a7db79, 95d0551. Fixed the flagged Workday-site fabrication (registry-verified atsWorkdaySite now wired in, never guesses "careers"). Review found the first proof-test didn't actually discriminate fixed-vs-buggy code (incomplete fetch mock let both pass identically) — rewritten to inspect the actual fetch call log instead; verified by empirically swapping in the pre-fix code and confirming the test fails, then restoring and confirming it passes.
-- [ ] Task 11 — Cross-source dedup (already done — verify only)
+- [x] Task 11 — Cross-source dedup (already done — verify only) — test-only commit closing the malformed-URL-in-mixed-batch gap. Reviewed clean.
 - [ ] Task 12 — Keyword orchestration (already done — verify only)
 - [ ] Task 13 — Orchestrator: dedicated test coverage
 - [ ] Task 14 — CLI (already done — verify only)
