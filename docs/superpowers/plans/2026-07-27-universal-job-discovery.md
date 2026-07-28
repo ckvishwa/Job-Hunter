@@ -226,6 +226,34 @@ Covered by Task 0 Steps 5, 6, 8. This task is the checkpoint: confirm `tests/res
 
 ---
 
+## Interlude: browser lifecycle fix + registry split (found during first Task 17 attempt)
+
+First Task 17 attempt found real bugs live validation exists to catch, blocking further progress:
+- `context.close()` didn't reliably terminate the real OS Chrome process on Windows; a second
+  run against the same profile then either hung indefinitely or failed outright on a stale lock.
+- The user paused Task 17 and required a proper fix: tracked shutdown with a bounded wait +
+  force-kill fallback, pre-launch live-lock detection (fail clear, never hang), stale-lock
+  cleanup only when unowned, a per-run isolated-profile option, never touching an unrelated
+  Chrome process. Commits `f5ea6bd`, `ac0205a`, `db2cbce` (the latter two are independent-review
+  follow-ups: a real prefix-collision that could have killed an unrelated live Chrome process
+  under `isolatedProfile`, then a real false-negative on Windows paths containing a space —
+  both reproduced against actual PowerShell/live-process output, not just reasoned about).
+- Also required: move the `fortuneRank: null` validation-only registry entries (AHEAD, Stripe,
+  Figma — added ad hoc during the interrupted first attempt) out of the production
+  `config/fortune500-registry.json` into `config/fortune500-registry.validation.json`, with an
+  explicit `--registry`/`companyRegistryPath` override so a controlled validation run can still
+  use them without ever mixing the two files. Commit `5555550`.
+- Live validation also caught one real, pre-existing data defect the way it's meant to: Google's
+  registry entry (`atsTenantOrBoardId: "google"`) is wrong — that Greenhouse board returns 404,
+  confirmed independently via a direct API call. Marked `verificationStatus: "blocked"` rather
+  than fabricating a corrected token; stays in production since it's still a real, Fortune-
+  ranked company.
+
+All four commits independently reviewed, all found issues fixed and re-reviewed clean. 30 files,
+209/209 tests, 0 typecheck errors before resuming Task 17.
+
+---
+
 ## Task 17: Controlled live validation
 
 Not run until Task 16 is fully green and the user has separately confirmed they want a live run (this is a real browser hitting real external sites — confirm before executing even though it was pre-authorized in the task brief, since it's the first non-mocked execution of this code).
