@@ -61,11 +61,23 @@ function execFileText(file: string, args: string[]): Promise<string> {
  * force-killed an unrelated, live Chrome process. The match requires the directory value to
  * be followed by a double-quote, a space, or the end of the command line -- never another
  * path character.
+ *
+ * Quoting note (also found and fixed during review, against a REAL running chrome.exe's
+ * captured command line): when a Windows argv element contains a space, standard command-line
+ * quoting wraps the WHOLE element in quotes -- "--user-data-dir=<dir>" -- not just the value
+ * after `=`. A profile path containing a space (extremely common: any username with a space,
+ * any path under "Program Files") would otherwise produce a false negative here, silently
+ * defeating both the in-use guard and the orphan-cleanup force-kill path -- the exact failure
+ * this function exists to prevent, just triggered a different way.
+ *
+ * ponytail: does not attempt to handle a duplicate --user-data-dir flag (indexOf finds the
+ * first occurrence, not necessarily the one Chromium's own last-write-wins flag parsing would
+ * honor) -- no code path in this repo ever passes launchPersistentChrome extra args that could
+ * produce that, so there's no current consumer to build it for. Revisit if that changes.
  */
 export function commandLineOwnsProfile(commandLine: string, absoluteUserDataDir: string): boolean {
-  // Real Chrome quotes BOTH sides of the value when quoting at all:
-  // --user-data-dir="<dir>" -- not just a trailing quote after an otherwise-unquoted value.
-  if (commandLine.includes(`--user-data-dir="${absoluteUserDataDir}"`)) return true;
+  // Whole-token quoting: "--user-data-dir=<dir>" (quote wraps the entire flag=value pair).
+  if (commandLine.includes(`"--user-data-dir=${absoluteUserDataDir}"`)) return true;
   const marker = `--user-data-dir=${absoluteUserDataDir}`;
   const idx = commandLine.indexOf(marker);
   if (idx === -1) return false;

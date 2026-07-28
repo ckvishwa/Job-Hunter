@@ -55,8 +55,30 @@ describe("commandLineOwnsProfile", () => {
     expect(commandLineOwnsProfile(`chrome.exe --user-data-dir=${dir}`, dir)).toBe(true);
   });
 
-  it("matches a quoted --user-data-dir", () => {
-    expect(commandLineOwnsProfile(`chrome.exe --user-data-dir="${dir}" --headless`, dir)).toBe(true);
+  // Regression coverage for a second real bug an independent review found: Windows argv
+  // quoting wraps the WHOLE flag=value token in quotes when the value contains a space --
+  // "--user-data-dir=<dir>" -- not just the value after "=". Confirmed against a real,
+  // live chrome.exe process's actual captured CommandLine during review (a crashpad-handler
+  // child using the default Chrome profile, whose path contains a space: "...\User Data").
+  // A space-containing profile path (e.g. any Windows username with a space, or any path
+  // under "Program Files") is common, not an edge case -- getting this wrong means the
+  // in-use guard and the orphan-cleanup force-kill both silently no-op against a real, live
+  // process, which is the exact failure this whole module exists to prevent.
+  it("matches a whole-token-quoted --user-data-dir when the profile path contains a space", () => {
+    const spacedDir = "C:\\Users\\ckvis\\AppData\\Local\\Google\\Chrome\\User Data";
+    const realCapturedShape =
+      `"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --type=crashpad-handler ` +
+      `"--user-data-dir=${spacedDir}" /prefetch:4`;
+    expect(commandLineOwnsProfile(realCapturedShape, spacedDir)).toBe(true);
+  });
+
+  it("does NOT match the OLD (incorrect) assumed quoting shape -- quote only around the value, not the whole token", () => {
+    // This is what the first version of this fix incorrectly expected. A command line in
+    // this shape doesn't actually occur on Windows for a spaced path, but the function must
+    // not accidentally match it either -- it's neither the real quoted form nor the real
+    // unquoted form (a stray leading quote sits where "--user-data-dir=" should start).
+    const spacedDir = "C:\\Users\\ckvis\\AppData\\Local\\Google\\Chrome\\User Data";
+    expect(commandLineOwnsProfile(`chrome.exe --user-data-dir="${spacedDir}" --headless`, spacedDir)).toBe(false);
   });
 
   // Regression coverage: reproduced against real PowerShell -like semantics during review that
