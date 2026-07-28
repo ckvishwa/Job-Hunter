@@ -123,6 +123,13 @@ export async function runDiscover(
       `[orchestrator] Dry run: would attempt ${targetSources.length} source(s) x ${enabledRoles.length} role(s) ` +
         `(${totalIterations} source/keyword iteration(s) total). No browser launched, no data written.`,
     );
+    if (filters.resetCheckpoint) {
+      // Checkpoint loading (and the reset it would trigger) happens after this return --
+      // a dry run never touches disk state, so --reset-checkpoint combined with --dry-run is
+      // silently ignored rather than performed. Told explicitly here so it isn't a silent
+      // surprise: rerun without --dry-run to actually apply the reset.
+      console.log(`[orchestrator] Dry run: --reset-checkpoint was NOT applied (dry runs never write to disk). Rerun without --dry-run to apply it.`);
+    }
     return summary;
   }
 
@@ -216,14 +223,6 @@ export async function runDiscover(
 
             await adapter.discover(discoveryCtx);
 
-            // Mark completed -- except for company-careers under an active --company filter:
-            // a filtered run only ever attempts a subset of the registry, and company-careers
-            // itself deliberately does not throw for companies it merely skipped (not
-            // attempted, not failed). Marking the whole checkpoint completed here regardless
-            // would make the orchestrator's own completed-checkpoint gate (above) skip
-            // company-careers on every future run -- filtered or not -- permanently stranding
-            // every company that was never targeted by this run's filter. Every other source
-            // is unaffected by filters.company (only company-careers reads it at all).
             // Mark completed -- except for company-careers under an active --company filter:
             // a filtered run only ever attempts a subset of the registry, and company-careers
             // itself deliberately does not throw for companies it merely skipped (not

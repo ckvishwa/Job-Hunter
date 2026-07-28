@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -152,6 +152,30 @@ describe("orchestrator --dry-run (Task 14)", () => {
 
     expect(launchFn).not.toHaveBeenCalled();
     expect(summary.sourcesAttempted).toBe(1);
+  });
+
+  it("does NOT apply --reset-checkpoint under --dry-run -- a dry run never touches disk state", async () => {
+    const launchFn = vi.fn(fakeLaunchFn);
+    const paths = makePaths();
+    const existingCheckpoints = {
+      "company-careers::sdet::us": {
+        key: "company-careers::sdet::us",
+        source: "company-careers",
+        keyword: "sdet",
+        location: "us",
+        lastPage: 0,
+        completed: true,
+        lastUpdated: "2026-01-01",
+        sourceJobIds: [],
+      },
+    };
+    writeFileSync(paths.checkpointsPath, JSON.stringify(existingCheckpoints), "utf-8");
+
+    await runDiscover(paths, { dryRun: true, resetCheckpoint: true }, launchFn);
+
+    // Untouched: dry runs return before checkpoint loading/reset ever happens.
+    expect(existsSync(paths.checkpointsPath)).toBe(true);
+    expect(JSON.parse(readFileSync(paths.checkpointsPath, "utf-8"))).toEqual(existingCheckpoints);
   });
 });
 
