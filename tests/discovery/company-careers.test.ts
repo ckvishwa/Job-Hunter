@@ -35,7 +35,10 @@ function makeRegistry(): CompanyRegistryEntry[] {
       atsWorkdaySite: null,
       atsWorkdayHostname: null,
       verificationStatus: "verified",
-      lastVerifiedDate: "2026-01-01",
+      lastVerifiedAt: "2026-01-01",
+      enabled: true,
+      verificationNote: null,
+      sourceProvenance: ["test-fixture"],
     },
     {
       company: "CompanyB",
@@ -47,7 +50,10 @@ function makeRegistry(): CompanyRegistryEntry[] {
       atsWorkdaySite: null,
       atsWorkdayHostname: null,
       verificationStatus: "verified",
-      lastVerifiedDate: "2026-01-01",
+      lastVerifiedAt: "2026-01-01",
+      enabled: true,
+      verificationNote: null,
+      sourceProvenance: ["test-fixture"],
     },
   ];
 }
@@ -207,7 +213,10 @@ describe("companyCareersDiscoveryAdapter real-data extraction and structural ski
         atsWorkdaySite: null,
         atsWorkdayHostname: null,
         verificationStatus: "verified",
-        lastVerifiedDate: "2026-01-01",
+        lastVerifiedAt: "2026-01-01",
+        enabled: true,
+        verificationNote: null,
+        sourceProvenance: ["test-fixture"],
       },
     ];
     loadCompanyRegistryMock.mockReturnValue(registry);
@@ -269,7 +278,10 @@ describe("companyCareersDiscoveryAdapter real-data extraction and structural ski
         atsWorkdaySite: null,
         atsWorkdayHostname: null,
         verificationStatus: "verified",
-        lastVerifiedDate: "2026-01-01",
+        lastVerifiedAt: "2026-01-01",
+        enabled: true,
+        verificationNote: null,
+        sourceProvenance: ["test-fixture"],
       },
     ];
     loadCompanyRegistryMock.mockReturnValue(registry);
@@ -333,7 +345,10 @@ describe("companyCareersDiscoveryAdapter real-data extraction and structural ski
         atsWorkdaySite: "companywcareers",
         atsWorkdayHostname: "companyw.wd1.myworkdayjobs.com",
         verificationStatus: "verified",
-        lastVerifiedDate: "2026-01-01",
+        lastVerifiedAt: "2026-01-01",
+        enabled: true,
+        verificationNote: null,
+        sourceProvenance: ["test-fixture"],
       },
     ];
     loadCompanyRegistryMock.mockReturnValue(registry);
@@ -377,14 +392,17 @@ describe("companyCareersDiscoveryAdapter real-data extraction and structural ski
       atsWorkdaySite: "companywcareers",
       atsWorkdayHostname: "companyw.wd1.myworkdayjobs.com",
       verificationStatus: "verified",
-      lastVerifiedDate: "2026-01-01",
+      verificationNote: null,
+      sourceProvenance: ["test-fixture"],
+      lastVerifiedAt: "2026-01-01",
+      enabled: true,
       ...overrides,
     };
   }
 
   it("skips a workday entry with every field null, without calling any adapter, and marks it completed", async () => {
     const registry: CompanyRegistryEntry[] = [
-      makeWorkdayEntry({ atsTenantOrBoardId: null, atsWorkdaySite: null, atsWorkdayHostname: null, verificationStatus: "unverified", lastVerifiedDate: null }),
+      makeWorkdayEntry({ atsTenantOrBoardId: null, atsWorkdaySite: null, atsWorkdayHostname: null, verificationStatus: "pending", lastVerifiedAt: null }),
     ];
     loadCompanyRegistryMock.mockReturnValue(registry);
 
@@ -535,8 +553,11 @@ describe("companyCareersDiscoveryAdapter real-data extraction and structural ski
         atsWorkdaySite: null,
         atsWorkdayHostname: null,
         // genericSelectors intentionally omitted
-        verificationStatus: "unverified",
-        lastVerifiedDate: null,
+        verificationStatus: "pending",
+        lastVerifiedAt: null,
+        enabled: true,
+        verificationNote: null,
+        sourceProvenance: ["test-fixture"],
       },
     ];
     loadCompanyRegistryMock.mockReturnValue(registry);
@@ -552,6 +573,72 @@ describe("companyCareersDiscoveryAdapter real-data extraction and structural ski
     const [jobs] = onPageProcessed.mock.calls[0] as [DiscoveredJobLite[], number];
     expect(jobs).toEqual([]);
     expect(checkpoint.completedCompanyKeys).toEqual(["companyg::companyg.com"]);
+  });
+
+  it("skips an atsType with no native adapter (ashby/icims/unknown) without calling any adapter, and marks it completed", async () => {
+    const registry: CompanyRegistryEntry[] = [
+      {
+        company: "CompanyAshby",
+        fortuneRank: null,
+        corporateDomain: "companyashby.com",
+        careersUrl: "https://jobs.ashbyhq.com/companyashby",
+        atsType: "ashby",
+        atsTenantOrBoardId: "companyashby",
+        atsWorkdaySite: null,
+        atsWorkdayHostname: null,
+        verificationStatus: "verified",
+        lastVerifiedAt: "2026-01-01",
+        enabled: true,
+        verificationNote: null,
+        sourceProvenance: ["test-fixture"],
+      },
+    ];
+    loadCompanyRegistryMock.mockReturnValue(registry);
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async (_jobs: DiscoveredJobLite[], _nextPageNum: number) => {});
+
+    await expect(
+      companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed)),
+    ).resolves.toBeUndefined();
+
+    expect(resolveAdapterMock).not.toHaveBeenCalled();
+    const [jobs] = onPageProcessed.mock.calls[0] as [DiscoveredJobLite[], number];
+    expect(jobs).toEqual([]);
+    expect(checkpoint.completedCompanyKeys).toEqual(["companyashby::companyashby.com"]);
+  });
+
+  it("skips an entry with no verified careersUrl without calling any adapter, and marks it completed", async () => {
+    const registry: CompanyRegistryEntry[] = [
+      {
+        company: "CompanyNoUrl",
+        fortuneRank: null,
+        corporateDomain: "companynourl.com",
+        careersUrl: null,
+        atsType: "greenhouse",
+        atsTenantOrBoardId: "companynourl",
+        atsWorkdaySite: null,
+        atsWorkdayHostname: null,
+        verificationStatus: "pending",
+        lastVerifiedAt: null,
+        enabled: true,
+        verificationNote: null,
+        sourceProvenance: ["test-fixture"],
+      },
+    ];
+    loadCompanyRegistryMock.mockReturnValue(registry);
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async (_jobs: DiscoveredJobLite[], _nextPageNum: number) => {});
+
+    await expect(
+      companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed)),
+    ).resolves.toBeUndefined();
+
+    expect(resolveAdapterMock).not.toHaveBeenCalled();
+    const [jobs] = onPageProcessed.mock.calls[0] as [DiscoveredJobLite[], number];
+    expect(jobs).toEqual([]);
+    expect(checkpoint.completedCompanyKeys).toEqual(["companynourl::companynourl.com"]);
   });
 });
 

@@ -61,6 +61,22 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
       const companyName = company.company.toLowerCase();
       console.log(`[company-careers] Processing company: ${company.company} (${company.atsType})`);
 
+      if (!company.careersUrl) {
+        console.log(`[company-careers] Skipping ${company.company}: no verified careers URL yet. No value guessed.`);
+        skipped.push({
+          company: company.company,
+          atsType: company.atsType,
+          reason: "no verified careers URL",
+          missingFields: ["careersUrl"],
+        });
+        completedKeys.push(companyKey);
+        await onPageProcessed([], i + 1);
+        context.onCompanyProcessed?.();
+        continue;
+      }
+      // Narrowed from here on: careersUrl is a non-null string for the rest of this iteration.
+      const careersUrl = company.careersUrl;
+
       if (company.atsType === "workday") {
         const missingFields: string[] = [];
         if (!company.atsWorkdayHostname) missingFields.push("atsWorkdayHostname");
@@ -110,11 +126,29 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
         continue;
       }
 
+      // ashby/icims/unknown -- no native adapter exists for these; CareerOps is the intended
+      // discovery path for them (--source careerops), not this company-careers pipeline.
+      // "generic" is already excluded above (always skipped), so this check narrows atsType
+      // to exactly "greenhouse" | "lever" | "workday" for the rest of this iteration.
+      if (company.atsType !== "greenhouse" && company.atsType !== "lever" && company.atsType !== "workday") {
+        console.log(`[company-careers] Skipping ${company.company}: atsType "${company.atsType}" has no native adapter (use --source careerops).`);
+        skipped.push({
+          company: company.company,
+          atsType: company.atsType,
+          reason: "atsType has no native adapter",
+          missingFields: [],
+        });
+        completedKeys.push(companyKey);
+        await onPageProcessed([], i + 1);
+        context.onCompanyProcessed?.();
+        continue;
+      }
+
       try {
         const site: SiteConfig = {
           id: `company-careers::${companyName}`,
           name: company.company,
-          url: company.careersUrl,
+          url: careersUrl,
           adapter: company.atsType,
           enabled: true,
         };

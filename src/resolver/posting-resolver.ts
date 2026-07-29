@@ -73,7 +73,7 @@ function matchCompany(url: string, registry: CompanyRegistryEntry[]): CompanyReg
       if (
         host.includes(company.corporateDomain.toLowerCase()) ||
         urlLower.includes(company.corporateDomain.toLowerCase()) ||
-        urlLower.includes(company.careersUrl.toLowerCase())
+        (company.careersUrl !== null && urlLower.includes(company.careersUrl.toLowerCase()))
       ) {
         return company;
       }
@@ -162,7 +162,16 @@ export class PostingResolver {
     const workdayUrlParts = atsType === "workday" ? new URL(finalUrl).pathname.split("/") : null;
     const workdaySite = atsType === "workday" ? companyMatch?.atsWorkdaySite || workdayUrlParts?.[3] || null : null;
 
-    if (atsType && context && (atsType !== "workday" || workdaySite)) {
+    // The registry can now carry atsType values (ashby, icims, unknown) with no native
+    // adapter -- narrowed out inline here (TS control-flow narrowing needs the literal
+    // comparisons directly in this expression, not behind a separate boolean) rather than
+    // widening AdapterKind, since CareerOps is the intended discovery/resolution path for
+    // those, not this native resolver.
+    if (
+      (atsType === "greenhouse" || atsType === "lever" || atsType === "workday" || atsType === "generic") &&
+      context &&
+      (atsType !== "workday" || workdaySite)
+    ) {
       const site: SiteConfig = {
         id: companyMatch ? `company-careers::${companyMatch.company.toLowerCase()}` : `resolved-ats::${atsType}`,
         name: companyName,
