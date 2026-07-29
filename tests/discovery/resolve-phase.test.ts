@@ -103,7 +103,7 @@ describe("runResolutionPhase", () => {
 
   it("preserves a per-job timeout as a placeholder with a reason, never silently dropping it", async () => {
     vi.useFakeTimers();
-    const jobs = [makeJob({ sourceJobId: "slow" })];
+    const jobs = [makeJob({ sourceJobId: "slow", matchedKeywords: ["SDET"], relevanceReason: "test reason" })];
     const resolveFn = vi.fn(() => new Promise<JobPosting>(() => {})); // never resolves
 
     const promise = runResolutionPhase(jobs, resolveFn, {
@@ -120,6 +120,8 @@ describe("runResolutionPhase", () => {
     expect(result.resolvedJobs).toHaveLength(1);
     expect(result.resolvedJobs[0]!.descriptionText).toContain("timed out after 1000ms");
     expect(result.resolvedJobs[0]!.descriptionText).toContain(UNRESOLVED_PLACEHOLDER_PREFIX);
+    expect(result.resolvedJobs[0]!.matchedKeywords).toEqual(["SDET"]);
+    expect(result.resolvedJobs[0]!.relevanceReason).toBe("test reason");
   });
 
   it("respects the total-timeout budget -- jobs never started are preserved with a reason, not silently dropped", async () => {

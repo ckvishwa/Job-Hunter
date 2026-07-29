@@ -52,6 +52,11 @@ export interface JobPosting {
   matchedProfiles: string[];
   discoveredFrom: string[];
   discoveredUrl?: string;
+  // Relevance evidence from src/discovery/relevance.ts's evaluateRelevance(), carried through
+  // from DiscoveredJobLite. Optional/absent on jobs from the older src/runner/source-runner.ts
+  // pipeline (its SourceAdapter.normalize() never runs relevance evaluation) -- never fabricated.
+  matchedKeywords?: string[];
+  relevanceReason?: string;
   rawMetadata: Record<string, unknown>;
 }
 

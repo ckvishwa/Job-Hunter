@@ -40,9 +40,9 @@ describe("PostingResolver", () => {
       department: null,
       descriptionSnippet: null,
       searchedProfile: "sdet",
-      matchedKeywords: [],
-      matchedFields: [],
-      relevanceReason: "",
+      matchedKeywords: ["Test Automation Engineer"],
+      matchedFields: ["title"],
+      relevanceReason: "Matched profile \"sdet\" via \"Test Automation Engineer\" in title",
     };
 
     // Mock fetch for redirect resolution & API info
@@ -84,6 +84,8 @@ describe("PostingResolver", () => {
     expect(resolved!.company).toBe("AHEAD");
     expect(resolved!.sourceType).toBe("company-careers");
     expect(resolved!.canonicalUrl).toBe("https://jobs.lever.co/thinkahead/123");
+    expect(resolved!.matchedKeywords).toEqual(["Test Automation Engineer"]);
+    expect(resolved!.relevanceReason).toBe("Matched profile \"sdet\" via \"Test Automation Engineer\" in title");
   });
 
   it("extracts using fallback scraping when no ATS matches", async () => {

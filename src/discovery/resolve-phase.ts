@@ -61,6 +61,8 @@ function buildPlaceholder(job: DiscoveredJobLite, reason: string): JobPosting {
     matchedProfiles: job.matchedProfiles,
     discoveredFrom: [job.source],
     discoveredUrl: job.resultUrl,
+    matchedKeywords: job.matchedKeywords,
+    relevanceReason: job.relevanceReason,
     rawMetadata: {},
   };
 }
