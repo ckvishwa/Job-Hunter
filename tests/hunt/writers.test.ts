@@ -128,6 +128,15 @@ describe("writeHtmlReport", () => {
     expect(content).toContain("badge-stale");
   });
 
+  it("neutralizes a javascript: URI in applyUrl instead of rendering it as a clickable href", () => {
+    mkdirSync(TMP_DIR, { recursive: true });
+    const filePath = path.join(TMP_DIR, "latest-jobs.html");
+    writeHtmlReport(filePath, [makeRow({ applyUrl: "javascript:alert(document.cookie)" })]);
+    const content = readFileSync(filePath, "utf-8");
+    expect(content).not.toContain("javascript:alert");
+    expect(content).toContain('href="#"');
+  });
+
   it("includes a search input, filter selects, and no external network references", () => {
     mkdirSync(TMP_DIR, { recursive: true });
     const filePath = path.join(TMP_DIR, "latest-jobs.html");

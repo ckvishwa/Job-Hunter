@@ -94,6 +94,22 @@ describe("classifyEligibility", () => {
       expect(result.eligible).toBe(true);
       expect(result.requiredYearsMin).toBe(4);
     });
+
+    it("does not reject when the JD mentions an unrelated number of years with no experience context nearby", () => {
+      const result = classifyEligibility("Software Engineer", "Founded 20 years ago, we now serve millions of users.");
+      expect(result.eligible).toBe(true);
+      expect(result.requiredYearsMin).toBeNull();
+    });
+
+    it("still accepts a genuine years-of-experience requirement even in a longer JD with other numbers", () => {
+      const result = classifyEligibility(
+        "Software Engineer",
+        "Founded 20 years ago, we now serve millions of users. This role requires 1-2 years of experience.",
+      );
+      expect(result.eligible).toBe(true);
+      expect(result.requiredYearsMin).toBe(1);
+      expect(result.requiredYearsMax).toBe(2);
+    });
   });
 
   it("never scans descriptionText for senior/staff/lead/manager words", () => {

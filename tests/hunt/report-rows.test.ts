@@ -38,6 +38,7 @@ function baseOptions(overrides: Partial<ReportRowOptions> = {}): ReportRowOption
     now: "2026-01-05T00:00:00.000Z",
     previousHuntAt: null,
     staleDays: 14,
+    requestedProfileIds: null,
     requestedCountry: "United States",
     requestedStates: null,
     remoteOnly: false,
@@ -182,9 +183,15 @@ describe("buildReportRows", () => {
     expect(rows[0]!.unresolved).toBe(true);
   });
 
-  it("sets matchedProfile from the job's primary matchedProfiles entry", () => {
+  it("sets matchedProfile from the job's primary matchedProfiles entry when no profile was requested", () => {
     const jobs = [makeJob({ matchedProfiles: ["cloud", "network"] })];
     const { rows } = buildReportRows(jobs, baseOptions());
     expect(rows[0]!.matchedProfile).toBe("cloud");
+  });
+
+  it("labels matchedProfile as the REQUESTED profile, not the discovery-time primary, for a multi-profile job", () => {
+    const jobs = [makeJob({ matchedProfiles: ["cloud", "network"] })];
+    const { rows } = buildReportRows(jobs, baseOptions({ requestedProfileIds: ["network"] }));
+    expect(rows[0]!.matchedProfile).toBe("network");
   });
 });

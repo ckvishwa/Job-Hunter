@@ -39,6 +39,11 @@ export interface ReportRowOptions {
   now: string;
   previousHuntAt: string | null;
   staleDays: number;
+  // The --profile filter active for this hunt run, or null if none. Used only to pick which
+  // of a multi-profile job's matchedProfiles is reported as the row's primary -- the profile
+  // actually being searched for, not whatever relevance.ts happened to record as primary at
+  // discovery time (same rule the discovery orchestrator itself already applies).
+  requestedProfileIds: string[] | null;
   requestedCountry: string | null;
   requestedStates: string[] | null;
   remoteOnly: boolean;
@@ -62,6 +67,14 @@ export interface ReportRowCounts {
 export interface ReportRowResult {
   rows: ReportRow[];
   counts: ReportRowCounts;
+}
+
+function pickMatchedProfile(matchedProfiles: string[], requestedProfileIds: string[] | null): string {
+  if (requestedProfileIds?.length) {
+    const requestedMatch = matchedProfiles.find((p) => requestedProfileIds.includes(p));
+    if (requestedMatch) return requestedMatch;
+  }
+  return matchedProfiles[0] ?? "";
 }
 
 function passesLocationFilter(
@@ -158,7 +171,7 @@ export function buildReportRows(jobs: JobPosting[], options: ReportRowOptions): 
         seniority: eligibility.seniority,
         requiredYearsMin: eligibility.requiredYearsMin,
         requiredYearsMax: eligibility.requiredYearsMax,
-        matchedProfile: job.matchedProfiles[0] ?? "",
+        matchedProfile: pickMatchedProfile(job.matchedProfiles, options.requestedProfileIds),
         matchedKeywords: job.matchedKeywords ?? [],
         postingAgeDays: freshnessInfo.postingAgeDays,
         applyUrl: job.applyUrl,

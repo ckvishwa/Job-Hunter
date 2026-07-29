@@ -97,6 +97,7 @@ export async function runHunt(
     now,
     previousHuntAt,
     staleDays: DEFAULT_STALE_DAYS,
+    requestedProfileIds: filters.profileIds ?? null,
     requestedCountry,
     requestedStates: filters.states ?? null,
     remoteOnly: !!filters.remoteOnly,

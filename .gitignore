@@ -4,6 +4,9 @@ dist/
 .chrome-profile-run-*/
 data/*.sqlite
 data/*.jsonl
+data/checkpoints.json
+data/hunt-state.json
+data/pre-hunt-mvp-backup/
 output/*.html
 output/*.csv
 output/*.json

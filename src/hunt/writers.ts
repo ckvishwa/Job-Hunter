@@ -71,6 +71,14 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+// Entity-escaping alone doesn't stop a "javascript:"/"data:" URI from executing when the Apply
+// link is clicked -- it only prevents breaking out of the href="..." attribute. applyUrl is
+// scraped/resolved third-party data (ultimately from an ATS response), never assumed safe just
+// because it's normally an https link. Only http(s) survives; anything else renders as "#".
+function safeHref(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : "#";
+}
+
 function badgesFor(row: ReportRow): string {
   const badges: string[] = [];
   if (row.isNew) badges.push('<span class="badge badge-new">NEW</span>');
@@ -84,7 +92,7 @@ function renderRow(row: ReportRow): string {
   const title = escapeHtml(row.title);
   const company = escapeHtml(row.company);
   const location = escapeHtml(row.location);
-  const applyUrl = escapeHtml(row.applyUrl);
+  const applyUrl = escapeHtml(safeHref(row.applyUrl));
   return `<tr data-profile="${escapeHtml(row.matchedProfile)}" data-country="${escapeHtml(row.country ?? "")}" data-seniority="${escapeHtml(row.seniority)}" data-arrangement="${escapeHtml(row.workArrangement)}" data-search="${escapeHtml(`${row.title} ${row.company} ${row.location}`.toLowerCase())}">
 <td data-sort="${row.rank}">${row.rank}</td>
 <td data-sort="${row.score}">${row.score}</td>

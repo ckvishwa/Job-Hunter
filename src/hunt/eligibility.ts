@@ -57,18 +57,47 @@ export interface ExperienceRange {
   max: number | null;
 }
 
+// A window around a numeric years-mention has to contain "experience" to count as a real
+// requirement -- otherwise generic company-history boilerplate ("With over 20 years of
+// experience serving customers...", "Founded 20 years ago...") false-triggers a senior-tier
+// rejection for an entry-level role whose title has no seniority signal at all (found live:
+// this is the exact "boilerplate mentions an unrelated number" failure mode relevance.ts
+// already had to guard against for keyword matching). A qualified match is required to
+// reject OR accept on years -- an unqualified/no match falls through to "unknown," which
+// stays eligible, biasing the false-positive/false-negative tradeoff toward never wrongly
+// rejecting a candidate over slightly under-scoring one. Residual limitation: a phrase like
+// "20 years of experience serving customers" is textually indistinguishable from a genuine
+// candidate-years requirement without semantic understanding of WHOSE experience is meant --
+// this heuristic catches "unrelated number, no experience context nearby" (the common case) but
+// not "experience" used in an unrelated sentence that happens to be adjacent to the number.
+const EXPERIENCE_CONTEXT_WINDOW = 60;
+const EXPERIENCE_CONTEXT = /experience/i;
+
+function hasExperienceContext(text: string, index: number, matchLength: number): boolean {
+  const start = Math.max(0, index - EXPERIENCE_CONTEXT_WINDOW);
+  const end = Math.min(text.length, index + matchLength + EXPERIENCE_CONTEXT_WINDOW);
+  return EXPERIENCE_CONTEXT.test(text.slice(start, end));
+}
+
+function firstQualifiedMatch(text: string, pattern: RegExp): RegExpMatchArray | null {
+  for (const match of text.matchAll(pattern)) {
+    if (hasExperienceContext(text, match.index!, match[0].length)) return match;
+  }
+  return null;
+}
+
 // Only ever reads numeric years-of-experience phrases -- never keyword-scans descriptionText
 // for seniority words (see REJECT_TITLE_TERMS comment above for why).
 export function extractExperienceRange(text: string): ExperienceRange {
-  const rangeMatch = text.match(/(\d{1,2})\s*(?:-|to|–)\s*(\d{1,2})\+?\s*(?:years?|yrs?)\b/i);
+  const rangeMatch = firstQualifiedMatch(text, /(\d{1,2})\s*(?:-|to|–)\s*(\d{1,2})\+?\s*(?:years?|yrs?)\b/gi);
   if (rangeMatch) {
     return { min: Number(rangeMatch[1]), max: Number(rangeMatch[2]) };
   }
-  const plusMatch = text.match(/(\d{1,2})\+\s*(?:years?|yrs?)\b/i);
+  const plusMatch = firstQualifiedMatch(text, /(\d{1,2})\+\s*(?:years?|yrs?)\b/gi);
   if (plusMatch) {
     return { min: Number(plusMatch[1]), max: null };
   }
-  const singleMatch = text.match(/(\d{1,2})\s*(?:years?|yrs?)\b/i);
+  const singleMatch = firstQualifiedMatch(text, /(\d{1,2})\s*(?:years?|yrs?)\b/gi);
   if (singleMatch) {
     return { min: Number(singleMatch[1]), max: Number(singleMatch[1]) };
   }
