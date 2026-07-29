@@ -4,7 +4,7 @@ import { z } from "zod";
 // enforces this again at the HTML edge -- this is the first gate, at ingestion). A
 // syntactically invalid URL (new URL() throws) is rejected the same way an unsafe scheme is:
 // both fail this refinement, neither reaches the rest of the pipeline.
-function isSafeUrl(value: string): boolean {
+export function isSafeUrl(value: string): boolean {
   try {
     const url = new URL(value);
     return url.protocol === "http:" || url.protocol === "https:";
