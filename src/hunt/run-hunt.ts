@@ -1,10 +1,14 @@
 import path from "node:path";
 import { runDiscover, type DiscoverFilters } from "../discovery/orchestrator.js";
 import type { DiscoveryRunSummary } from "../discovery/report.js";
-import { loadJobs } from "../storage/jsonl-store.js";
+import { loadJobs, saveJobs } from "../storage/jsonl-store.js";
+import { mergeJobs } from "../dedup/deduplicator.js";
+import { loadRolesConfig } from "../config/loader.js";
 import { loadHuntState, saveHuntState } from "./hunt-state.js";
 import { buildReportRows, type ReportRow } from "./report-rows.js";
 import { writeCsvReport, writeHtmlReport, writeJsonReport } from "./writers.js";
+import { CareerOpsSource, resolveCareerOpsHome } from "../sources/careerops/index.js";
+import type { JobSource } from "../sources/job-source.js";
 
 // A job not re-seen in this many days is flagged stale (Task 3) -- excluded from the default
 // report output unless --include-stale is passed.
@@ -25,6 +29,11 @@ export interface HuntFilters {
   includeStale?: boolean;
   limit?: number;
   dryRun?: boolean;
+  // "native" (default, unset) is today's exact runDiscoverFn path, unchanged. "careerops"
+  // skips runDiscoverFn entirely (no browser launch) and routes through CareerOpsSource
+  // instead. "both" is not implemented yet.
+  source?: "native" | "careerops";
+  careerOpsHome?: string;
 }
 
 export interface HuntPaths {
@@ -64,24 +73,51 @@ export async function runHunt(
   // Lets tests fix "now" relative to fixture discoveredAt/lastSeenAt values instead of the
   // real wall clock, which would otherwise make old fixture timestamps spuriously "stale."
   nowOverride?: string,
+  // Test seam for the careerops path only -- the real CLI never passes this, always using a
+  // real CareerOpsSource. Mirrors runDiscoverFn's own DI pattern.
+  careerOpsSourceFactory: (careerOpsHome: string) => JobSource = (careerOpsHome) =>
+    new CareerOpsSource({ careerOpsHome, roles: loadRolesConfig(paths.rolesConfigPath) }),
 ): Promise<HuntSummary> {
   const requestedCountry = filters.location ?? DEFAULT_LOCATION;
+  const source = filters.source ?? "native";
 
-  const discoverySummary = await runDiscoverFn(
-    {
-      sitesConfigPath: paths.sitesConfigPath,
-      rolesConfigPath: paths.rolesConfigPath,
-      portalsConfigPath: paths.portalsConfigPath,
-      discoveredJobsPath: paths.discoveredJobsPath,
-      jobsStorePath: paths.jobsStorePath,
-      checkpointsPath: paths.checkpointsPath,
-    },
-    {
+  let resolutionTimeMs: number;
+
+  if (source === "native") {
+    const discoverySummary = await runDiscoverFn(
+      {
+        sitesConfigPath: paths.sitesConfigPath,
+        rolesConfigPath: paths.rolesConfigPath,
+        portalsConfigPath: paths.portalsConfigPath,
+        discoveredJobsPath: paths.discoveredJobsPath,
+        jobsStorePath: paths.jobsStorePath,
+        checkpointsPath: paths.checkpointsPath,
+      },
+      {
+        profileIds: filters.profileIds,
+        location: requestedCountry,
+        dryRun: filters.dryRun,
+      },
+    );
+    resolutionTimeMs = discoverySummary.resolutionTimeMs;
+  } else {
+    const careerOpsHome = resolveCareerOpsHome(filters.careerOpsHome);
+    const careerOpsSource = careerOpsSourceFactory(careerOpsHome);
+    const start = Date.now();
+    const discoveryResult = await careerOpsSource.discover({
       profileIds: filters.profileIds,
-      location: requestedCountry,
+      days: filters.days,
+      limit: filters.limit,
       dryRun: filters.dryRun,
-    },
-  );
+    });
+    resolutionTimeMs = Date.now() - start;
+    if (!filters.dryRun) {
+      const existingJobs = loadJobs(paths.jobsStorePath);
+      const mergeNow = nowOverride ?? new Date().toISOString();
+      const merged = mergeJobs(existingJobs, discoveryResult.jobs, mergeNow);
+      saveJobs(paths.jobsStorePath, merged);
+    }
+  }
 
   const huntState = loadHuntState(paths.huntStatePath);
   const key = huntStateKey(filters.profileIds);
@@ -131,7 +167,7 @@ export async function runHunt(
     eligibleRetained: counts.eligibleRetained,
     newJobs: counts.newJobs,
     top10: rows.slice(0, TOP_N),
-    resolutionTimeMs: discoverySummary.resolutionTimeMs,
+    resolutionTimeMs,
     reportPaths,
   };
 }

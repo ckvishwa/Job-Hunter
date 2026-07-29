@@ -36,7 +36,11 @@ export interface ResolvePhaseResult {
   elapsedMs: number;
 }
 
-function buildPlaceholder(job: DiscoveredJobLite, reason: string): JobPosting {
+// Exported for reuse by any caller that has a DiscoveredJobLite it deliberately isn't running
+// through the full resolver (e.g. a source that doesn't yet do JD resolution at all) but still
+// needs an honestly-labeled JobPosting -- the SAME "unresolved" convention scoring.ts,
+// report-rows.ts, and this module's own timeout/error paths already key off, not a second one.
+export function buildPlaceholder(job: DiscoveredJobLite, reason: string): JobPosting {
   const now = new Date().toISOString();
   return {
     id: computeJobId(job.resultUrl),

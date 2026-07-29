@@ -1,11 +1,12 @@
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, vi } from "vitest";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { runHunt, type HuntPaths } from "../../src/hunt/run-hunt.js";
-import { saveJobs } from "../../src/storage/jsonl-store.js";
+import { loadJobs, saveJobs } from "../../src/storage/jsonl-store.js";
 import { loadHuntState } from "../../src/hunt/hunt-state.js";
 import type { JobPosting } from "../../src/adapters/types.js";
 import type { DiscoveryRunSummary } from "../../src/discovery/report.js";
+import type { JobSource } from "../../src/sources/job-source.js";
 
 const TMP_DIR = path.resolve("tests/hunt/.tmp-run-hunt");
 // Fixed "now" for every runHunt call in this file -- keeps fixture discoveredAt/lastSeenAt
@@ -170,5 +171,63 @@ describe("runHunt", () => {
     const secondJson = readFileSync(path.join(paths.outputDir, "latest-jobs.json"), "utf-8");
 
     expect(secondJson).toBe(firstJson);
+  });
+});
+
+describe("runHunt - source selection", () => {
+  afterEach(() => {
+    if (existsSync(TMP_DIR)) rmSync(TMP_DIR, { recursive: true, force: true });
+  });
+
+  function fakeCareerOpsSource(jobs: JobPosting[]): JobSource {
+    return { id: "careerops", discover: async () => ({ jobs, health: { attempted: jobs.length, succeeded: jobs.length, failed: 0 }, errors: [] }) };
+  }
+
+  it("default (no --source) calls runDiscoverFn exactly as before -- no invisible breaking change", async () => {
+    const paths = makePaths();
+    mkdirSync(TMP_DIR, { recursive: true });
+    const runDiscoverFn = vi.fn().mockResolvedValue(stubDiscoverSummary());
+    const careerOpsFactory = vi.fn();
+
+    await runHunt(paths, { profileIds: ["sdet"], location: "United States" }, runDiscoverFn, NOW, careerOpsFactory);
+
+    expect(runDiscoverFn).toHaveBeenCalledTimes(1);
+    expect(careerOpsFactory).not.toHaveBeenCalled();
+  });
+
+  it("--source careerops never calls runDiscoverFn", async () => {
+    const paths = makePaths();
+    mkdirSync(TMP_DIR, { recursive: true });
+    const runDiscoverFn = vi.fn().mockResolvedValue(stubDiscoverSummary());
+    const careerOpsFactory = vi.fn().mockReturnValue(fakeCareerOpsSource([]));
+
+    await runHunt(paths, { profileIds: ["sdet"], location: "United States", source: "careerops" }, runDiscoverFn, NOW, careerOpsFactory);
+
+    expect(runDiscoverFn).not.toHaveBeenCalled();
+    expect(careerOpsFactory).toHaveBeenCalledTimes(1);
+  });
+
+  it("--source careerops merges the source's jobs into jobsStorePath via the existing dedup primitives", async () => {
+    const paths = makePaths();
+    mkdirSync(TMP_DIR, { recursive: true });
+    const job = makeJob({ title: "SDET II", canonicalUrl: "https://example.com/careerops/1", applyUrl: "https://example.com/careerops/1" });
+    const careerOpsFactory = vi.fn().mockReturnValue(fakeCareerOpsSource([job]));
+
+    await runHunt(paths, { profileIds: ["sdet"], location: "United States", source: "careerops" }, vi.fn(), NOW, careerOpsFactory);
+
+    const stored = loadJobs(paths.jobsStorePath);
+    expect(stored.some((j) => j.canonicalUrl === "https://example.com/careerops/1")).toBe(true);
+  });
+
+  it("--source careerops with --dry-run does not persist to jobsStorePath", async () => {
+    const paths = makePaths();
+    mkdirSync(TMP_DIR, { recursive: true });
+    const job = makeJob({ canonicalUrl: "https://example.com/careerops/2", applyUrl: "https://example.com/careerops/2" });
+    const careerOpsFactory = vi.fn().mockReturnValue(fakeCareerOpsSource([job]));
+
+    await runHunt(paths, { profileIds: ["sdet"], location: "United States", source: "careerops", dryRun: true }, vi.fn(), NOW, careerOpsFactory);
+
+    const stored = loadJobs(paths.jobsStorePath);
+    expect(stored.some((j) => j.canonicalUrl === "https://example.com/careerops/2")).toBe(false);
   });
 });

@@ -54,4 +54,18 @@ describe("parseHuntArgs", () => {
     expect(result.states).toBeUndefined();
     expect(result.days).toBeUndefined();
   });
+
+  it("parses --source native and --source careerops", () => {
+    expect(parseHuntArgs(["--source", "native"]).source).toBe("native");
+    expect(parseHuntArgs(["--source", "careerops"]).source).toBe("careerops");
+  });
+
+  it("ignores an invalid --source value instead of accepting an arbitrary string", () => {
+    const result = parseHuntArgs(["--source", "both"]);
+    expect(result.source).toBeUndefined();
+  });
+
+  it("parses --careerops-home", () => {
+    expect(parseHuntArgs(["--careerops-home", "C:/custom/career-ops"]).careerOpsHome).toBe("C:/custom/career-ops");
+  });
 });

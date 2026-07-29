@@ -45,6 +45,15 @@ export function parseHuntArgs(argv: string[]): HuntFilters {
       }
     } else if (arg === "--dry-run") {
       result.dryRun = true;
+    } else if (arg === "--source") {
+      const value = argv[++i];
+      if (value === "native" || value === "careerops") {
+        result.source = value;
+      } else {
+        console.error(`Ignoring invalid --source value "${value ?? ""}" - must be "native" or "careerops".`);
+      }
+    } else if (arg === "--careerops-home") {
+      result.careerOpsHome = argv[++i];
     }
   }
   return result;
