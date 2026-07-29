@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "collect": "tsx src/runner/cli.ts",
-    "discover": "tsx src/discovery/cli.ts"
+    "discover": "tsx src/discovery/cli.ts",
+    "hunt": "tsx src/hunt/cli.ts"
   },
   "dependencies": {
     "js-yaml": "^4.1.0",
