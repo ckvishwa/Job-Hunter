@@ -21,8 +21,11 @@ function entry(overrides: Record<string, unknown> = {}) {
     atsTenantOrBoardId: "acme",
     atsWorkdaySite: null,
     atsWorkdayHostname: null,
+    enabled: true,
     verificationStatus: "verified",
-    lastVerifiedDate: "2026-07-27",
+    verificationNote: null,
+    sourceProvenance: ["test-fixture"],
+    lastVerifiedAt: "2026-07-27",
     ...overrides,
   };
 }
@@ -69,23 +72,30 @@ describe("loadCompanyRegistry", () => {
     expect(loadCompanyRegistry(filePath)).toHaveLength(2);
   });
 
-  it("loads the real config/fortune500-registry.json cleanly -- production, real ranked companies only", () => {
+  it("loads the real config/fortune500-registry.json cleanly -- exactly 500 real ranked companies", () => {
     const realPath = path.resolve("config/fortune500-registry.json");
     // Sanity-check the fixture itself parses as JSON before handing it to the loader.
     JSON.parse(readFileSync(realPath, "utf-8"));
 
     const registry = loadCompanyRegistry(realPath);
-    expect(registry).toHaveLength(4);
-    expect(registry.map((e) => e.company).sort()).toEqual(
-      ["Amazon", "Apple", "Google", "Walmart"].sort(),
-    );
-    // Every production entry is a genuinely Fortune-ranked company -- validation-only
-    // companies (fortuneRank: null) belong in config/fortune500-registry.validation.json,
-    // never mixed into this file (see the sibling test below).
+    expect(registry).toHaveLength(500);
+    // Every production entry is a genuinely Fortune-ranked company, rank 1-500 exactly once
+    // each -- validation-only companies (fortuneRank: null) belong in
+    // config/fortune500-registry.validation.json, never mixed into this file (see the
+    // sibling test below).
+    const ranks = registry.map((e) => e.fortuneRank);
+    expect(new Set(ranks).size).toBe(500);
+    expect(Math.min(...(ranks as number[]))).toBe(1);
+    expect(Math.max(...(ranks as number[]))).toBe(500);
     for (const e of registry) {
       expect(e.fortuneRank).not.toBeNull();
-      expect(e.atsWorkdaySite).toBeNull();
     }
+    // The 5 companies verified in a prior session (Task 2 restart, plus this task's Target
+    // graduation from the validation file) carry real ATS data, not "unknown".
+    const walmart = registry.find((e) => e.company === "Walmart")!;
+    expect(walmart.atsType).toBe("workday");
+    const target = registry.find((e) => e.company === "Target")!;
+    expect(target.atsWorkdaySite).toBe("targetcareers");
   });
 
   it("loads the real config/fortune500-registry.validation.json cleanly -- validation-only companies, never mixed into production", () => {
@@ -93,15 +103,14 @@ describe("loadCompanyRegistry", () => {
     JSON.parse(readFileSync(validationPath, "utf-8"));
 
     const registry = loadCompanyRegistry(validationPath);
-    expect(registry).toHaveLength(4);
-    expect(registry.map((e) => e.company).sort()).toEqual(["AHEAD", "Figma", "Stripe", "Target"].sort());
+    expect(registry).toHaveLength(3);
+    expect(registry.map((e) => e.company).sort()).toEqual(["AHEAD", "Figma", "Stripe"].sort());
     // Every validation entry is deliberately NOT Fortune-ranked -- these exist only to give
     // controlled live-validation runs (Task 17) real, working companies per ATS type without
-    // fabricating or guessing details about an actual Fortune 500 member. Target IS a genuine
-    // Fortune 500 company with a real, verified Workday tenant (Task 2 restart) -- kept here
-    // rather than in production because its exact current Fortune rank number was never
-    // independently confirmed, and fabricating one would violate the same "never guess" rule
-    // this file's own production/validation split exists to enforce.
+    // fabricating or guessing details about an actual Fortune 500 member. Target was moved
+    // OUT of this file into production in this task, once its real Fortune rank (33) was
+    // confirmed from a verified dataset -- keeping it here too would violate the no-overlap
+    // invariant this test enforces below.
     for (const e of registry) {
       expect(e.fortuneRank).toBeNull();
     }

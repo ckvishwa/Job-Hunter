@@ -8,8 +8,11 @@
     "atsTenantOrBoardId": "thinkahead",
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
+    "enabled": true,
     "verificationStatus": "verified",
-    "lastVerifiedDate": "2026-07-27"
+    "verificationNote": null,
+    "sourceProvenance": ["job-hunter-manual-verification-2026-07-27"],
+    "lastVerifiedAt": "2026-07-27"
   },
   {
     "company": "Stripe",
@@ -20,8 +23,11 @@
     "atsTenantOrBoardId": "stripe",
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
-    "verificationStatus": "blocked",
-    "lastVerifiedDate": "2026-07-27"
+    "enabled": true,
+    "verificationStatus": "unreachable",
+    "verificationNote": "Careers page scrape was blocked on prior verification attempt",
+    "sourceProvenance": ["job-hunter-manual-verification-2026-07-27"],
+    "lastVerifiedAt": "2026-07-27"
   },
   {
     "company": "Figma",
@@ -32,19 +38,10 @@
     "atsTenantOrBoardId": "figma",
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
+    "enabled": true,
     "verificationStatus": "verified",
-    "lastVerifiedDate": "2026-07-27"
-  },
-  {
-    "company": "Target",
-    "fortuneRank": null,
-    "corporateDomain": "target.com",
-    "careersUrl": "https://target.wd5.myworkdayjobs.com/targetcareers",
-    "atsType": "workday",
-    "atsTenantOrBoardId": "target",
-    "atsWorkdaySite": "targetcareers",
-    "atsWorkdayHostname": "target.wd5.myworkdayjobs.com",
-    "verificationStatus": "verified",
-    "lastVerifiedDate": "2026-07-28"
+    "verificationNote": null,
+    "sourceProvenance": ["job-hunter-manual-verification-2026-07-27"],
+    "lastVerifiedAt": "2026-07-27"
   }
 ]
