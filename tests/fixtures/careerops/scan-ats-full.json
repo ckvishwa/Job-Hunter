@@ -1,0 +1,162 @@
+{
+  "date": "2026-07-29",
+  "sources": ["greenhouse", "lever", "workday"],
+  "resumed": false,
+  "sinceDays": 14,
+  "companiesAvailable": 12701,
+  "companiesScanned": 80,
+  "capHit": true,
+  "datasetStatus": { "greenhouse": "ok", "lever": "ok", "workday": "ok" },
+  "postingsKept": 12,
+  "postingsDroppedNoDate": 0,
+  "postingsFilteredBlacklist": 0,
+  "postingsAnnotatedBlacklisted": 0,
+  "postingsDroppedContent": 0,
+  "unreachableBoards": 2,
+  "cappedBoards": 0,
+  "saved": false,
+  "offers": [
+    {
+      "company": "10alabs",
+      "title": "Cybersecurity Engineer",
+      "url": "https://job-boards.greenhouse.io/10alabs/jobs/4330885009",
+      "location": "Remote · 10a Labs",
+      "postedAt": "2026-07-28",
+      "dateStatus": "dated",
+      "blacklisted": false,
+      "note": null,
+      "source": "greenhouse-full"
+    },
+    {
+      "company": "ableserve",
+      "title": "Assistant Chief Engineer",
+      "url": "https://jobs.lever.co/ableserve/fbe0d138-b0d5-447f-b3ef-0b2effc37107",
+      "location": "Seattle, WA",
+      "postedAt": "2026-07-28",
+      "dateStatus": "dated",
+      "blacklisted": false,
+      "note": null,
+      "source": "lever-full"
+    },
+    {
+      "company": "Northwind Systems",
+      "title": "Cloud Security Engineer",
+      "url": "https://northwind.wd5.myworkdayjobs.com/en-US/Northwind/job/Remote/Cloud-Security-Engineer_R00123",
+      "location": "Remote",
+      "postedAt": "2026-07-27",
+      "dateStatus": "dated",
+      "blacklisted": false,
+      "note": null,
+      "source": "workday-full"
+    },
+    {
+      "company": "Vertex Cloud",
+      "title": "Network Security Engineer",
+      "url": "https://job-boards.greenhouse.io/vertexcloud/jobs/9001001",
+      "location": "Austin, TX",
+      "postedAt": "2026-07-26",
+      "dateStatus": "dated",
+      "blacklisted": false,
+      "note": null,
+      "source": "greenhouse-full"
+    },
+    {
+      "company": "Vertex Cloud",
+      "title": "Network Security Engineer",
+      "url": "https://jobs.lever.co/vertexcloud/9001001-mirror",
+      "location": "Austin, TX",
+      "postedAt": "2026-07-26",
+      "dateStatus": "dated",
+      "blacklisted": false,
+      "note": null,
+      "source": "lever-full"
+    },
+    {
+      "company": "Fenwick Data",
+      "title": "SDET II",
+      "url": "https://job-boards.greenhouse.io/fenwickdata/jobs/1002003",
+      "location": null,
+      "postedAt": "2026-07-25",
+      "dateStatus": "dated",
+      "blacklisted": false,
+      "note": null,
+      "source": "greenhouse-full"
+    },
+    {
+      "company": "Fenwick Data",
+      "title": "not-a-url-offer",
+      "url": "not-a-valid-url",
+      "location": "Remote",
+      "postedAt": "2026-07-25",
+      "dateStatus": "dated",
+      "blacklisted": false,
+      "note": null,
+      "source": "greenhouse-full"
+    },
+    {
+      "company": "Fenwick Data",
+      "title": "javascript-url-offer",
+      "url": "javascript:alert(1)",
+      "location": "Remote",
+      "postedAt": "2026-07-25",
+      "dateStatus": "dated",
+      "blacklisted": false,
+      "note": null,
+      "source": "greenhouse-full"
+    },
+    {
+      "title": "malformed-missing-company",
+      "url": "https://job-boards.greenhouse.io/malformed/jobs/1",
+      "location": "Remote",
+      "postedAt": "2026-07-25",
+      "dateStatus": "dated",
+      "blacklisted": false,
+      "note": null,
+      "source": "greenhouse-full"
+    },
+    {
+      "company": "Ridgeline Corp",
+      "title": "Senior Cloud Security Engineer",
+      "url": "https://job-boards.greenhouse.io/ridgelinecorp/jobs/2002001",
+      "location": "Denver, CO",
+      "postedAt": "2026-07-24",
+      "dateStatus": "dated",
+      "blacklisted": false,
+      "note": null,
+      "source": "greenhouse-full"
+    },
+    {
+      "company": "Ridgeline Corp",
+      "title": "SDET I",
+      "url": "https://job-boards.greenhouse.io/ridgelinecorp/jobs/2002002",
+      "location": "Denver, CO",
+      "postedAt": "2026-07-24",
+      "dateStatus": "dated",
+      "blacklisted": false,
+      "note": null,
+      "source": "greenhouse-full"
+    },
+    {
+      "company": "Meridian Labs",
+      "title": "Cloud Network Engineer",
+      "url": "https://job-boards.greenhouse.io/meridianlabs/jobs/3003001",
+      "location": "Remote",
+      "postedAt": "2026-07-23",
+      "dateStatus": "dated",
+      "blacklisted": false,
+      "note": null,
+      "source": "greenhouse-full"
+    },
+    {
+      "company": "Sentry Facilities",
+      "title": "Corporate Security Guard",
+      "url": "https://job-boards.greenhouse.io/sentryfacilities/jobs/4004001",
+      "location": "Chicago, IL",
+      "postedAt": "2026-07-22",
+      "dateStatus": "dated",
+      "blacklisted": false,
+      "note": null,
+      "source": "greenhouse-full"
+    }
+  ]
+}
