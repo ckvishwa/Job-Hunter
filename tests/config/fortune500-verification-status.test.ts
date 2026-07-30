@@ -62,4 +62,37 @@ describe("verificationStatus -- 'no-parent-careers-page' and 'not-found' are dis
     expect(result.verificationRequiredCount).toBe(1);
     expect(result.verificationStatusCounts.pending).toBe(499);
   });
+
+  // Reproduces the exact bug this task fixes: a candidate URL discovered via search (and later
+  // found to sit behind a bot-protection challenge, or preserved as a "pending" candidate
+  // awaiting live verification) still carries a non-null careersUrl -- that URL's mere presence
+  // must never inflate careerUrlsVerified/scanReadyEntries. Only verificationStatus ===
+  // "verified" may count.
+  it("a preserved candidate careersUrl on a non-'verified' entry is excluded from careerUrlsVerified and scanReadyEntries", () => {
+    const entries = [
+      entry({ fortuneRank: 1, careersUrl: "https://acme.com/careers", verificationStatus: "verified" }),
+      entry({
+        fortuneRank: 2,
+        company: "Challenged",
+        corporateDomain: "challenged.com",
+        careersUrl: "https://careers.challenged.com/",
+        verificationStatus: "verification-required",
+        verificationNote: "Site presented a bot-protection challenge page",
+      }),
+      entry({
+        fortuneRank: 3,
+        company: "Candidate",
+        corporateDomain: "candidate.com",
+        careersUrl: "https://careers.candidate.com/",
+        verificationStatus: "pending",
+        verificationNote: "Official-looking career URL discovered through search; live verification pending",
+      }),
+      ...Array.from({ length: 497 }, (_, i) => entry({ fortuneRank: i + 4, company: `Co${i + 4}`, corporateDomain: `co${i + 4}.com`, careersUrl: null, verificationStatus: "pending" })),
+    ];
+    const result = auditFortune500Registry(entries);
+    expect(result.careerUrlsVerified).toBe(1);
+    expect(result.scanReadyEntries).toBe(1);
+    expect(result.verificationStatusCounts.pending).toBe(498);
+    expect(result.verificationRequiredCount).toBe(1);
+  });
 });

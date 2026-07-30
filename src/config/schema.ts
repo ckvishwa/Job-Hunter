@@ -131,6 +131,16 @@ export const companyRegistryEntrySchema = z
     // present, gated to http(s) only -- the same rule every other URL in this codebase is
     // held to (schema.ts's siteSchema, careerops-schema.ts, writers.ts's safeHref).
     careersUrl: z.string().url().refine(isHttpUrl, { message: "careersUrl must use http:// or https://" }).nullable(),
+    // Optional -- only populated when a live fetch actually followed a redirect, so the
+    // pre-redirect URL that was originally discovered isn't lost once careersUrl is updated to
+    // point at the final destination. Absent (not merely null) on every entry that hasn't been
+    // through live redirect-chain verification.
+    careersUrlOriginal: z.string().url().refine(isHttpUrl, { message: "careersUrlOriginal must use http:// or https://" }).nullable().optional(),
+    careersUrlFinal: z.string().url().refine(isHttpUrl, { message: "careersUrlFinal must use http:// or https://" }).nullable().optional(),
+    // Free-text description of how careersUrl's current status was established (e.g.
+    // "live-fetch-2026-07-30", "manual-verification-2026-07-30-official-site-websearch") --
+    // distinct from sourceProvenance (where the *candidate* URL/domain came from originally).
+    careersVerificationSource: z.string().min(1).nullable().optional(),
     atsType: z.enum(["greenhouse", "lever", "ashby", "workday", "icims", "generic", "unknown"]),
     // For atsType: "workday" entries, doubles as the Workday tenant id (e.g. "target") --
     // the same "this company's identifier within its ATS" role it already plays for
