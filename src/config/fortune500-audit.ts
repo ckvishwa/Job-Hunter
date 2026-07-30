@@ -11,7 +11,7 @@ export const CURRENT_EDITION = "Fortune 500, 2026";
 export const OPERATIONAL_READINESS_TARGET = 475;
 
 const ATS_TYPES = ["greenhouse", "lever", "ashby", "workday", "icims", "generic", "unknown"] as const;
-const VERIFICATION_STATUSES = ["verified", "pending", "unreachable", "verification-required", "unsupported"] as const;
+const VERIFICATION_STATUSES = ["verified", "no-parent-careers-page", "unreachable", "verification-required", "not-found", "pending"] as const;
 
 export interface Fortune500AuditIssue {
   index: number;
@@ -47,6 +47,13 @@ export interface Fortune500AuditResult {
   careerUrlsVerified: number;
   careerUrlsUnreachable: number;
   verificationRequiredCount: number;
+  // "no-parent-careers-page" -- a documented, evidence-backed exception (e.g. a holding company
+  // with no centralized careers page). Mutually exclusive from careerUrlsVerified: an exception
+  // is never counted as a verified career URL, no matter how well-justified.
+  documentedExceptions: number;
+  notFoundCount: number;
+  // totalEntries minus pending -- every entry that has been looked at, regardless of outcome.
+  attemptedCount: number;
   scanReadyEntries: number;
   // Entries whose sourceProvenance carries more than the bare edition-membership string --
   // i.e. something (a domain, a career URL, a verification attempt) was actually sourced for
@@ -195,6 +202,9 @@ export function auditFortune500Registry(rawEntries: unknown[]): Fortune500AuditR
     careerUrlsVerified: scanReadyEntries,
     careerUrlsUnreachable: verificationStatusCounts.unreachable,
     verificationRequiredCount: verificationStatusCounts["verification-required"],
+    documentedExceptions: verificationStatusCounts["no-parent-careers-page"],
+    notFoundCount: verificationStatusCounts["not-found"],
+    attemptedCount: totalEntries - verificationStatusCounts.pending,
     scanReadyEntries,
     provenanceBeyondEdition,
     // Structural validity (`ok`) is necessary but never sufficient -- a registry of 500

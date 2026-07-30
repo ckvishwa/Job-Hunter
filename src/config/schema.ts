@@ -155,7 +155,14 @@ export const companyRegistryEntrySchema = z
     // verificationStatus (which describes data confidence, not intent). Defaults true; a
     // future task can flip individual entries off without deleting their data.
     enabled: z.boolean(),
-    verificationStatus: z.enum(["verified", "pending", "unreachable", "verification-required", "unsupported"]),
+    // "pending" = not yet attempted. "verification-required" = attempted, but the site itself
+    // presented a challenge/CAPTCHA page we don't bypass -- a DIFFERENT thing from "haven't
+    // looked yet" (these two were conflated under "verification-required" until this was
+    // caught: 480 never-attempted entries were indistinguishable from a genuine challenge-page
+    // case). "no-parent-careers-page" = a specific, evidence-backed finding (e.g. a holding
+    // company with no centralized careers page) -- distinct from both, never counted as
+    // verified, never conflated with "haven't checked."
+    verificationStatus: z.enum(["verified", "no-parent-careers-page", "unreachable", "verification-required", "not-found", "pending"]),
     // Free-text context for *why* verificationStatus is what it is (e.g. "ATS not yet
     // verified", "careers page returned 403 on last check") -- null when there's nothing to
     // add beyond the status itself.

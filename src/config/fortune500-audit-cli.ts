@@ -21,9 +21,6 @@ function toCsv(result: Fortune500AuditResult): string {
     ["genericCount", result.atsCounts.generic],
     ["verifiedCount", result.verificationStatusCounts.verified],
     ["pendingCount", result.verificationStatusCounts.pending],
-    ["unreachableCount", result.verificationStatusCounts.unreachable],
-    ["verificationRequiredCount", result.verificationStatusCounts["verification-required"]],
-    ["unsupportedCount", result.verificationStatusCounts.unsupported],
     ["schemaErrors", result.schemaErrors.length],
     ["unsafeUrlCount", result.unsafeUrlCount],
     ["ok", String(result.ok)],
@@ -31,9 +28,12 @@ function toCsv(result: Fortune500AuditResult): string {
     ["currentEditionIdentities", result.currentEditionIdentities],
     ["domainsVerified", result.domainsVerified],
     ["domainsMissing", result.domainsMissing],
+    ["attemptedCount", result.attemptedCount],
     ["careerUrlsVerified", result.careerUrlsVerified],
     ["careerUrlsUnreachable", result.careerUrlsUnreachable],
     ["verificationRequiredCount", result.verificationRequiredCount],
+    ["documentedExceptions", result.documentedExceptions],
+    ["notFoundCount", result.notFoundCount],
     ["scanReadyEntries", result.scanReadyEntries],
     ["provenanceBeyondEdition", result.provenanceBeyondEdition],
     ["operationallyComplete", String(result.operationallyComplete)],
@@ -82,7 +82,7 @@ function printSummary(result: Fortune500AuditResult): void {
   console.log(
     `Verification: verified=${result.verificationStatusCounts.verified} pending=${result.verificationStatusCounts.pending} ` +
       `unreachable=${result.verificationStatusCounts.unreachable} verification-required=${result.verificationStatusCounts["verification-required"]} ` +
-      `unsupported=${result.verificationStatusCounts.unsupported}`,
+      `no-parent-careers-page=${result.verificationStatusCounts["no-parent-careers-page"]} not-found=${result.verificationStatusCounts["not-found"]}`,
   );
   console.log(`Unsafe URLs: ${result.unsafeUrlCount}`);
   console.log(`Schema errors: ${result.schemaErrors.length}`);
@@ -94,8 +94,12 @@ function printSummary(result: Fortune500AuditResult): void {
   }
   console.log(`\n-- Operational readiness (${result.edition}) --`);
   console.log(`Current-edition identities: ${result.currentEditionIdentities}`);
+  console.log(`Companies attempted: ${result.attemptedCount} / not-yet-attempted (pending): ${result.verificationStatusCounts.pending}`);
   console.log(`Official domains verified: ${result.domainsVerified} / missing: ${result.domainsMissing}`);
-  console.log(`Career URLs verified: ${result.careerUrlsVerified} / unreachable: ${result.careerUrlsUnreachable} / verification-required: ${result.verificationRequiredCount}`);
+  console.log(
+    `Career URLs verified: ${result.careerUrlsVerified} / documented exceptions (no-parent-careers-page): ${result.documentedExceptions} / ` +
+      `unreachable: ${result.careerUrlsUnreachable} / verification-required: ${result.verificationRequiredCount} / not-found: ${result.notFoundCount}`,
+  );
   console.log(`Scan-ready entries: ${result.scanReadyEntries}`);
   console.log(`Source provenance beyond bare edition membership: ${result.provenanceBeyondEdition}/${result.totalEntries}`);
   console.log(
