@@ -275,14 +275,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of cardinalhealth.com, confirmed via cardinalhealth.com/en/careers.html link.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Nvidia",
@@ -332,14 +332,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of elevancehealth.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Centene",
@@ -351,14 +351,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of centene.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Bank of America",
@@ -408,14 +408,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of ford.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "General Motors",
@@ -427,14 +427,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of gm.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Citigroup",
@@ -446,14 +446,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "careersUrl is on a distinct but confirmed first-party company-owned careers domain (not the carried corporateDomain, not a third-party portal). citi.com is Citigroup's well-established consumer/corporate brand domain.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Home Depot",
@@ -484,14 +484,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Careers page directly on corporate domain fanniemae.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Kroger",
@@ -503,14 +503,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "careersUrl is on a distinct but confirmed first-party company-owned careers domain (not the carried corporateDomain, not a third-party portal). krogerfamilycareers.com is Kroger's official branded careers site, referenced from kroger.com/careers and ir.kroger.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Verizon Communications",
@@ -541,14 +541,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of phillips66.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Marathon Petroleum",
@@ -560,14 +560,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Careers page directly on corporate domain marathonpetroleum.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "StoneX Group",
@@ -579,14 +579,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Careers page directly on corporate domain stonex.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "State Farm Insurance",
@@ -598,14 +598,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of statefarm.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Freddie Mac",
@@ -617,14 +617,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of freddiemac.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Humana",
@@ -636,14 +636,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of humana.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "AT&T",
@@ -655,14 +655,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "careersUrl is on a distinct but confirmed first-party company-owned careers domain (not the carried corporateDomain, not a third-party portal). att.jobs is AT&T's official .jobs-registry careers domain (restricted TLD, employer-verified).",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Goldman Sachs Group",
@@ -674,14 +674,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Careers page directly on corporate domain goldmansachs.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Comcast",
@@ -693,14 +693,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "careersUrl is on a distinct but confirmed first-party company-owned careers domain (not the carried corporateDomain, not a third-party portal). jobs.comcast.com is linked from corporate.comcast.com/careers.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Wells Fargo",
@@ -712,14 +712,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "careersUrl is on a distinct but confirmed first-party company-owned careers domain (not the carried corporateDomain, not a third-party portal). wellsfargojobs.com is Wells Fargo's official careers brand domain.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Morgan Stanley",
@@ -731,14 +731,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Careers page directly on corporate domain morganstanley.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Valero Energy",
@@ -750,14 +750,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Careers page directly on corporate domain valero.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Dell Technologies",
@@ -769,14 +769,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "careersUrl is on a distinct but confirmed first-party company-owned careers domain (not the carried corporateDomain, not a third-party portal). jobs.dell.com is Dell's official careers domain.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Target",
@@ -807,14 +807,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Careers page directly on corporate domain tesla.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Walt Disney",
@@ -826,14 +826,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "careersUrl is on a distinct but confirmed first-party company-owned careers domain (not the carried corporateDomain, not a third-party portal). disneycareers.com is The Walt Disney Company's official careers brand domain.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Johnson & Johnson",
@@ -845,14 +845,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of jnj.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "PepsiCo",
@@ -864,14 +864,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "careersUrl is on a distinct but confirmed first-party company-owned careers domain (not the carried corporateDomain, not a third-party portal). pepsicojobs.com is PepsiCo's official careers brand domain.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Boeing",
@@ -883,14 +883,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of boeing.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "United Parcel Service",
@@ -902,14 +902,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "careersUrl is on a distinct but confirmed first-party company-owned careers domain (not the carried corporateDomain, not a third-party portal). jobs-ups.com is UPS's official careers brand domain.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "RTX",
@@ -921,13 +921,13 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "corporateDomain was previously null (unresolved identity); derived and live-verified this session from the official careers.rtx.com subdomain -- rtx.com is RTX Corporation's primary corporate domain.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "FedEx",
@@ -939,14 +939,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of fedex.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Progressive",
@@ -958,14 +958,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of progressive.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Lowe's",
@@ -977,33 +977,33 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of lowes.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Energy Transfer",
     "fortuneRank": 53,
     "corporateDomain": "energytransfer.com",
-    "careersUrl": null,
+    "careersUrl": "https://www.energytransfer.com/internships/",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "not-found",
-    "verificationNote": "Checked official energytransfer.com site: only found an internship-specific page (path /internships/, oddly titled \"Careers | Energy Transfer\" in metadata) -- no confirmed general careers portal on the corporate domain. A third-party SelectMinds-hosted job portal (energytransfer.referrals.selectminds.com) appears in search results but could not be confirmed as linked from the official corporate site, so it was not accepted as evidence.",
+    "verificationStatus": "pending",
+    "verificationNote": "Reconsidered from 'not-found': a credible but unconfirmed candidate page exists on the official domain (path /internships/, page metadata titled \"Careers | Energy Transfer\") -- not confirmed as a general careers portal. Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Procter & Gamble",
@@ -1015,14 +1015,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "careersUrl is on a distinct but confirmed first-party company-owned careers domain (not the carried corporateDomain, not a third-party portal). pgcareers.com is P&G's official careers brand domain.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Sysco",
@@ -1034,14 +1034,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of sysco.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "American Express",
@@ -1053,14 +1053,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Careers page directly on corporate domain americanexpress.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Albertsons",
@@ -1072,14 +1072,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "careersUrl is on a distinct but confirmed first-party company-owned careers domain (not the carried corporateDomain, not a third-party portal). albertsons.com is a sibling consumer-facing domain within the same corporate family as the carried corporateDomain (albertsonscompanies.com).",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Archer Daniels Midland",
@@ -1091,14 +1091,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Careers page directly on corporate domain adm.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "MetLife",
@@ -1110,14 +1110,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "careersUrl is on a distinct but confirmed first-party company-owned careers domain (not the carried corporateDomain, not a third-party portal). metlifecareers.com is MetLife's official careers brand domain.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "HCA Healthcare",
@@ -1129,14 +1129,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of hcahealthcare.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Lockheed Martin",
@@ -1148,14 +1148,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "careersUrl is on a distinct but confirmed first-party company-owned careers domain (not the carried corporateDomain, not a third-party portal). lockheedmartinjobs.com is Lockheed Martin's official careers brand domain. Source noted the site is being migrated to a new careers experience around Aug 2026 -- may need re-verification after that launch.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "New York Life Insurance",
@@ -1167,14 +1167,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of newyorklife.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Capital One Financial",
@@ -1186,14 +1186,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "careersUrl is on a distinct but confirmed first-party company-owned careers domain (not the carried corporateDomain, not a third-party portal). capitalonecareers.com is Capital One's official careers brand domain.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Allstate",
@@ -1205,14 +1205,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of allstate.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Caterpillar",
@@ -1224,14 +1224,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of caterpillar.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "International Business Machines",
@@ -1243,14 +1243,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Careers page directly on corporate domain ibm.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Eli Lilly",
@@ -1262,14 +1262,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of lilly.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Merck",
@@ -1281,14 +1281,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of merck.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Nationwide",
@@ -1300,14 +1300,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Official careers subdomain of nationwide.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Broadcom",
@@ -1319,14 +1319,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Careers page directly on corporate domain broadcom.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Delta Air Lines",
@@ -1338,14 +1338,14 @@
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verified",
-    "verificationNote": "Careers page directly on corporate domain delta.com.",
+    "verificationStatus": "pending",
+    "verificationNote": "Official-looking career URL discovered through search; live reachability, redirect destination, and company ownership verification pending.",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)",
       "manual-verification-2026-07-30-official-site-websearch"
     ],
-    "lastVerifiedAt": "2026-07-30"
+    "lastVerifiedAt": null
   },
   {
     "company": "Publix Super Markets",
