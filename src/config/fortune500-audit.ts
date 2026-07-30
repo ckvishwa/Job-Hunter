@@ -1,6 +1,14 @@
 import { companyRegistrySchema, type CompanyRegistryEntry } from "./schema.js";
 
 export const EXPECTED_TOTAL = 500;
+// The edition this audit reports against. Not derived from the data (no per-entry "edition"
+// field exists -- edition is a property of the whole registry snapshot, recorded in each
+// entry's sourceProvenance strings instead) -- stated once, here, and bumped by whichever task
+// next refreshes the registry to a newer edition.
+export const CURRENT_EDITION = "Fortune 500, 2026";
+// Minimum scan-ready (verified career URL) entries for the registry to be considered
+// operationally complete, not just structurally valid. Matches the task's own acceptance bar.
+export const OPERATIONAL_READINESS_TARGET = 475;
 
 const ATS_TYPES = ["greenhouse", "lever", "ashby", "workday", "icims", "generic", "unknown"] as const;
 const VERIFICATION_STATUSES = ["verified", "pending", "unreachable", "verification-required", "unsupported"] as const;
@@ -28,6 +36,23 @@ export interface Fortune500AuditResult {
   schemaErrors: Fortune500AuditIssue[];
   ok: boolean;
   failReasons: string[];
+
+  // -- Operational-readiness reporting (distinct from `ok`/structural validity above; a
+  // registry can be `ok: true` -- 500 structurally valid rows -- while still being nowhere
+  // near operationally complete). --
+  edition: string;
+  currentEditionIdentities: number;
+  domainsVerified: number;
+  domainsMissing: number;
+  careerUrlsVerified: number;
+  careerUrlsUnreachable: number;
+  verificationRequiredCount: number;
+  scanReadyEntries: number;
+  // Entries whose sourceProvenance carries more than the bare edition-membership string --
+  // i.e. something (a domain, a career URL, a verification attempt) was actually sourced for
+  // them, not just "this company is in the 2026 list."
+  provenanceBeyondEdition: number;
+  operationallyComplete: boolean;
 }
 
 function isHttpUrl(value: string): boolean {
@@ -63,6 +88,9 @@ export function auditFortune500Registry(rawEntries: unknown[]): Fortune500AuditR
 
   let careerUrlsPresent = 0;
   let unsafeUrlCount = 0;
+  let domainsVerified = 0;
+  let scanReadyEntries = 0;
+  let provenanceBeyondEdition = 0;
   const rankCounts = new Map<number, number>();
 
   rawEntries.forEach((raw) => {
@@ -77,6 +105,8 @@ export function auditFortune500Registry(rawEntries: unknown[]): Fortune500AuditR
       if (!isHttpUrl(careersUrl)) unsafeUrlCount += 1;
     }
 
+    if (rawField<string>(raw, "corporateDomain") !== null) domainsVerified += 1;
+
     const atsType = rawField<string>(raw, "atsType");
     if (atsType && (ATS_TYPES as readonly string[]).includes(atsType)) {
       atsCounts[atsType as (typeof ATS_TYPES)[number]] += 1;
@@ -86,6 +116,10 @@ export function auditFortune500Registry(rawEntries: unknown[]): Fortune500AuditR
     if (status && (VERIFICATION_STATUSES as readonly string[]).includes(status)) {
       verificationStatusCounts[status as (typeof VERIFICATION_STATUSES)[number]] += 1;
     }
+    if (status === "verified" && careersUrl) scanReadyEntries += 1;
+
+    const provenance = rawField<string[]>(raw, "sourceProvenance");
+    if (Array.isArray(provenance) && provenance.length > 1) provenanceBeyondEdition += 1;
   });
 
   const missingRanks: number[] = [];
@@ -153,6 +187,19 @@ export function auditFortune500Registry(rawEntries: unknown[]): Fortune500AuditR
     schemaErrors,
     ok: failReasons.length === 0,
     failReasons,
+
+    edition: CURRENT_EDITION,
+    currentEditionIdentities: totalEntries,
+    domainsVerified,
+    domainsMissing: totalEntries - domainsVerified,
+    careerUrlsVerified: scanReadyEntries,
+    careerUrlsUnreachable: verificationStatusCounts.unreachable,
+    verificationRequiredCount: verificationStatusCounts["verification-required"],
+    scanReadyEntries,
+    provenanceBeyondEdition,
+    // Structural validity (`ok`) is necessary but never sufficient -- a registry of 500
+    // honestly-unknown rows is `ok: true` and `operationallyComplete: false` at the same time.
+    operationallyComplete: failReasons.length === 0 && scanReadyEntries >= OPERATIONAL_READINESS_TARGET,
   };
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { auditFortune500Registry, EXPECTED_TOTAL } from "../../src/config/fortune500-audit.js";
+import { auditFortune500Registry, EXPECTED_TOTAL, CURRENT_EDITION, OPERATIONAL_READINESS_TARGET } from "../../src/config/fortune500-audit.js";
 
 function entry(overrides: Record<string, unknown> = {}) {
   return {
@@ -161,5 +161,67 @@ describe("auditFortune500Registry", () => {
 
   it("EXPECTED_TOTAL constant is 500", () => {
     expect(EXPECTED_TOTAL).toBe(500);
+  });
+});
+
+describe("auditFortune500Registry - operational readiness (structural validity != operational completeness)", () => {
+  it("reports the current edition", () => {
+    const result = auditFortune500Registry(validRegistry());
+    expect(result.edition).toBe(CURRENT_EDITION);
+    expect(result.currentEditionIdentities).toBe(500);
+  });
+
+  it("a structurally valid but operationally sparse registry is ok:true and operationallyComplete:false", () => {
+    // validRegistry() has 1 verified entry and 499 honestly-unknown ones -- structurally
+    // perfect, nowhere near operationally complete. This is the exact case the task exists to
+    // prevent being mislabeled as "the registry is done."
+    const result = auditFortune500Registry(validRegistry());
+    expect(result.ok).toBe(true);
+    expect(result.scanReadyEntries).toBe(1);
+    expect(result.operationallyComplete).toBe(false);
+  });
+
+  it("domainsVerified/domainsMissing count null corporateDomain honestly", () => {
+    const entries = validRegistry();
+    entries[1] = entry({ company: "NoDomainCo", fortuneRank: 2, corporateDomain: null, atsType: "unknown", atsTenantOrBoardId: null, verificationStatus: "pending" });
+    const result = auditFortune500Registry(entries);
+    expect(result.domainsMissing).toBeGreaterThanOrEqual(1);
+    expect(result.domainsVerified).toBe(500 - result.domainsMissing);
+  });
+
+  it("careerUrlsUnreachable and verificationRequiredCount reflect their respective (distinct) verificationStatus values", () => {
+    const entries = validRegistry(); // rank 1 = verified; ranks 2-500 = pending
+    entries[1] = entry({ company: "Unreachable", fortuneRank: 2, careersUrl: null, verificationStatus: "unreachable" });
+    entries[2] = entry({ company: "NeedsReview", fortuneRank: 3, careersUrl: null, verificationStatus: "verification-required" });
+    const result = auditFortune500Registry(entries);
+    expect(result.careerUrlsUnreachable).toBe(1);
+    expect(result.verificationRequiredCount).toBe(1);
+    expect(result.verificationStatusCounts.pending).toBe(497); // the remaining ranks 4-500
+  });
+
+  it("scanReadyEntries requires BOTH verificationStatus:verified AND a non-null careersUrl", () => {
+    const entries = validRegistry();
+    // verified status but no URL -- not scan-ready.
+    entries[1] = entry({ company: "VerifiedNoUrl", fortuneRank: 2, careersUrl: null, verificationStatus: "verified" });
+    const result = auditFortune500Registry(entries);
+    expect(result.scanReadyEntries).toBe(1); // only the original rank-1 entry
+  });
+
+  it("operationallyComplete becomes true once scanReadyEntries reaches the target", () => {
+    const entries = validRegistry().map((e, i) =>
+      i < OPERATIONAL_READINESS_TARGET
+        ? entry({ ...(e as Record<string, unknown>), careersUrl: `https://company${i + 1}.example/careers`, verificationStatus: "verified" })
+        : e,
+    );
+    const result = auditFortune500Registry(entries);
+    expect(result.scanReadyEntries).toBeGreaterThanOrEqual(OPERATIONAL_READINESS_TARGET);
+    expect(result.operationallyComplete).toBe(true);
+  });
+
+  it("provenanceBeyondEdition counts entries whose sourceProvenance has more than one entry", () => {
+    const entries = validRegistry();
+    entries[0] = entry({ sourceProvenance: ["fortune-500-2026-official", "verified-2026-07-30"] });
+    const result = auditFortune500Registry(entries);
+    expect(result.provenanceBeyondEdition).toBe(1); // only the rank-1 entry has 2 provenance strings
   });
 });

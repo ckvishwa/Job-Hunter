@@ -27,6 +27,16 @@ function toCsv(result: Fortune500AuditResult): string {
     ["schemaErrors", result.schemaErrors.length],
     ["unsafeUrlCount", result.unsafeUrlCount],
     ["ok", String(result.ok)],
+    ["edition", result.edition],
+    ["currentEditionIdentities", result.currentEditionIdentities],
+    ["domainsVerified", result.domainsVerified],
+    ["domainsMissing", result.domainsMissing],
+    ["careerUrlsVerified", result.careerUrlsVerified],
+    ["careerUrlsUnreachable", result.careerUrlsUnreachable],
+    ["verificationRequiredCount", result.verificationRequiredCount],
+    ["scanReadyEntries", result.scanReadyEntries],
+    ["provenanceBeyondEdition", result.provenanceBeyondEdition],
+    ["operationallyComplete", String(result.operationallyComplete)],
   ];
   const header = "metric,value";
   const lines = rows.map(([metric, value]) => `${metric},${value}`);
@@ -82,7 +92,18 @@ function printSummary(result: Fortune500AuditResult): void {
     }
     if (result.schemaErrors.length > 20) console.log(`  ... and ${result.schemaErrors.length - 20} more`);
   }
-  console.log(result.ok ? "RESULT: OK" : `RESULT: FAILED -- ${result.failReasons.join("; ")}`);
+  console.log(`\n-- Operational readiness (${result.edition}) --`);
+  console.log(`Current-edition identities: ${result.currentEditionIdentities}`);
+  console.log(`Official domains verified: ${result.domainsVerified} / missing: ${result.domainsMissing}`);
+  console.log(`Career URLs verified: ${result.careerUrlsVerified} / unreachable: ${result.careerUrlsUnreachable} / verification-required: ${result.verificationRequiredCount}`);
+  console.log(`Scan-ready entries: ${result.scanReadyEntries}`);
+  console.log(`Source provenance beyond bare edition membership: ${result.provenanceBeyondEdition}/${result.totalEntries}`);
+  console.log(
+    result.operationallyComplete
+      ? "OPERATIONAL READINESS: COMPLETE"
+      : `OPERATIONAL READINESS: NOT COMPLETE -- ${result.scanReadyEntries} scan-ready of ${result.totalEntries} (target: >=475). Structurally valid rows are not the same as an operationally usable registry.`,
+  );
+  console.log(result.ok ? "STRUCTURAL RESULT: OK" : `STRUCTURAL RESULT: FAILED -- ${result.failReasons.join("; ")}`);
   console.log("===================================\n");
 }
 

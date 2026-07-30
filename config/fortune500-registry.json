@@ -40,19 +40,21 @@
   {
     "company": "UnitedHealth Group",
     "fortuneRank": 3,
-    "corporateDomain": null,
-    "careersUrl": null,
+    "corporateDomain": "unitedhealthgroup.com",
+    "careersUrl": "https://careers.unitedhealthgroup.com/search-jobs",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationStatus": "verified",
+    "verificationNote": null,
     "sourceProvenance": [
-      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)"
+      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: careers.unitedhealthgroup.com",
+      "derived from verified official career URL's own registrable domain (2026-07-30)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "Apple",
@@ -95,19 +97,21 @@
   {
     "company": "CVS Health",
     "fortuneRank": 6,
-    "corporateDomain": null,
-    "careersUrl": null,
+    "corporateDomain": "cvshealth.com",
+    "careersUrl": "https://jobs.cvshealth.com/us/en",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationStatus": "verified",
+    "verificationNote": null,
     "sourceProvenance": [
-      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)"
+      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: jobs.cvshealth.com",
+      "derived from verified official career URL's own registrable domain (2026-07-30)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "Berkshire Hathaway",
@@ -120,131 +124,146 @@
     "atsWorkdayHostname": null,
     "enabled": true,
     "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationNote": "Holding company -- only subsidiary-specific career sites exist (Berkshire Hathaway Energy, GUARD Insurance, Automotive, HomeServices, BHHC, BH Specialty), none authoritative for the ranked parent entity itself",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: no single official parent-company careers page found",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "McKesson",
     "fortuneRank": 8,
-    "corporateDomain": null,
-    "careersUrl": null,
+    "corporateDomain": "mckesson.com",
+    "careersUrl": "https://careers.mckesson.com/en",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationStatus": "verified",
+    "verificationNote": null,
     "sourceProvenance": [
-      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)"
+      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: careers.mckesson.com",
+      "derived from verified official career URL's own registrable domain (2026-07-30)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "ExxonMobil Holdings",
     "fortuneRank": 9,
-    "corporateDomain": null,
-    "careersUrl": null,
+    "corporateDomain": "exxonmobil.com",
+    "careersUrl": "https://corporate.exxonmobil.com/careers",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationStatus": "verified",
+    "verificationNote": null,
     "sourceProvenance": [
-      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)"
+      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: corporate.exxonmobil.com/careers",
+      "derived from verified official career URL's own registrable domain (2026-07-30)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "Cencora",
     "fortuneRank": 10,
-    "corporateDomain": null,
-    "careersUrl": null,
+    "corporateDomain": "cencora.com",
+    "careersUrl": "https://careers.cencora.com/us/en",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationStatus": "verified",
+    "verificationNote": null,
     "sourceProvenance": [
-      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)"
+      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: careers.cencora.com",
+      "derived from verified official career URL's own registrable domain (2026-07-30)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "Microsoft",
     "fortuneRank": 11,
-    "corporateDomain": null,
-    "careersUrl": null,
+    "corporateDomain": "microsoft.com",
+    "careersUrl": "https://careers.microsoft.com/",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationStatus": "verified",
+    "verificationNote": null,
     "sourceProvenance": [
-      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)"
+      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: careers.microsoft.com",
+      "derived from verified official career URL's own registrable domain (2026-07-30)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "JPMorgan Chase",
     "fortuneRank": 12,
-    "corporateDomain": null,
-    "careersUrl": null,
+    "corporateDomain": "jpmorganchase.com",
+    "careersUrl": "https://www.jpmorganchase.com/careers",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationStatus": "verified",
+    "verificationNote": null,
     "sourceProvenance": [
-      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)"
+      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: jpmorganchase.com/careers",
+      "derived from verified official career URL's own registrable domain (2026-07-30)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "Costco Wholesale",
     "fortuneRank": 13,
-    "corporateDomain": null,
-    "careersUrl": null,
+    "corporateDomain": "costco.com",
+    "careersUrl": "https://careers.costco.com/",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationStatus": "verified",
+    "verificationNote": null,
     "sourceProvenance": [
-      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)"
+      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: careers.costco.com",
+      "derived from verified official career URL's own registrable domain (2026-07-30)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "Cigna Group",
     "fortuneRank": 14,
-    "corporateDomain": null,
-    "careersUrl": null,
+    "corporateDomain": "thecignagroup.com",
+    "careersUrl": "https://jobs.thecignagroup.com/us/en/",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationStatus": "verified",
+    "verificationNote": null,
     "sourceProvenance": [
-      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)"
+      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: jobs.thecignagroup.com",
+      "derived from verified official career URL's own registrable domain (2026-07-30)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "Cardinal Health",
@@ -267,37 +286,40 @@
   {
     "company": "Nvidia",
     "fortuneRank": 16,
-    "corporateDomain": null,
-    "careersUrl": null,
+    "corporateDomain": "nvidia.com",
+    "careersUrl": "https://www.nvidia.com/en-us/about-nvidia/careers/",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationStatus": "verified",
+    "verificationNote": null,
     "sourceProvenance": [
-      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)"
+      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: nvidia.com/en-us/about-nvidia/careers",
+      "derived from verified official career URL's own registrable domain (2026-07-30)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "Meta Platforms",
     "fortuneRank": 17,
     "corporateDomain": "meta.com",
-    "careersUrl": null,
+    "careersUrl": "https://www.metacareers.com/",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationStatus": "verified",
+    "verificationNote": "careers URL uses Meta's dedicated metacareers.com brand domain, distinct from the meta.com corporate domain",
     "sourceProvenance": [
       "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: metacareers.com",
       "fortune-500-2023-eatmoreoranges-dataset (carried forward, not independently re-verified for the 2026 edition)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "Elevance Health",
@@ -338,36 +360,40 @@
   {
     "company": "Bank of America",
     "fortuneRank": 20,
-    "corporateDomain": null,
-    "careersUrl": null,
+    "corporateDomain": "bankofamerica.com",
+    "careersUrl": "https://careers.bankofamerica.com/en-us",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationStatus": "verified",
+    "verificationNote": null,
     "sourceProvenance": [
-      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)"
+      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: careers.bankofamerica.com",
+      "derived from verified official career URL's own registrable domain (2026-07-30)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "Chevron",
     "fortuneRank": 21,
-    "corporateDomain": null,
-    "careersUrl": null,
+    "corporateDomain": "chevron.com",
+    "careersUrl": "https://careers.chevron.com/",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationStatus": "verified",
+    "verificationNote": null,
     "sourceProvenance": [
-      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)"
+      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: careers.chevron.com",
+      "derived from verified official career URL's own registrable domain (2026-07-30)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "Ford Motor",
@@ -426,19 +452,21 @@
   {
     "company": "Home Depot",
     "fortuneRank": 25,
-    "corporateDomain": null,
-    "careersUrl": null,
+    "corporateDomain": "homedepot.com",
+    "careersUrl": "https://careers.homedepot.com/",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationStatus": "verified",
+    "verificationNote": null,
     "sourceProvenance": [
-      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)"
+      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: careers.homedepot.com",
+      "derived from verified official career URL's own registrable domain (2026-07-30)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "Fannie Mae",
@@ -479,19 +507,21 @@
   {
     "company": "Verizon Communications",
     "fortuneRank": 28,
-    "corporateDomain": null,
-    "careersUrl": null,
+    "corporateDomain": "verizon.com",
+    "careersUrl": "https://mycareer.verizon.com/jobs/",
     "atsType": "unknown",
     "atsTenantOrBoardId": null,
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "verification-required",
-    "verificationNote": "Not yet attempted this session -- pending a future verification pass",
+    "verificationStatus": "verified",
+    "verificationNote": null,
     "sourceProvenance": [
-      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)"
+      "fortune-500-2026-official (fortune.com __NEXT_DATA__ franchiseSearch.items, order field as canonical rank)",
+      "WebSearch: mycareer.verizon.com",
+      "derived from verified official career URL's own registrable domain (2026-07-30)"
     ],
-    "lastVerifiedAt": null
+    "lastVerifiedAt": "2026-07-30"
   },
   {
     "company": "Phillips 66",
