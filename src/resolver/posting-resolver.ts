@@ -71,8 +71,8 @@ function matchCompany(url: string, registry: CompanyRegistryEntry[]): CompanyReg
     // Check domain or careersUrl matching
     for (const company of registry) {
       if (
-        host.includes(company.corporateDomain.toLowerCase()) ||
-        urlLower.includes(company.corporateDomain.toLowerCase()) ||
+        (company.corporateDomain !== null && host.includes(company.corporateDomain.toLowerCase())) ||
+        (company.corporateDomain !== null && urlLower.includes(company.corporateDomain.toLowerCase())) ||
         (company.careersUrl !== null && urlLower.includes(company.careersUrl.toLowerCase()))
       ) {
         return company;

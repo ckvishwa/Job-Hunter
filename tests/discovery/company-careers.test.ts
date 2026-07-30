@@ -640,6 +640,39 @@ describe("companyCareersDiscoveryAdapter real-data extraction and structural ski
     expect(jobs).toEqual([]);
     expect(checkpoint.completedCompanyKeys).toEqual(["companynourl::companynourl.com"]);
   });
+
+  it("handles a null corporateDomain (ambiguous/unverified identity) without crashing -- falls back to a stable checkpoint key", async () => {
+    const registry: CompanyRegistryEntry[] = [
+      {
+        company: "CompanyNoDomain",
+        fortuneRank: null,
+        corporateDomain: null,
+        careersUrl: null,
+        atsType: "unknown",
+        atsTenantOrBoardId: null,
+        atsWorkdaySite: null,
+        atsWorkdayHostname: null,
+        verificationStatus: "verification-required",
+        lastVerifiedAt: null,
+        enabled: true,
+        verificationNote: "no verified source",
+        sourceProvenance: ["test-fixture"],
+      },
+    ];
+    loadCompanyRegistryMock.mockReturnValue(registry);
+
+    const checkpoint = makeCheckpoint();
+    const onPageProcessed = vi.fn(async (_jobs: DiscoveredJobLite[], _nextPageNum: number) => {});
+
+    await expect(
+      companyCareersDiscoveryAdapter.discover(makeContext(checkpoint, onPageProcessed)),
+    ).resolves.toBeUndefined();
+
+    expect(resolveAdapterMock).not.toHaveBeenCalled();
+    const [jobs] = onPageProcessed.mock.calls[0] as [DiscoveredJobLite[], number];
+    expect(jobs).toEqual([]);
+    expect(checkpoint.completedCompanyKeys).toEqual(["companynodomain::(no-domain)"]);
+  });
 });
 
 describe("companyCareersDiscoveryAdapter --company filter", () => {

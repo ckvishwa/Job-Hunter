@@ -29,8 +29,11 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
     // recorded as done; failed companies are retried each run/resume.
     if (!checkpoint.completedCompanyKeys) checkpoint.completedCompanyKeys = [];
     const completedKeys = checkpoint.completedCompanyKeys;
-    const registryKey = (c: { company: string; corporateDomain: string }): string =>
-      `${c.company.toLowerCase()}::${c.corporateDomain.toLowerCase()}`;
+    // corporateDomain can be null (ambiguous/unverified identity) -- falls back to a stable
+    // "no-domain" marker rather than crashing; the company name half of the key still keeps
+    // distinct unresolved companies from colliding in practice.
+    const registryKey = (c: { company: string; corporateDomain: string | null }): string =>
+      `${c.company.toLowerCase()}::${c.corporateDomain?.toLowerCase() ?? "(no-domain)"}`;
 
     // Only greenhouse/lever registry entries carry enough verified data to build a real
     // SiteConfig today (a boardToken/site slug). Workday needs a verified per-company ATS

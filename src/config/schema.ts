@@ -123,7 +123,10 @@ export const companyRegistryEntrySchema = z
   .object({
     company: z.string().min(1),
     fortuneRank: z.number().int().positive().nullable(),
-    corporateDomain: z.string().min(1).regex(DOMAIN_RE, "corporateDomain must be a valid domain (e.g. example.com)"),
+    // Nullable: an ambiguous/unverified company identity (e.g. newly added to a registry
+    // edition, not yet cross-referenced against a verified source) must stay null with a
+    // reason (see verificationNote), never a guessed "companyname.com".
+    corporateDomain: z.string().min(1).regex(DOMAIN_RE, "corporateDomain must be a valid domain (e.g. example.com)").nullable(),
     // Nullable: most of a 500-entry registry won't have a verified careers URL yet. When
     // present, gated to http(s) only -- the same rule every other URL in this codebase is
     // held to (schema.ts's siteSchema, careerops-schema.ts, writers.ts's safeHref).
@@ -202,10 +205,15 @@ export const companyRegistrySchema = z.array(companyRegistryEntrySchema).superRe
       rankSeen.set(entry.fortuneRank, indices);
     }
 
-    const domainKey = `${entry.company.toLowerCase()}::${entry.corporateDomain.toLowerCase()}`;
-    const indices = domainSeen.get(domainKey) ?? [];
-    indices.push(index);
-    domainSeen.set(domainKey, indices);
+    // A null corporateDomain (ambiguous/unverified identity) is never a "duplicate" against
+    // any other null-domain entry -- many different unresolved companies legitimately share
+    // "no verified domain yet." Only entries that both HAVE a real domain can collide.
+    if (entry.corporateDomain !== null) {
+      const domainKey = `${entry.company.toLowerCase()}::${entry.corporateDomain.toLowerCase()}`;
+      const indices = domainSeen.get(domainKey) ?? [];
+      indices.push(index);
+      domainSeen.set(domainKey, indices);
+    }
   });
 
   for (const [rank, indices] of rankSeen) {
