@@ -2,7 +2,7 @@ import type { BrowserContext } from "playwright";
 import { loadCollectSettings, loadRolesConfig, loadSitesConfig } from "../config/loader.js";
 import { closePersistentChrome, launchPersistentChrome, registerShutdownOnSignal } from "../browser/launcher.js";
 import { resolveAdapter } from "../adapters/registry.js";
-import { loadJobs, saveJobs } from "../storage/jsonl-store.js";
+import { loadJobs, updateJobs } from "../storage/jsonl-store.js";
 import { mergeJobs } from "../dedup/deduplicator.js";
 import type { GenericPlaywrightDeps } from "../adapters/generic-playwright.js";
 import type { JobPosting, RoleSearch } from "../adapters/types.js";
@@ -143,11 +143,10 @@ export async function runCollect(
       }
     }
 
-    const existing = loadJobs(paths.jobsStorePath);
-    const merged = mergeJobs(existing, cappedCollected, new Date().toISOString());
-    summary.duplicatesRemoved = existing.length + cappedCollected.length - merged.length;
-
-    saveJobs(paths.jobsStorePath, merged);
+    const nowIso = new Date().toISOString();
+    const baseline = loadJobs(paths.jobsStorePath);
+    summary.duplicatesRemoved = baseline.length + cappedCollected.length - mergeJobs(baseline, cappedCollected, nowIso).length;
+    const merged = await updateJobs(paths.jobsStorePath, (current) => mergeJobs(current, cappedCollected, nowIso));
     summary.jobsWritten = merged.length;
 
     return summary;

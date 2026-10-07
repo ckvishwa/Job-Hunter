@@ -63,16 +63,13 @@ describe("jsonl-store", () => {
     expect(existsSync(`${filePath}.tmp`)).toBe(false);
   });
 
-  it("skips malformed lines instead of crashing", () => {
+  it("refuses to load a store with a malformed record instead of skipping it (Slice 1.1)", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "job-hunter-jsonl-"));
     const filePath = path.join(dir, "jobs.jsonl");
-    const goodJob = makeJob();
-    require("node:fs").writeFileSync(
-      filePath,
-      `${JSON.stringify(goodJob)}\nnot valid json\n`,
-      "utf-8",
-    );
-    expect(loadJobs(filePath)).toEqual([goodJob]);
+    require("node:fs").writeFileSync(filePath, `${JSON.stringify(makeJob())}
+not valid json
+`, "utf-8");
+    expect(() => loadJobs(filePath)).toThrow(/CORRUPT_RECORD/);
   });
 
   it("writes one JSON object per line with no trailing commas", () => {

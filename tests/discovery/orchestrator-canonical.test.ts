@@ -1,9 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BrowserContext } from "playwright";
 import type { DiscoveryContext, PortalDiscoveryAdapter } from "../../src/discovery/types.js";
-import { loadJobFailures, loadJobs } from "../../src/storage/jsonl-store.js";
+import { JobStoreError, loadJobFailures, loadJobs } from "../../src/storage/jsonl-store.js";
 import {
   ACME,
   FULL_JD_HTML,
@@ -312,5 +312,87 @@ describe("jobs.jsonl file shape", () => {
     const raw = readFileSync(paths.jobsStorePath, "utf-8");
     expect(raw.endsWith("\n")).toBe(true);
     for (const line of raw.trim().split("\n")) expect(() => JSON.parse(line)).not.toThrow();
+  });
+});
+
+describe("authoritative store failures (V1 Slice 1.1)", () => {
+  it("a corrupt jobs.jsonl blocks the run before any browser launches and is left byte-for-byte unchanged", async () => {
+    const dir = tempDataDir();
+    const paths = makePaths(dir);
+    const corrupt = `{"id":"1","note":"ok"}\nnot json\n`;
+    writeFileSync(paths.jobsStorePath, corrupt);
+    vi.stubGlobal("fetch", vi.fn(makeFetchRouter({ greenhouse: { "101": greenhousePayload(101) } }).impl));
+    discoverJobs(discoveredJob("101"));
+    const { launch } = makeLaunch(null);
+
+    await expect(runDiscover(paths, { ...FILTERS, registryPath: writeRegistry() }, launch, makeClose())).rejects.toBeInstanceOf(JobStoreError);
+
+    expect(launch).not.toHaveBeenCalled();
+    expect(discoverMock).not.toHaveBeenCalled();
+    expect(readFileSync(paths.jobsStorePath, "utf-8")).toBe(corrupt);
+    expect(existsSync(paths.checkpointsPath)).toBe(false);
+  });
+
+  it("a store that becomes unwritable mid-run fails the run, persists nothing, leaves checkpoints incomplete and still closes Chrome", async () => {
+    const dir = tempDataDir();
+    const paths = makePaths(dir);
+    const base = makeFetchRouter({ greenhouse: { "101": greenhousePayload(101) } });
+    const garbage = "competing writer left this behind\n";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: unknown) => {
+        // A competing writer corrupts the authoritative file after our startup read, before our first save.
+        if (String(input).includes("boards-api")) writeFileSync(paths.jobsStorePath, garbage);
+        return base.impl(input);
+      }),
+    );
+    discoverJobs(discoveredJob("101"));
+    const close = makeClose();
+    const { launch, context } = makeLaunch(null);
+
+    await expect(runDiscover(paths, { ...FILTERS, registryPath: writeRegistry() }, launch, close)).rejects.toMatchObject({ code: "CORRUPT_RECORD" });
+
+    expect(readFileSync(paths.jobsStorePath, "utf-8")).toBe(garbage);
+    const checkpoints = JSON.parse(readFileSync(paths.checkpointsPath, "utf-8")) as Record<string, { completed: boolean }>;
+    expect(Object.keys(checkpoints).length).toBeGreaterThan(0);
+    expect(Object.values(checkpoints).every((c) => c.completed === false)).toBe(true);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(close.mock.calls[0]![0]).toBe(context);
+    expect(existsSync(`${paths.jobsStorePath}.lock`)).toBe(false);
+  });
+
+  it("checkpoints are marked completed only after the store write succeeded", async () => {
+    const dir = tempDataDir();
+    const paths = makePaths(dir);
+    vi.stubGlobal("fetch", vi.fn(makeFetchRouter({ greenhouse: { "101": greenhousePayload(101) } }).impl));
+    discoverJobs(discoveredJob("101"));
+    await runDiscover(paths, { ...FILTERS, registryPath: writeRegistry() }, makeLaunch(null).launch, makeClose());
+    const checkpoints = JSON.parse(readFileSync(paths.checkpointsPath, "utf-8")) as Record<string, { completed: boolean }>;
+    expect(Object.values(checkpoints).every((c) => c.completed === true)).toBe(true);
+    expect(loadJobs(paths.jobsStorePath)).toHaveLength(1);
+  });
+
+  it("another writer's acknowledged update between our saves is merged, not overwritten", async () => {
+    const dir = tempDataDir();
+    const paths = makePaths(dir);
+    const base = makeFetchRouter({ greenhouse: { "101": greenhousePayload(101), "102": greenhousePayload(102) } });
+    const { updateJobs } = await import("../../src/storage/job-store.js");
+    let injected = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: unknown) => {
+        if (!injected && String(input).includes("/jobs/102") && String(input).includes("boards-api")) {
+          injected = true;
+          // A different process commits a job after our first save, before our second.
+          await updateJobs(paths.jobsStorePath, (cur) => [...cur, { ...cur[0]!, id: "foreign", atsIdentity: "greenhouse:other:9", canonicalUrl: "https://other.example/9", requisitionId: "9", title: "Foreign" }]);
+        }
+        return base.impl(input);
+      }),
+    );
+    discoverJobs(discoveredJob("101"), discoveredJob("102"));
+    await runDiscover(paths, { ...FILTERS, registryPath: writeRegistry(), resolveConcurrency: 1 }, makeLaunch(null).launch, makeClose());
+
+    const ids = loadJobs(paths.jobsStorePath).map((j) => j.atsIdentity).sort();
+    expect(ids).toEqual(["greenhouse:acme:101", "greenhouse:acme:102", "greenhouse:other:9"]);
   });
 });

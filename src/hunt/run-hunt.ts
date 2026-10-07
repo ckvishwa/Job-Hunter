@@ -1,7 +1,7 @@
 import path from "node:path";
 import { runDiscover, type DiscoverFilters } from "../discovery/orchestrator.js";
 import type { DiscoveryRunSummary } from "../discovery/report.js";
-import { loadJobs, saveJobs } from "../storage/jsonl-store.js";
+import { loadJobs, updateJobs } from "../storage/jsonl-store.js";
 import { mergeJobs } from "../dedup/deduplicator.js";
 import { loadRolesConfig } from "../config/loader.js";
 import { loadHuntState, saveHuntState } from "./hunt-state.js";
@@ -112,10 +112,8 @@ export async function runHunt(
     });
     resolutionTimeMs = Date.now() - start;
     if (!filters.dryRun) {
-      const existingJobs = loadJobs(paths.jobsStorePath);
       const mergeNow = nowOverride ?? new Date().toISOString();
-      const merged = mergeJobs(existingJobs, discoveryResult.jobs, mergeNow);
-      saveJobs(paths.jobsStorePath, merged);
+      await updateJobs(paths.jobsStorePath, (existingJobs) => mergeJobs(existingJobs, discoveryResult.jobs, mergeNow));
     }
   }
 

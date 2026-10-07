@@ -8,7 +8,7 @@ import {
 import { loadCollectSettings, loadPortalsConfig, loadRolesConfig, loadSitesConfig } from "../config/loader.js";
 import { getOrCreateCheckpoint, loadCheckpoints, resetCheckpoints, saveCheckpoints } from "./checkpoints.js";
 import { resolveDiscoveryAdapter } from "./registry.js";
-import { appendDiscoveredJobs, appendJobFailures, loadJobs, saveJobs } from "../storage/jsonl-store.js";
+import { appendDiscoveredJobs, appendJobFailures, loadJobs, updateJobs } from "../storage/jsonl-store.js";
 import { mergeJobs } from "../dedup/deduplicator.js";
 import { canonicalizeUrl } from "../dedup/canonicalize-url.js";
 import { buildJobFailure, evaluatePersistable, type JobFailureCode } from "../domain/canonical-job.js";
@@ -207,6 +207,11 @@ export async function runDiscover(
     return buildSummary(counters);
   }
 
+  // Strict preflight read of the authoritative store BEFORE any browser is launched: a corrupt
+  // or half-written jobs.jsonl throws JobStoreError here, with the file untouched, instead of
+  // after a full discovery pass. Also the true pre-run baseline used for duplicate counting.
+  const existingJobsBeforeRun = loadJobs(paths.jobsStorePath);
+
   // Launch Playwright Chrome context. isolatedProfile picks a fresh, unused profile dir
   // (avoids contending with another run's profile lock); omitted (undefined) uses the shared
   // persistent profile, launchPersistentChrome's own default. Whichever value is chosen here
@@ -233,6 +238,10 @@ export async function runDiscover(
     saveCheckpoints(paths.checkpointsPath, checkpoints);
   }
   const newlyDiscovered: DiscoveredJobLite[] = [];
+  // Checkpoints whose discovery finished this run. They are only marked completed after the
+  // authoritative store write succeeded: if persisting fails, a rerun must rediscover those
+  // listings instead of skipping jobs that were never saved.
+  const pendingCompletions: typeof checkpoints[string][] = [];
 
   try {
     const playwrightContext = await ensureContext();
@@ -362,7 +371,7 @@ export async function runDiscover(
             // every company that was never targeted by this run's filter. Every other source
             // is unaffected by filters.company (only company-careers reads it at all).
             if (!(source === "company-careers" && filters.company)) {
-              checkpoint.completed = true;
+              pendingCompletions.push(checkpoint);
             }
             saveCheckpoints(paths.checkpointsPath, checkpoints);
 
@@ -411,13 +420,9 @@ export async function runDiscover(
 
     const resolver = filters.registryPath ? new PostingResolver(filters.registryPath) : new PostingResolver();
 
-    // Captured ONCE, before any resolution/incremental-saving happens -- the true pre-run
-    // baseline. Reused (never reloaded from disk mid-phase) for every incremental save AND the
-    // final Phase 3 merge below, so duplicatesMerged is computed against what was on disk
-    // BEFORE this run's own resolutions, not re-inflated by this run's own incremental writes
-    // (reloading fresh inside persistIncrementally would make Phase 3 see its own already-
-    // written jobs as "existing," miscounting every one of them as a duplicate).
-    const existingJobsBeforeRun = loadJobs(paths.jobsStorePath);
+    // existingJobsBeforeRun (strict preflight read above) is only the duplicate-counting
+    // baseline now. Every write re-reads the CURRENT file under the store lock (updateJobs), so
+    // another writer's acknowledged update between two of our saves is merged, not overwritten.
 
     // Bounded resolution (Task 4): concurrency-limited, per-job and (optionally) total
     // timeouts, so one slow/stuck job (a real ~12-minute stall was observed live) can never
@@ -451,9 +456,10 @@ export async function runDiscover(
       // Chained onto the previous save so concurrent workers' onJobResolved calls never
       // interleave a read-modify-write of jobs.jsonl (an unserialized second save, computed
       // from a stale read, could silently discard the first save's job).
-      saveChain = saveChain.then(() => {
-        const merged = mergeJobs(existingJobsBeforeRun, resolvedJobsSoFar, new Date().toISOString());
-        saveJobs(paths.jobsStorePath, merged);
+      // A storage failure rejects the chain and propagates out of the resolution phase: the
+      // run fails, checkpoints stay incomplete, and nothing is reported as persisted.
+      saveChain = saveChain.then(async () => {
+        await updateJobs(paths.jobsStorePath, (current) => mergeJobs(current, resolvedJobsSoFar, new Date().toISOString()));
       });
       return saveChain;
     };
@@ -508,11 +514,16 @@ export async function runDiscover(
     // ever reached, and duplicatesMerged reflects genuine pre-existing duplicates rather than
     // this run's own incremental writes.
     const now = new Date().toISOString();
-    const merged = mergeJobs(existingJobsBeforeRun, resolvedJobs, now);
-
-    counters.duplicatesMerged = existingJobsBeforeRun.length + resolvedJobs.length - merged.length;
-    saveJobs(paths.jobsStorePath, merged);
+    // Pure probe against the pre-run baseline, so duplicatesMerged ignores this run's own
+    // incremental writes and anything a concurrent writer added.
+    const probe = mergeJobs(existingJobsBeforeRun, resolvedJobs, now);
+    counters.duplicatesMerged = existingJobsBeforeRun.length + resolvedJobs.length - probe.length;
+    const merged = await updateJobs(paths.jobsStorePath, (current) => mergeJobs(current, resolvedJobs, now));
     counters.jobsWritten = merged.length;
+
+    // Persistence succeeded: only now are this run's discovery checkpoints complete.
+    for (const cp of pendingCompletions) cp.completed = true;
+    saveCheckpoints(paths.checkpointsPath, checkpoints);
 
     // Track profile/source totals for the newly written jobs
     for (const job of resolvedJobs) {
