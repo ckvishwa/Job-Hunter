@@ -5,6 +5,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { BrowserContext, Page } from "playwright";
 import type { DiscoveredJobLite, DiscoveryContext, PortalDiscoveryAdapter } from "../../src/discovery/types.js";
 import { loadDiscoveredJobs } from "../../src/storage/jsonl-store.js";
+import { discoveredJob as canonicalJob, greenhousePayload, makeFetchRouter, writeRegistry } from "../helpers/canonical-fixtures.js";
 
 // Task 12 scope only: verify keyword/profile orchestration wiring against the real
 // config/roles.yml (+ real, all-disabled config/sites.yml and config/portals.yml, which
@@ -503,29 +504,56 @@ describe("orchestrator relevance filtering + limit placement (Profile Relevance 
   });
 
   it("is deterministic and idempotent: rerunning after a completed run discovers/resolves/writes nothing new", async () => {
-    const paths = makePaths();
+    // V1 Slice 1: only a verified, complete posting is persisted (jobs.jsonl no longer accepts
+    // an unverifiable "Acme @ example.invalid" placeholder), so this idempotency check now
+    // resolves a real-shaped Greenhouse posting against a temp registry through the same
+    // production resolver. Same intent as before: second run adds nothing and skips discover().
+    const router = makeFetchRouter({ greenhouse: { "101": greenhousePayload(101) } });
+    const defaultFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(router.impl));
+    try {
+      const paths = makePaths();
+      const registryPath = writeRegistry();
+      discoverMock.mockImplementationOnce(async (context: DiscoveryContext) => {
+        await context.onPageProcessed([canonicalJob("101")], 1);
+      });
+      discoverMock.mockResolvedValue(undefined);
+      vi.useFakeTimers();
+      const summary1Promise = runDiscover(paths, { profileIds: ["sdet"], registryPath }, fakeLaunchFn, fakeCloseFn);
+      await vi.advanceTimersByTimeAsync(2000);
+      const summary1 = await summary1Promise;
+      expect(summary1.jobsWritten).toBe(1);
+      expect(summary1.relevantRetained).toBe(1);
+
+      discoverMock.mockReset();
+      discoverMock.mockResolvedValue(undefined); // every checkpoint is already completed -> discover() is never even called again
+      const summary2Promise = runDiscover(paths, { profileIds: ["sdet"], registryPath }, fakeLaunchFn, fakeCloseFn);
+      await vi.advanceTimersByTimeAsync(2000);
+      const summary2 = await summary2Promise;
+
+      expect(discoverMock).not.toHaveBeenCalled();
+      expect(summary2.listingsDiscovered).toBe(0);
+      expect(summary2.relevantRetained).toBe(0);
+      expect(summary2.jobsWritten).toBe(summary1.jobsWritten); // no growth
+      expect(loadDiscoveredJobs(paths.discoveredJobsPath)).toHaveLength(1); // still exactly the one retained job, no duplicate append
+    } finally {
+      vi.stubGlobal("fetch", defaultFetch);
+    }
+  });
+
+  it("does not persist an unverifiable placeholder posting: it becomes a typed failure instead (V1 Slice 1)", async () => {
     discoverMock.mockImplementationOnce(async (context: DiscoveryContext) => {
       await context.onPageProcessed([relevantJob("r1")], 1);
     });
     discoverMock.mockResolvedValue(undefined);
+    const paths = makePaths();
     vi.useFakeTimers();
-    const summary1Promise = runDiscover(paths, { profileIds: ["sdet"] }, fakeLaunchFn, fakeCloseFn);
+    const summaryPromise = runDiscover(paths, { profileIds: ["sdet"] }, fakeLaunchFn, fakeCloseFn);
     await vi.advanceTimersByTimeAsync(2000);
-    const summary1 = await summary1Promise;
-    expect(summary1.jobsWritten).toBeGreaterThan(0);
-    expect(summary1.relevantRetained).toBe(1);
+    const summary = await summaryPromise;
 
-    discoverMock.mockReset();
-    discoverMock.mockResolvedValue(undefined); // every checkpoint is already completed -> discover() is never even called again
-    const summary2Promise = runDiscover(paths, { profileIds: ["sdet"] }, fakeLaunchFn, fakeCloseFn);
-    await vi.advanceTimersByTimeAsync(2000);
-    const summary2 = await summary2Promise;
-
-    expect(discoverMock).not.toHaveBeenCalled();
-    expect(summary2.listingsDiscovered).toBe(0);
-    expect(summary2.relevantRetained).toBe(0);
-    expect(summary2.jobsWritten).toBe(summary1.jobsWritten); // no growth
-    expect(loadDiscoveredJobs(paths.discoveredJobsPath)).toHaveLength(1); // still exactly the one retained job, no duplicate append
+    expect(summary.jobsWritten).toBe(0);
+    expect(summary.unresolvedDiscoveries).toBe(1);
   });
 });
 

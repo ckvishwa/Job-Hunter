@@ -19,6 +19,8 @@ export function parseDiscoverArgs(argv: string[]): DiscoverFilters {
       result.company = argv[++i];
     } else if (arg === "--registry") {
       result.registryPath = argv[++i];
+    } else if (arg === "--data-dir") {
+      result.dataDir = argv[++i];
     } else if (arg === "--isolated-profile") {
       result.isolatedProfile = true;
     } else if (arg === "--resume") {
@@ -119,14 +121,18 @@ function printDiscoverSummary(summary: DiscoveryRunSummary): void {
 
 async function main(): Promise<void> {
   const filters = parseDiscoverArgs(process.argv.slice(2));
+  // --data-dir redirects every output (jobs, discovered, checkpoints, failures) so a proof or
+  // validation run never mixes with the working dataset in data/.
+  const dataDir = filters.dataDir ?? "data";
   const summary = await runDiscover(
     {
       sitesConfigPath: path.resolve("config/sites.yml"),
       rolesConfigPath: path.resolve("config/roles.yml"),
       portalsConfigPath: path.resolve("config/portals.yml"),
-      discoveredJobsPath: path.resolve("data/discovered-jobs.jsonl"),
-      jobsStorePath: path.resolve("data/jobs.jsonl"),
-      checkpointsPath: path.resolve("data/checkpoints.json"),
+      discoveredJobsPath: path.resolve(dataDir, "discovered-jobs.jsonl"),
+      jobsStorePath: path.resolve(dataDir, "jobs.jsonl"),
+      checkpointsPath: path.resolve(dataDir, "checkpoints.json"),
+      failuresPath: path.resolve(dataDir, "job-failures.jsonl"),
     },
     filters,
   );

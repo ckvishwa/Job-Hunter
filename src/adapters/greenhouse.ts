@@ -2,7 +2,7 @@ import type { CollectSettings, SiteConfig } from "../types.js";
 import type { DiscoveredJob, RawJobDetail, RoleSearch, SourceAdapter } from "./types.js";
 import { matchProfiles } from "./match-profiles.js";
 import { detectVerification } from "../browser/verification.js";
-import { stripHtml } from "../extraction/jd-cleaner.js";
+import { stripHtml, unescapeEscapedHtml } from "../extraction/jd-cleaner.js";
 import { extractRequiredYears } from "../extraction/metadata.js";
 import { computeJobId } from "../dedup/canonicalize-url.js";
 
@@ -84,11 +84,13 @@ export const greenhouseAdapter: SourceAdapter = {
 
   async fetchJobDetails(job: DiscoveredJob): Promise<RawJobDetail> {
     const raw = job.rawMetadata as unknown as GreenhouseJob;
+    // Greenhouse returns `content` entity-escaped ("&lt;p&gt;...") on its job endpoints.
+    const html = raw.content ? unescapeEscapedHtml(raw.content) : null;
     return {
       externalId: job.externalId,
       title: raw.title,
-      descriptionText: stripHtml(raw.content ?? ""),
-      descriptionHtml: raw.content ?? null,
+      descriptionText: stripHtml(html ?? ""),
+      descriptionHtml: html,
       location: raw.location?.name ?? null,
       department: raw.departments?.[0]?.name ?? null,
       employmentType: null,

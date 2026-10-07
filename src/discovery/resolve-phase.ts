@@ -23,7 +23,15 @@ export interface ResolvePhaseOptions {
   // Called after each job resolves (success, timeout, or error) with the result so far --
   // lets the caller persist incrementally (clean shutdown: nothing resolved before an
   // interrupt is ever lost, since it's on disk by the time the interrupt could even land).
-  onJobResolved?: (resolved: JobPosting, index: number, total: number) => void;
+  // `outcome` tells the caller *why* a placeholder was produced (timed out vs errored) so it
+  // can record an accurate typed failure instead of parsing the placeholder's description.
+  onJobResolved?: (
+    resolved: JobPosting,
+    index: number,
+    total: number,
+    outcome: "succeeded" | "timedOut" | "errored",
+    job: DiscoveredJobLite,
+  ) => void | Promise<void>;
   log?: (message: string) => void;
 }
 
@@ -158,7 +166,7 @@ export async function runResolutionPhase(
         unresolved += 1;
       }
       completedCount += 1;
-      options.onJobResolved?.(posting, completedCount, jobs.length);
+      await options.onJobResolved?.(posting, completedCount, jobs.length, outcome, job);
       if (completedCount % options.progressEvery === 0) {
         options.log?.(`[orchestrator] Resolved ${completedCount}/${jobs.length} jobs (${succeeded} succeeded, ${unresolved} unresolved).`);
       }

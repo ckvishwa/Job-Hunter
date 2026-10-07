@@ -29,6 +29,19 @@ export interface RawJobDetail {
   rawMetadata: Record<string, unknown>;
 }
 
+/**
+ * One sighting of a posting: where the listing was found, where the official page finally
+ * resolved, and how the JD text was obtained. Persisted on JobPosting.sourceObservations.
+ */
+export interface SourceObservation {
+  sourceKind: string;
+  observedUrl: string;
+  finalUrl: string;
+  observedAt: string;
+  // "ats-api": public Greenhouse/Lever/Workday JSON. "browser-dom": scraped from the page in headed Chrome.
+  extractionMethod: "ats-api" | "browser-dom";
+}
+
 export interface JobPosting {
   id: string;
   source: string;
@@ -57,6 +70,18 @@ export interface JobPosting {
   // pipeline (its SourceAdapter.normalize() never runs relevance evaluation) -- never fabricated.
   matchedKeywords?: string[];
   relevanceReason?: string;
+  // V1 Slice 1 canonical fields (src/domain/canonical-job.ts). Optional so legacy records and
+  // the older src/runner pipeline stay valid; discovery output must carry all of them to be
+  // persisted (evaluatePersistable).
+  schemaVersion?: number;
+  jdContentHash?: string;
+  extractedAt?: string;
+  resolutionStatus?: "resolved" | "unresolved";
+  sourceObservations?: SourceObservation[];
+  // "<ats>:<board>:<jobId>", e.g. "greenhouse:figma:5829751004". Distinct requisitions never share one.
+  atsIdentity?: string;
+  // Transient: why resolution failed. Never persisted (stripped by evaluatePersistable).
+  resolutionFailure?: { code: string; detail: string };
   rawMetadata: Record<string, unknown>;
 }
 

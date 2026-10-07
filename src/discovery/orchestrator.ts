@@ -8,14 +8,17 @@ import {
 import { loadCollectSettings, loadPortalsConfig, loadRolesConfig, loadSitesConfig } from "../config/loader.js";
 import { getOrCreateCheckpoint, loadCheckpoints, resetCheckpoints, saveCheckpoints } from "./checkpoints.js";
 import { resolveDiscoveryAdapter } from "./registry.js";
-import { appendDiscoveredJobs, loadJobs, saveJobs } from "../storage/jsonl-store.js";
+import { appendDiscoveredJobs, appendJobFailures, loadJobs, saveJobs } from "../storage/jsonl-store.js";
 import { mergeJobs } from "../dedup/deduplicator.js";
+import { canonicalizeUrl } from "../dedup/canonicalize-url.js";
+import { buildJobFailure, evaluatePersistable, type JobFailureCode } from "../domain/canonical-job.js";
 import { PostingResolver } from "../resolver/posting-resolver.js";
 import type { DiscoveredJobLite, DiscoveryContext } from "./types.js";
 import type { JobPosting } from "../adapters/types.js";
 import { evaluateRelevance } from "./relevance.js";
 import { runResolutionPhase, UNRESOLVED_PLACEHOLDER_PREFIX } from "./resolve-phase.js";
 import { buildSummary, type DiscoveryRunSummary, type RawDiscoveryCounters } from "./report.js";
+import { randomBytes } from "node:crypto";
 import path from "node:path";
 
 const DEFAULT_RESOLVE_CONCURRENCY = 3;
@@ -36,6 +39,8 @@ export interface DiscoverFilters {
   // before the run starts (see below).
   resetCheckpoint?: string | true;
   dryRun?: boolean;
+  // CLI-only convenience (src/discovery/cli.ts): output directory for this run.
+  dataDir?: string;
   // Launch a fresh, unused Chrome profile for this run instead of the shared persistent one
   // -- for controlled live-validation runs that need to avoid contending with another run's
   // profile lock. Not for normal usage: the shared profile's persistence (cookies/logins) is
@@ -91,6 +96,9 @@ export async function runDiscover(
     discoveredJobsPath: string;
     jobsStorePath: string;
     checkpointsPath: string;
+    // Typed rejection log (see src/domain/canonical-job.ts JobFailure). Defaults to
+    // job-failures.jsonl next to the jobs store.
+    failuresPath?: string;
   },
   filters: DiscoverFilters = {},
   launchFn: typeof launchPersistentChrome = launchPersistentChrome,
@@ -386,7 +394,19 @@ export async function runDiscover(
     // grows via mergeJobs below, discoveredJobs.jsonl is append-only), and slicing a
     // deterministically-ordered array keeps the result deterministic and idempotent across
     // reruns of the same input.
-    const jobsToResolve = typeof limit === "number" ? newlyDiscovered.slice(0, limit) : newlyDiscovered;
+    // company-careers runs the whole board once per role keyword, so the same listing is
+    // discovered several times in one run (each keyword has its own checkpoint). Resolve each
+    // distinct listing once: key = employer + ATS job id, else the canonical listing URL.
+    const seenListings = new Set<string>();
+    const distinctDiscovered = newlyDiscovered.filter((job) => {
+      const key = job.sourceJobId
+        ? `${job.company.toLowerCase()}::${job.sourceJobId}`
+        : `url::${canonicalizeUrl(job.resultUrl)}`;
+      if (seenListings.has(key)) return false;
+      seenListings.add(key);
+      return true;
+    });
+    const jobsToResolve = typeof limit === "number" ? distinctDiscovered.slice(0, limit) : distinctDiscovered;
     console.log(`[orchestrator] Resolving details for ${jobsToResolve.length} job(s) (Limit: ${limit ?? "None"}).`);
 
     const resolver = filters.registryPath ? new PostingResolver(filters.registryPath) : new PostingResolver();
@@ -404,7 +424,28 @@ export async function runDiscover(
     // block the rest of a run. Incrementally persisted below via onJobResolved -- an interrupt
     // mid-resolution loses at most the one job in flight past the last completed save, not the
     // whole phase's progress.
+    // Only postings that pass the canonical gate (official employer, real JD, valid schema)
+    // are ever persisted to jobs.jsonl; every rejection becomes a typed JobFailure instead.
     const resolvedJobsSoFar: JobPosting[] = [];
+    const failuresPath = paths.failuresPath ?? path.join(path.dirname(paths.jobsStorePath), "job-failures.jsonl");
+    const runId = `run-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`;
+    let failureCount = 0;
+    const recordFailure = (code: JobFailureCode, detail: string, job: DiscoveredJobLite, targetUrl: string): void => {
+      failureCount += 1;
+      appendJobFailures(failuresPath, [
+        buildJobFailure({
+          code,
+          stage: "resolution",
+          runId,
+          targetUrl,
+          company: job.company,
+          title: job.title,
+          sourceJobId: job.sourceJobId,
+          detail,
+        }),
+      ]);
+      console.error(`[orchestrator] Rejected "${job.title}" at "${job.company}": ${code} - ${detail}`);
+    };
     let saveChain: Promise<void> = Promise.resolve();
     const persistIncrementally = (): Promise<void> => {
       // Chained onto the previous save so concurrent workers' onJobResolved calls never
@@ -431,8 +472,22 @@ export async function runDiscover(
         progressEvery: RESOLVE_PROGRESS_EVERY,
         delayBetweenRequestsMs: settings.delayBetweenRequestsMs,
         log: (message) => console.log(message),
-        onJobResolved: async (posting) => {
-          resolvedJobsSoFar.push(posting);
+        onJobResolved: async (posting, _index, _total, outcome, job) => {
+          if (outcome === "timedOut") {
+            recordFailure("RESOLUTION_TIMEOUT", "Resolution exceeded the per-job timeout.", job, job.resultUrl);
+            return;
+          }
+          if (outcome === "errored" && posting.descriptionText.startsWith(UNRESOLVED_PLACEHOLDER_PREFIX)) {
+            const reason = posting.descriptionText.split("Reason:")[1]?.trim() ?? "resolver produced no posting";
+            recordFailure("RESOLUTION_ERROR", reason, job, job.resultUrl);
+            return;
+          }
+          const gate = evaluatePersistable(posting);
+          if (!gate.ok) {
+            recordFailure(gate.failure.code as JobFailureCode, gate.failure.detail, job, posting.canonicalUrl || job.resultUrl);
+            return;
+          }
+          resolvedJobsSoFar.push(gate.posting);
           await persistIncrementally();
         },
       },
@@ -442,10 +497,10 @@ export async function runDiscover(
     counters.resolutionsAttempted = resolvePhaseResult.attempted;
     counters.resolutionsSucceeded = resolvePhaseResult.succeeded;
     counters.resolutionsTimedOut = resolvePhaseResult.timedOut;
-    counters.unresolvedDiscoveries = resolvePhaseResult.unresolved;
-    counters.officialPostingsResolved = resolvePhaseResult.succeeded;
-    counters.jdsExtracted = resolvePhaseResult.resolvedJobs.length;
-    const resolvedJobs = resolvePhaseResult.resolvedJobs;
+    counters.unresolvedDiscoveries = failureCount;
+    counters.officialPostingsResolved = resolvedJobsSoFar.length;
+    counters.jdsExtracted = resolvedJobsSoFar.length;
+    const resolvedJobs = resolvedJobsSoFar;
 
     // PHASE 3: Deduplication & Saving. Authoritative final merge/save/counters, against the
     // SAME pre-run baseline the incremental saves above used -- idempotent with (and
