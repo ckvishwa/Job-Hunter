@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "jdHash": "6cda9b85eef7200306748a20395b0fa83f2158e2ef4da9e44c7cf92b583cda54",
+  "provenance": "MANUAL_ANNOTATION",
+  "coverage": "partial",
+  "reviewedBy": null,
+  "reviewedAt": null,
+  "omissions": [
+    "Only 3 of about 20 responsibilities are annotated.",
+    "The clause \"In the case of the latter, some security experience is preferred\" has no schema slot and is not represented.",
+    "Compensation, equity and benefits sections are not requirements and are not annotated.",
+    "No reviewer other than the annotator has checked the annotation."
+  ],
+  "notes": "Review record for docs/evidence/fixtures/figma-security-engineer.manual-annotation.json. Coverage stays partial and reviewedBy stays null until a named person reviews the annotation against the JD."
+}

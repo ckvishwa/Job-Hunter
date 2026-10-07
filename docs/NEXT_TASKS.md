@@ -1,5 +1,14 @@
 # Next tasks
 
+## Open gates after Slice 3 (in this order)
+
+1. **Real candidate facts (needs the user).** Review `private-runtime/candidate/pending-facts.json` (128 pending facts from the four resumes): approve what is true (`approvalStatus`, `verification.verifiedBy/verifiedAt`), reject comma-split fragments, add `roleTags` to the employment fact, `experienceIds` to skills used there, explicit `work_authorization` / `clearance` facts if wanted, and any location preference. Then run `npm run decide` with that file. Until then every real decision is REVIEW.
+2. **Extraction review (needs a person other than the annotator).** Have the Figma annotation checked against the JD and record `coverage: complete`, `reviewedBy`, `reviewedAt` in an extraction review file; without that no job can be ELIGIBLE.
+3. **Curated requirement vocabulary.** Requirement values are free text and match only exactly (or via approved `matchTerms` / the tiny synonym list). Decide how annotated values map to skill names (a reviewed vocabulary file) before judging many jobs; do not add fuzzy matching.
+4. **Autonomous parser admission** (below). 
+5. **V1 Slice 4 (next code task):** ResumePlan from approved facts only, with every claim mapped to an approved fact id, validated before any rendering. Out of scope until gate 1 yields approved facts to select from.
+
+
 ## Search demo follow-ups (not blocking Slice 3)
 
 - Run the search flow on a second, different careers site (a native Greenhouse board such as `job-boards.greenhouse.io/<board>` needs Enter to apply `?keyword=`; Lever boards differ again) and record which default selectors hold.
@@ -8,7 +17,11 @@
 - Title targeting is done (MATCH/REVIEW/NO_MATCH). Open question for the user, not decided here: whether entry-level / new-grad titles should be excluded; the repository has no seniority rule and none was added.
 - Resolve REVIEW entries: decide whether to open them (`selection.openReview`) or add explicit roles to `config/roles.yml`.
 
-## V1 Slice 3 — approved candidate facts and deterministic decision (next, one bounded task)
+## V1 Slice 3 (DONE for the engine; real-data gate open, see below)
+
+The original scope below was implemented as specified; see `docs/evidence/v1-slice3-decision.md`. Kept for reference.
+
+### Original scope — approved candidate facts and deterministic decision (next, one bounded task)
 
 Goal: prove `StructuredJob` + approved candidate facts -> explained `ELIGIBLE | REJECT | REVIEW` with no guessed sensitive answers. Offline, deterministic, no model. Uses a SYNTHETIC candidate only; the real candidate's facts must be supplied and approved by the user in a later step. Nothing is inferred from a resume, a name or history.
 

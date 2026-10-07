@@ -9,9 +9,10 @@ Last updated: 2026-10-07. Branch `careerops-integration` (worktree `.claude/work
 | 0 | Read-only audit | Done (in conversation; no document) |
 | 1 | Real headed discovery proof | **Done for one target (Figma / Greenhouse).** Evidence: `docs/evidence/v1-slice1-discovery-proof.md` |
 | 1.1 | Protect authoritative job persistence | **Done.** See section below |
+| 3 | Approved candidate facts and evidence-based decision | **Engine, contract, importer and command done; real candidate decision PENDING (no fact approved).** Evidence: `docs/evidence/v1-slice3-decision.md` |
 | search demo | Visible-browser search discovery (Stripe) | **Done**, live-verified. Evidence: `docs/evidence/search-demo-stripe.md` |
 | 2 | Structured JD contract + provider validation | **Contract, validator, fixture-provider wiring done; autonomous parser gate PENDING.** Evidence: `docs/evidence/v1-slice2-structured-jd.md` |
-| 3-6 | Candidate facts, ResumePlan, ATS form path, readiness | Not started (Slice 3 next, see `docs/NEXT_TASKS.md`) |
+| 4-6 | ResumePlan, ATS form path, readiness | Not started (see `docs/NEXT_TASKS.md`) |
 
 V2-V5 are untouched.
 
@@ -40,6 +41,8 @@ Rejections become typed failures in `<data-dir>/job-failures.jsonl` (`POSTING_UN
 | After search demo | `npx vitest run` | 66 files, **733 passed**, 0 failed (+29: 11 browser E2E, 18 search-input/CLI) |
 | After shortlist iteration | `npx vitest run` | 67 files, **760 passed**, 0 failed (+27) |
 | After search demo | `npx tsc --noEmit` | clean |
+| After Slice 3 | `npx vitest run` | 71 files, **834 passed**, 0 failed (+74: 41 evaluate, 8 decide CLI, 13 profile, 12 resume import) |
+| Slice 3 demonstration | `npm run decide ...` on the saved Figma JD | REVIEW (synthetic candidate; real pending facts also REVIEW) |
 | Slice 2 demonstration | `npm run parse-jd ...` on the saved Figma JD | ACCEPTED, MANUAL_ANNOTATION / FIXTURE_PROVIDER only |
 | Live success + dedupe + failure | see evidence file | pass (Figma / Greenhouse only) |
 
@@ -64,6 +67,10 @@ Guarantees on the supported environment (Windows 11 / NTFS, local disk): all-or-
 Decision note: existing implementation = none (no lock anywhere; `launcher.ts` lock handling is Chrome-specific). Alternatives: (a) `proper-lockfile` (new dependency, mkdir + mtime heartbeat; staleness by time can steal a slow live writer's lock); (b) SQLite (out of scope, large migration); (c) chosen: ~100 lines, zero dependencies, exclusive-create with owner token and pid-liveness staleness (never time-only). Tradeoff: own code to maintain and no heartbeat, so a live-but-hung writer blocks others until the 10 s timeout fails loudly. Reversal: callers revert to `loadJobs` + `saveJobs`, which still refuse corrupt stores.
 
 Intentional change to an existing test: `tests/storage/jsonl-store.test.ts` "skips malformed lines instead of crashing" asserted the bug; it now asserts `CORRUPT_RECORD`.
+
+## Slice 3: candidate facts and decisions (2026-10-07)
+
+`npm run decide -- --data-dir <dir> --job <id|atsIdentity> --profile <candidate-profile.json> [--review <extraction-review.json>]` turns one saved job + its validated StructuredJob (same JD revision) + approved candidate facts into ELIGIBLE / REJECT / REVIEW with per-criterion JD evidence and fact ids, stored in `<dir>/decisions.jsonl`. Title targeting is not an input; sponsorship statements are recorded, never used to reject; sensitive answers need explicit approved facts; years are overlap-safe and never inferred from a skill mention; ELIGIBLE needs a named reviewer's attestation that the extraction covers the JD. `npm run candidate:import -- --resumes-dir <dir>` writes a reviewable file of PENDING facts from `Resume*.docx` (128 facts from the four real resumes, all pending, in gitignored `private-runtime/`). Template: `config/candidate-profile.template.json`. Evidence, policy, the review steps and one demonstrated decision (SYNTHETIC_CANDIDATE + MANUAL_ANNOTATION -> REVIEW): `docs/evidence/v1-slice3-decision.md`. Verification: 71 files / 834 passed, `tsc` clean.
 
 ## Search demo iteration 2: shortlist and clean text (2026-10-07)
 

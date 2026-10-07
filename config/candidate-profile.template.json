@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "candidateId": "REPLACE-with-a-short-id",
+  "profileVersion": "template.0",
+  "updatedAt": "2026-01-01",
+  "facts": [
+    {
+      "factId": "example-skill",
+      "kind": "skill",
+      "value": "REPLACE with a skill exactly as you want it matched, e.g. Python",
+      "polarity": "has",
+      "attributes": {
+        "matchTerms": []
+      },
+      "source": {
+        "kind": "user-statement",
+        "reference": "template"
+      },
+      "verification": {
+        "verifiedBy": null,
+        "verifiedAt": null,
+        "validUntil": null
+      },
+      "approvalStatus": "pending",
+      "sensitivity": "normal",
+      "notes": "To approve: set approvalStatus to approved and fill verification.verifiedBy and verification.verifiedAt (an ISO date). Pending facts never satisfy a requirement."
+    },
+    {
+      "factId": "example-employment",
+      "kind": "employment",
+      "value": "REPLACE Employer — Title",
+      "polarity": "has",
+      "attributes": {
+        "employer": "REPLACE",
+        "title": "REPLACE",
+        "startDate": "2020-01",
+        "endDate": null,
+        "roleTags": []
+      },
+      "source": {
+        "kind": "user-statement",
+        "reference": "template"
+      },
+      "verification": {
+        "verifiedBy": null,
+        "verifiedAt": null,
+        "validUntil": null
+      },
+      "approvalStatus": "pending",
+      "sensitivity": "normal",
+      "notes": "endDate null = current job. roleTags are YOUR approved wording for what this job counts as in years-of-role requirements (e.g. QA automation); role-years are never inferred from the title."
+    },
+    {
+      "factId": "example-work-authorization",
+      "kind": "work_authorization",
+      "value": "REPLACE with your explicit answer, e.g. authorized to work in the United States",
+      "polarity": "has",
+      "attributes": {},
+      "source": {
+        "kind": "user-statement",
+        "reference": "template"
+      },
+      "verification": {
+        "verifiedBy": null,
+        "verifiedAt": null,
+        "validUntil": null
+      },
+      "approvalStatus": "pending",
+      "sensitivity": "sensitive",
+      "notes": "Sensitive answers exist only as explicit facts you state. They are never derived from your name, education, history or a model. Use polarity lacks to state that you do not hold something."
+    }
+  ],
+  "preferences": {},
+  "employmentHistoryComplete": null
+}
