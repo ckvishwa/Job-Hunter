@@ -49,17 +49,22 @@ export function appendDiscoveredJobs(filePath: string, jobs: DiscoveredJobLite[]
   appendFileSync(filePath, content, "utf-8");
 }
 
-/** Appends typed failure records (data/job-failures.jsonl) and fsyncs before returning. */
-export function appendJobFailures(filePath: string, failures: JobFailure[]): void {
-  if (failures.length === 0) return;
+/** Durable append of JSON records (one per line, fsync before returning). Not for authoritative state. */
+export function appendJsonlRecords(filePath: string, records: readonly unknown[]): void {
+  if (records.length === 0) return;
   mkdirSync(dirname(filePath), { recursive: true });
   const fd = openSync(filePath, "a");
   try {
-    writeSync(fd, failures.map((failure) => JSON.stringify(failure)).join("\n") + "\n", null, "utf-8");
+    writeSync(fd, records.map((record) => JSON.stringify(record)).join("\n") + "\n", null, "utf-8");
     fsyncSync(fd);
   } finally {
     closeSync(fd);
   }
+}
+
+/** Appends typed failure records (data/job-failures.jsonl) and fsyncs before returning. */
+export function appendJobFailures(filePath: string, failures: JobFailure[]): void {
+  appendJsonlRecords(filePath, failures);
 }
 
 export function loadJobFailures(filePath: string): JobFailure[] {

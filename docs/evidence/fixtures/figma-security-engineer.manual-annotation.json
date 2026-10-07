@@ -1,0 +1,300 @@
+{
+  "fixtureSchemaVersion": 1,
+  "provenance": "MANUAL_ANNOTATION",
+  "annotator": "Claude Code session (hand-selected quotes; offsets located by exact unique substring search)",
+  "annotatedAt": "2026-10-07",
+  "notes": "Figma 'Security Engineer' (greenhouse:figma:5829751004) from data/slice1-proof. Manual annotation for contract demonstration only; NOT model output and NOT evidence of autonomous extraction accuracy.",
+  "entries": [
+    {
+      "sourceJdHash": "6cda9b85eef7200306748a20395b0fa83f2158e2ef4da9e44c7cf92b583cda54",
+      "label": "figma security engineer 5829751004",
+      "output": {
+        "sourceJdHash": "6cda9b85eef7200306748a20395b0fa83f2158e2ef4da9e44c7cf92b583cda54",
+        "requirements": [
+          {
+            "id": "exp-security-eng",
+            "type": "role_experience",
+            "value": "Security Engineering",
+            "level": "required",
+            "evidence": [
+              {
+                "quote": "5+ years of proven engineering experience working in either a Security Engineering or a Software Engineering role.",
+                "start": 2929,
+                "end": 3043
+              }
+            ],
+            "minimumYears": 5,
+            "scope": {
+              "kind": "role",
+              "value": "Security Engineering"
+            },
+            "groupId": "g-experience-role"
+          },
+          {
+            "id": "exp-software-eng",
+            "type": "role_experience",
+            "value": "Software Engineering",
+            "level": "required",
+            "evidence": [
+              {
+                "quote": "5+ years of proven engineering experience working in either a Security Engineering or a Software Engineering role.",
+                "start": 2929,
+                "end": 3043
+              }
+            ],
+            "minimumYears": 5,
+            "scope": {
+              "kind": "role",
+              "value": "Software Engineering"
+            },
+            "groupId": "g-experience-role"
+          },
+          {
+            "id": "judgment-security",
+            "type": "skill",
+            "value": "security judgment: threat modeling and risk prioritization",
+            "level": "required",
+            "evidence": [
+              {
+                "quote": "Strong security judgment in threat modeling and risk prioritization and/or strong technical judgment in designing and building maintainable, scalable systems.",
+                "start": 3110,
+                "end": 3268
+              }
+            ],
+            "groupId": "g-judgment"
+          },
+          {
+            "id": "judgment-technical",
+            "type": "skill",
+            "value": "technical judgment: designing and building maintainable, scalable systems",
+            "level": "required",
+            "evidence": [
+              {
+                "quote": "Strong security judgment in threat modeling and risk prioritization and/or strong technical judgment in designing and building maintainable, scalable systems.",
+                "start": 3110,
+                "end": 3268
+              }
+            ],
+            "groupId": "g-judgment"
+          },
+          {
+            "id": "coding-language",
+            "type": "language",
+            "value": "at least one general-purpose coding language",
+            "level": "required",
+            "evidence": [
+              {
+                "quote": "Proficiency in at least one general-purpose coding language.",
+                "start": 3269,
+                "end": 3329
+              }
+            ]
+          },
+          {
+            "id": "communication",
+            "type": "soft_skill",
+            "value": "communication and cross-functional collaboration",
+            "level": "required",
+            "evidence": [
+              {
+                "quote": "Strong communication and interpersonal skills, with demonstrated experience collaborating across functions.",
+                "start": 3330,
+                "end": 3437
+              }
+            ]
+          },
+          {
+            "id": "sme-appsec",
+            "type": "domain_knowledge",
+            "value": "Application Security",
+            "level": "preferred",
+            "evidence": [
+              {
+                "quote": "Subject matter expertise in Application Security, Cloud Security, Corporate Security, Data Access Governance, and/or IAM (Identity and Access Management).",
+                "start": 3495,
+                "end": 3649
+              },
+              {
+                "quote": "While not required, it’s an added plus if you also have:",
+                "start": 3438,
+                "end": 3494
+              }
+            ],
+            "groupId": "g-sme"
+          },
+          {
+            "id": "sme-cloudsec",
+            "type": "domain_knowledge",
+            "value": "Cloud Security",
+            "level": "preferred",
+            "evidence": [
+              {
+                "quote": "Subject matter expertise in Application Security, Cloud Security, Corporate Security, Data Access Governance, and/or IAM (Identity and Access Management).",
+                "start": 3495,
+                "end": 3649
+              },
+              {
+                "quote": "While not required, it’s an added plus if you also have:",
+                "start": 3438,
+                "end": 3494
+              }
+            ],
+            "groupId": "g-sme"
+          },
+          {
+            "id": "sme-corpsec",
+            "type": "domain_knowledge",
+            "value": "Corporate Security",
+            "level": "preferred",
+            "evidence": [
+              {
+                "quote": "Subject matter expertise in Application Security, Cloud Security, Corporate Security, Data Access Governance, and/or IAM (Identity and Access Management).",
+                "start": 3495,
+                "end": 3649
+              },
+              {
+                "quote": "While not required, it’s an added plus if you also have:",
+                "start": 3438,
+                "end": 3494
+              }
+            ],
+            "groupId": "g-sme"
+          },
+          {
+            "id": "sme-dag",
+            "type": "domain_knowledge",
+            "value": "Data Access Governance",
+            "level": "preferred",
+            "evidence": [
+              {
+                "quote": "Subject matter expertise in Application Security, Cloud Security, Corporate Security, Data Access Governance, and/or IAM (Identity and Access Management).",
+                "start": 3495,
+                "end": 3649
+              },
+              {
+                "quote": "While not required, it’s an added plus if you also have:",
+                "start": 3438,
+                "end": 3494
+              }
+            ],
+            "groupId": "g-sme"
+          },
+          {
+            "id": "sme-iam",
+            "type": "domain_knowledge",
+            "value": "IAM",
+            "level": "preferred",
+            "evidence": [
+              {
+                "quote": "Subject matter expertise in Application Security, Cloud Security, Corporate Security, Data Access Governance, and/or IAM (Identity and Access Management).",
+                "start": 3495,
+                "end": 3649
+              },
+              {
+                "quote": "While not required, it’s an added plus if you also have:",
+                "start": 3438,
+                "end": 3494
+              }
+            ],
+            "groupId": "g-sme"
+          },
+          {
+            "id": "prioritization",
+            "type": "skill",
+            "value": "prioritization decisions in security controls",
+            "level": "preferred",
+            "evidence": [
+              {
+                "quote": "Demonstrated ability to make hard prioritization decisions in security controls.",
+                "start": 3650,
+                "end": 3730
+              },
+              {
+                "quote": "While not required, it’s an added plus if you also have:",
+                "start": 3438,
+                "end": 3494
+              }
+            ]
+          }
+        ],
+        "responsibilities": [
+          {
+            "id": "resp-assessments",
+            "value": "technical security assessments, code audits and design reviews",
+            "evidence": [
+              {
+                "quote": "Perform technical security assessments, code audits, and design reviews for new product features.",
+                "start": 2082,
+                "end": 2179
+              }
+            ]
+          },
+          {
+            "id": "resp-incidents",
+            "value": "respond to product security incidents",
+            "evidence": [
+              {
+                "quote": "Help respond to product security incidents.",
+                "start": 2442,
+                "end": 2485
+              }
+            ]
+          },
+          {
+            "id": "resp-anti-abuse",
+            "value": "build systems to prevent spam, fraud and abuse",
+            "evidence": [
+              {
+                "quote": "Design and build technical systems to prevent spam, fraud, and abuse.",
+                "start": 2497,
+                "end": 2566
+              }
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "id": "loc-us",
+            "type": "location",
+            "status": "required",
+            "value": "US hubs or remote within the United States",
+            "evidence": [
+              {
+                "quote": "This is a full-time role that can be held from one of our US hubs or remotely in the United States.",
+                "start": 2789,
+                "end": 2888
+              }
+            ]
+          },
+          {
+            "id": "emp-full-time",
+            "type": "employment_type",
+            "status": "required",
+            "value": "full-time",
+            "evidence": [
+              {
+                "quote": "full-time role",
+                "start": 2799,
+                "end": 2813
+              }
+            ]
+          }
+        ],
+        "alternativeGroups": [
+          {
+            "id": "g-experience-role",
+            "operator": "any_of"
+          },
+          {
+            "id": "g-judgment",
+            "operator": "any_of"
+          },
+          {
+            "id": "g-sme",
+            "operator": "any_of"
+          }
+        ]
+      }
+    }
+  ]
+}

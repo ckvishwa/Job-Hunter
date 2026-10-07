@@ -1,0 +1,90 @@
+import { randomBytes } from "node:crypto";
+import type { JobPosting } from "../adapters/types.js";
+import { computeJdContentHash } from "../domain/canonical-job.js";
+import {
+  STRUCTURED_PARSER_VERSION,
+  buildSemanticFailure,
+  validateStructuredProposal,
+  type SemanticIssue,
+  type SemanticParseFailure,
+  type StructuredJob,
+  type TrustedParseContext,
+} from "../domain/structured-job.js";
+import { appendJsonlRecords } from "../storage/jsonl-store.js";
+import { upsertStructuredJob } from "../storage/structured-store.js";
+import type { JobSemanticProvider } from "./provider.js";
+
+// Production boundary for Slice 2:
+//   saved canonical JD -> provider proposal -> runtime schema -> source-evidence validation
+//   -> accepted StructuredJob (durably stored) | SEMANTIC_PARSE_FAILED.
+// Every proposal, from any provider, goes through validateStructuredProposal. A rejected
+// proposal is rejected as a whole: nothing partial is stored or returned as accepted.
+
+export interface ParseOptions {
+  /** Where accepted results are stored (locked, atomic). Omit to validate without persisting. */
+  structuredPath?: string;
+  /** Append-only SEMANTIC_PARSE_FAILED log. Omit to skip logging. */
+  failuresPath?: string;
+  runId?: string;
+  now?: string;
+}
+
+export type ParseResult =
+  | { ok: true; structured: StructuredJob; persisted: boolean }
+  | { ok: false; failure: SemanticParseFailure };
+
+function newRunId(): string {
+  return `parse-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`;
+}
+
+export async function parseCanonicalJob(job: JobPosting, provider: JobSemanticProvider, options: ParseOptions = {}): Promise<ParseResult> {
+  const runId = options.runId ?? newRunId();
+  const now = options.now ?? new Date().toISOString();
+  const trusted: TrustedParseContext = {
+    jobId: job.id,
+    jdHash: job.jdContentHash ?? "",
+    parserVersion: STRUCTURED_PARSER_VERSION,
+    providerRevision: provider.revision,
+    now,
+  };
+
+  const fail = (code: SemanticParseFailure["code"], issues: SemanticIssue[], retryable?: boolean): ParseResult => {
+    const failure = buildSemanticFailure({ code, issues, runId, trusted, retryable, at: now });
+    if (options.failuresPath) appendJsonlRecords(options.failuresPath, [failure]);
+    return { ok: false, failure };
+  };
+
+  // Only a resolved canonical job with an intact hash is parseable.
+  if (job.resolutionStatus !== "resolved" || !job.jdContentHash || computeJdContentHash(job.descriptionText) !== job.jdContentHash) {
+    return fail("STALE_SOURCE", [
+      { code: "STALE_SOURCE", path: "(job)", message: "job is not a resolved canonical job whose stored JD matches its recorded hash" },
+    ]);
+  }
+
+  let output: unknown;
+  try {
+    output = await provider.extractJob({ rawJd: job.descriptionText, jdHash: job.jdContentHash });
+  } catch (err) {
+    // Class name only: an error message could echo provider or JD content.
+    const name = err instanceof Error ? err.name : "UnknownError";
+    const retryable = name !== "FixtureNotFoundError" && name !== "FixtureInputMismatchError";
+    return fail("PROVIDER_FAILED", [{ code: "PROVIDER_FAILED", path: "(provider)", message: `provider threw ${name}` }], retryable);
+  }
+
+  if (typeof output === "string") {
+    try {
+      output = JSON.parse(output);
+    } catch {
+      return fail("MALFORMED_JSON", [{ code: "MALFORMED_JSON", path: "(provider output)", message: "provider output is not valid JSON" }]);
+    }
+  }
+
+  const outcome = validateStructuredProposal(job.descriptionText, trusted, output);
+  if (!outcome.ok) return fail(outcome.code, outcome.issues);
+
+  // Persist before reporting success. A storage failure throws (JobStoreError) and is NOT a parse failure.
+  if (options.structuredPath) {
+    await upsertStructuredJob(options.structuredPath, outcome.job);
+  }
+  return { ok: true, structured: outcome.job, persisted: options.structuredPath !== undefined };
+}

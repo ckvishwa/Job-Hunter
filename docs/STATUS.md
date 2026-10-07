@@ -9,8 +9,8 @@ Last updated: 2026-10-07. Branch `careerops-integration` (worktree `.claude/work
 | 0 | Read-only audit | Done (in conversation; no document) |
 | 1 | Real headed discovery proof | **Done for one target (Figma / Greenhouse).** Evidence: `docs/evidence/v1-slice1-discovery-proof.md` |
 | 1.1 | Protect authoritative job persistence | **Done.** See section below |
-| 2 | Structured JD contract + provider validation | Not started — see `docs/NEXT_TASKS.md` |
-| 3-6 | Candidate facts, ResumePlan, ATS form path, readiness | Not started |
+| 2 | Structured JD contract + provider validation | **Contract, validator, fixture-provider wiring done; autonomous parser gate PENDING.** Evidence: `docs/evidence/v1-slice2-structured-jd.md` |
+| 3-6 | Candidate facts, ResumePlan, ATS form path, readiness | Not started (Slice 3 next, see `docs/NEXT_TASKS.md`) |
 
 V2-V5 are untouched.
 
@@ -34,6 +34,9 @@ Rejections become typed failures in `<data-dir>/job-failures.jsonl` (`POSTING_UN
 | After Slice 1.1 | `npx vitest run` | 62 files, **610 passed**, 0 failed (22 new: 18 `job-store`, 4 orchestrator store-failure tests; 1 old test rewritten) |
 | After Slice 1.1 | `npx tsc --noEmit` | clean |
 | Slice 1.1 live re-run | `discover ... --reset-checkpoint` on `data/slice1-proof` | 0 unresolved, 2 duplicates merged, 2 records, 0 owned Chrome processes after |
+| After Slice 2 | `npx vitest run` | 64 files, **704 passed**, 0 failed (94 new: 69 `structured-job`, 25 `parse-job`) |
+| After Slice 2 | `npx tsc --noEmit` | clean |
+| Slice 2 demonstration | `npm run parse-jd ...` on the saved Figma JD | ACCEPTED, MANUAL_ANNOTATION / FIXTURE_PROVIDER only |
 | Live success + dedupe + failure | see evidence file | pass (Figma / Greenhouse only) |
 
 Intentional change to an existing test: `tests/discovery/orchestrator.test.ts` "is deterministic and idempotent" used to assert `jobsWritten > 0` for a fixture whose only product was an unverifiable placeholder (`Acme @ example.invalid`). That placeholder is now correctly rejected, so the test resolves a verified Greenhouse-shaped posting through the real resolver; its idempotency assertions are unchanged, and a new test pins that the placeholder becomes a typed failure instead. No assertion was weakened.
@@ -58,6 +61,16 @@ Decision note: existing implementation = none (no lock anywhere; `launcher.ts` l
 
 Intentional change to an existing test: `tests/storage/jsonl-store.test.ts` "skips malformed lines instead of crashing" asserted the bug; it now asserts `CORRUPT_RECORD`.
 
+## Slice 2 — structured JD contracts (2026-10-07)
+
+`src/domain/structured-job.ts` defines `StructuredJob` and the production validator; `src/semantic/` holds the provider interface, the stored-output fixture provider and `parseCanonicalJob`; accepted results go to `<data-dir>/structured-jobs.jsonl` (same lock/atomic/strict-read protections as `jobs.jsonl`), rejections to `<data-dir>/structured-failures.jsonl` as `SEMANTIC_PARSE_FAILED`.
+
+Entry point: `npm run parse-jd -- --data-dir <dir> --job <job id | atsIdentity> --fixtures <fixture.json>` (reads `jobs.jsonl`, never writes it).
+
+Achieved: strict proposal schema with trusted binding of job id, JD hash, parser version and provider revision; exact UTF-16 evidence validation (no normalization, surrogate-safe); OR groups and mixed AND/OR; required/preferred; role-years vs tool-years; unknown (never false) clearance/sponsorship/citizenship/work authorization; whole-proposal rejection with no partial result and no downstream mutation; safe diagnostics.
+
+NOT achieved (pending gate): any autonomous parser. No model, prompt, labelled set, held-out benchmark or live inference exists. The only real-document result is a hand annotation passed through the fixture provider (`MANUAL_ANNOTATION` / `FIXTURE_PROVIDER`); it proves the contract works on a real saved document, not extraction accuracy. Details and limits: `docs/evidence/v1-slice2-structured-jd.md`.
+
 ## Known gaps and risks
 
 - Only one live target. Lever, company-hosted `gh_jid` pages, Workday and the browser-DOM extraction path are fixture-tested only.
@@ -67,4 +80,7 @@ Intentional change to an existing test: `tests/storage/jsonl-store.test.ts` "ski
 - `data/checkpoints.json` is still written without a lock.
 - `docs/ard/00-SHARED-CONTRACTS.md` is referenced by the ARD pack but absent in both `docs/ard` folders. Failure category names were taken from the V1 ARD.
 - `docs/ard/` exists only in the parent checkout (untracked there); it is not copied into this branch.
+- `StructuredJob.jdHash` is bound from `JobPosting.jdContentHash` (naming differs from `docs/ard/00-SHARED-CONTRACTS.md`, which uses `jdHash` for the canonical job). Reconcile when the canonical schema is next versioned.
+- The structured schema has no slot for conditional preferences ("if the latter, some security experience is preferred") or nested boolean expressions; add behind a schema version when a consumer needs them.
+- `docs/ard/00-SHARED-CONTRACTS.md` was present in the parent checkout at Slice 2 time; earlier notes saying it was absent are superseded.
 - Dedupe tiers 3-4 (company+title+location, description fingerprint) still join postings that have no `atsIdentity`; they cannot override a conflicting identity.

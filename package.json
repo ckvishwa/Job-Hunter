@@ -11,6 +11,7 @@
     "test": "vitest run",
     "collect": "tsx src/runner/cli.ts",
     "discover": "tsx src/discovery/cli.ts",
+    "parse-jd": "tsx src/semantic/cli.ts",
     "hunt": "tsx src/hunt/cli.ts",
     "audit:fortune500": "tsx src/config/fortune500-audit-cli.ts"
   },

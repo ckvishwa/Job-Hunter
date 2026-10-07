@@ -78,6 +78,15 @@ function isJobRecord(value: unknown): value is JobPosting {
  * unparseable line is a CORRUPT_RECORD. Nothing is dropped silently and nothing is rewritten.
  */
 export function loadJobs(filePath: string): JobPosting[] {
+  return loadRecords(filePath, isJobRecord);
+}
+
+/**
+ * Generic strict JSONL read (same corruption rules as loadJobs). `isRecord` decides what counts
+ * as a valid record; anything else is CORRUPT_RECORD. Used for other versioned artifacts that
+ * need the same protection (e.g. structured JD results).
+ */
+export function loadRecords<T>(filePath: string, isRecord: (value: unknown) => value is T): T[] {
   if (!existsSync(filePath)) return [];
   let raw: string;
   try {
@@ -88,7 +97,7 @@ export function loadJobs(filePath: string): JobPosting[] {
 
   const lines = raw.split("\n");
   const endsWithNewline = raw.endsWith("\n");
-  const jobs: JobPosting[] = [];
+  const jobs: T[] = [];
   const bad: number[] = [];
   let badTrailingBytes: number | null = null;
 
@@ -98,7 +107,7 @@ export function loadJobs(filePath: string): JobPosting[] {
     let ok = false;
     try {
       const parsed: unknown = JSON.parse(trimmed);
-      if (isJobRecord(parsed)) {
+      if (isRecord(parsed)) {
         jobs.push(parsed);
         ok = true;
       }
@@ -168,9 +177,14 @@ function renameWithRetry(from: string, to: string): void {
   }
 }
 
-function replaceStore(filePath: string, jobs: JobPosting[], hooks?: JobStoreHooks): void {
+function replaceStore<T>(
+  filePath: string,
+  jobs: T[],
+  isRecord: (value: unknown) => value is T,
+  hooks?: JobStoreHooks,
+): void {
   // Never replace a store we cannot fully read: that is how corrupt records used to vanish.
-  loadJobs(filePath);
+  loadRecords(filePath, isRecord);
 
   mkdirSync(dirname(filePath), { recursive: true });
   const tmpPath = `${filePath}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
@@ -195,7 +209,7 @@ function replaceStore(filePath: string, jobs: JobPosting[], hooks?: JobStoreHook
  * must use updateJobs().
  */
 export function saveJobs(filePath: string, jobs: JobPosting[], hooks?: JobStoreHooks): void {
-  replaceStore(filePath, jobs, hooks);
+  replaceStore(filePath, jobs, isJobRecord, hooks);
 }
 
 // ---------------------------------------------------------------------------
@@ -372,21 +386,22 @@ export async function acquireLock(filePath: string, options: LockOptions = {}): 
 }
 
 /**
- * The only supported way to change the store from existing contents: lock, strict-read the
+ * The only supported way to change a store from its existing contents: lock, strict-read the
  * CURRENT file, apply `update`, write atomically, release (also on exceptions). A failed
  * update leaves the store unchanged and the error propagates to the caller.
  */
-export async function updateJobs(
+export async function updateRecords<T>(
   filePath: string,
-  update: (current: JobPosting[]) => JobPosting[],
+  isRecord: (value: unknown) => value is T,
+  update: (current: T[]) => T[],
   options: LockOptions & JobStoreHooks = {},
-): Promise<JobPosting[]> {
+): Promise<T[]> {
   const lock = await acquireLock(filePath, options);
-  let result: JobPosting[];
+  let result: T[];
   try {
-    const current = loadJobs(filePath);
+    const current = loadRecords(filePath, isRecord);
     result = update(current);
-    replaceStore(filePath, result, options);
+    replaceStore(filePath, result, isRecord, options);
   } catch (err) {
     try {
       lock.release();
@@ -397,4 +412,12 @@ export async function updateJobs(
   }
   lock.release();
   return result;
+}
+
+export function updateJobs(
+  filePath: string,
+  update: (current: JobPosting[]) => JobPosting[],
+  options: LockOptions & JobStoreHooks = {},
+): Promise<JobPosting[]> {
+  return updateRecords(filePath, isJobRecord, update, options);
 }
