@@ -24,7 +24,7 @@ export type ExtractionMethod = SourceObservation["extractionMethod"];
 // Typed failures
 // ---------------------------------------------------------------------------
 
-export type JobFailureCategory = "POSTING_UNRESOLVED" | "JD_EXTRACTION_FAILED";
+export type JobFailureCategory = "POSTING_UNRESOLVED" | "JD_EXTRACTION_FAILED" | "DISCOVERY_FAILED";
 
 export type JobFailureCode =
   // POSTING_UNRESOLVED
@@ -38,6 +38,10 @@ export type JobFailureCode =
   | "RESOLUTION_TIMEOUT"
   | "RESOLUTION_ERROR"
   | "UNSTAMPED_POSTING"
+  // DISCOVERY_FAILED (visible-browser search flow)
+  | "SEARCH_CONTROL_NOT_FOUND"
+  | "SEARCH_NO_RESPONSE"
+  | "NAVIGATION_FAILED"
   // JD_EXTRACTION_FAILED
   | "EMPTY_DESCRIPTION"
   | "PLACEHOLDER_DESCRIPTION"
@@ -55,6 +59,9 @@ const CATEGORY_BY_CODE: Record<JobFailureCode, JobFailureCategory> = {
   RESOLUTION_TIMEOUT: "POSTING_UNRESOLVED",
   RESOLUTION_ERROR: "POSTING_UNRESOLVED",
   UNSTAMPED_POSTING: "POSTING_UNRESOLVED",
+  SEARCH_CONTROL_NOT_FOUND: "DISCOVERY_FAILED",
+  SEARCH_NO_RESPONSE: "DISCOVERY_FAILED",
+  NAVIGATION_FAILED: "DISCOVERY_FAILED",
   EMPTY_DESCRIPTION: "JD_EXTRACTION_FAILED",
   PLACEHOLDER_DESCRIPTION: "JD_EXTRACTION_FAILED",
   DESCRIPTION_TOO_SHORT: "JD_EXTRACTION_FAILED",
@@ -63,7 +70,13 @@ const CATEGORY_BY_CODE: Record<JobFailureCode, JobFailureCategory> = {
 
 // Only failures that depend on transient conditions are worth retrying later; a wrong
 // employer or an empty page is a verdict about that URL, not about this attempt.
-const RETRYABLE_CODES = new Set<JobFailureCode>(["RESOLUTION_TIMEOUT", "RESOLUTION_ERROR", "DESCRIPTION_TOO_SHORT"]);
+const RETRYABLE_CODES = new Set<JobFailureCode>([
+  "RESOLUTION_TIMEOUT",
+  "RESOLUTION_ERROR",
+  "DESCRIPTION_TOO_SHORT",
+  "SEARCH_NO_RESPONSE",
+  "NAVIGATION_FAILED",
+]);
 
 export interface ResolutionFailure {
   code: JobFailureCode;
@@ -74,7 +87,7 @@ export interface JobFailure {
   schemaVersion: number;
   category: JobFailureCategory;
   code: JobFailureCode;
-  stage: "resolution" | "persistence";
+  stage: "resolution" | "persistence" | "search";
   runId: string;
   targetUrl: string;
   company: string;
@@ -210,6 +223,18 @@ export function extractGreenhouseJidParam(url: string): string | null {
   return jid && /^\d+$/.test(jid) ? jid : null;
 }
 
+/**
+ * Job id carried as the last path segment of a company-hosted listing URL
+ * (e.g. https://stripe.com/careers/listing/some-role/8172503). Only used for employers whose
+ * registry ATS is Greenhouse; the 6+ digit floor keeps years and page numbers from passing as ids.
+ */
+export function extractTrailingNumericId(url: string): string | null {
+  const parsed = parseHttpUrl(url);
+  if (!parsed) return null;
+  const last = parsed.pathname.split("/").filter(Boolean).at(-1) ?? "";
+  return /^\d{6,}$/.test(last) ? last : null;
+}
+
 function normalizeName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -280,7 +305,7 @@ export function verifyOfficialPosting(input: {
     hostKind = "company-domain";
     if (entry.atsType === "greenhouse" && entry.atsTenantOrBoardId) {
       board = entry.atsTenantOrBoardId;
-      jobId = extractGreenhouseJidParam(input.finalUrl);
+      jobId = extractGreenhouseJidParam(input.finalUrl) ?? extractTrailingNumericId(input.finalUrl);
     }
   } else if (entry.atsType === "workday" && entry.atsWorkdayHostname && host === entry.atsWorkdayHostname.toLowerCase()) {
     hostKind = "ats-board";

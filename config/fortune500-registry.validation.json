@@ -11,23 +11,28 @@
     "enabled": true,
     "verificationStatus": "verified",
     "verificationNote": null,
-    "sourceProvenance": ["job-hunter-manual-verification-2026-07-27"],
+    "sourceProvenance": [
+      "job-hunter-manual-verification-2026-07-27"
+    ],
     "lastVerifiedAt": "2026-07-27"
   },
   {
     "company": "Stripe",
     "fortuneRank": null,
     "corporateDomain": "stripe.com",
-    "careersUrl": "https://stripe.com/jobs",
+    "careersUrl": "https://stripe.com/careers/search",
     "atsType": "greenhouse",
     "atsTenantOrBoardId": "stripe",
     "atsWorkdaySite": null,
     "atsWorkdayHostname": null,
     "enabled": true,
-    "verificationStatus": "unreachable",
-    "verificationNote": "Careers page scrape was blocked on prior verification attempt",
-    "sourceProvenance": ["job-hunter-manual-verification-2026-07-27"],
-    "lastVerifiedAt": "2026-07-27"
+    "verificationStatus": "verified",
+    "verificationNote": "Live check 2026-10-07: https://stripe.com/jobs/search redirects to https://stripe.com/careers/search, which has a visible \"Search for a role\" field; job listings link to stripe.com/careers/listing/<slug>/<greenhouse job id>; Greenhouse board \"stripe\" lists the same ids with absolute_url on stripe.com (gh_jid).",
+    "sourceProvenance": [
+      "job-hunter-manual-verification-2026-07-27",
+      "job-hunter-live-check-2026-10-07"
+    ],
+    "lastVerifiedAt": "2026-10-07"
   },
   {
     "company": "Figma",
@@ -41,7 +46,9 @@
     "enabled": true,
     "verificationStatus": "verified",
     "verificationNote": null,
-    "sourceProvenance": ["job-hunter-manual-verification-2026-07-27"],
+    "sourceProvenance": [
+      "job-hunter-manual-verification-2026-07-27"
+    ],
     "lastVerifiedAt": "2026-07-27"
   }
 ]

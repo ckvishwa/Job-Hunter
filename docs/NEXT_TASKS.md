@@ -1,5 +1,12 @@
 # Next tasks
 
+## Search demo follow-ups (not blocking Slice 3)
+
+- Run the search flow on a second, different careers site (a native Greenhouse board such as `job-boards.greenhouse.io/<board>` needs Enter to apply `?keyword=`; Lever boards differ again) and record which default selectors hold.
+- Strip page chrome from the extracted JD (breadcrumb, fact panel, Apply label) once a second site shows what is reusable.
+- Feed `job-search-inputs.json` entries from the registry for several companies in one run, with a per-run job cap and the existing bounded-retry policy.
+- A relevance gate before opening results (use `config/roles.yml` evaluation on the result titles) so the demo opens the most relevant listing, not just the first.
+
 ## V1 Slice 3 — approved candidate facts and deterministic decision (next, one bounded task)
 
 Goal: prove `StructuredJob` + approved candidate facts -> explained `ELIGIBLE | REJECT | REVIEW` with no guessed sensitive answers. Offline, deterministic, no model. Uses a SYNTHETIC candidate only; the real candidate's facts must be supplied and approved by the user in a later step. Nothing is inferred from a resume, a name or history.

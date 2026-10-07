@@ -9,6 +9,7 @@ Last updated: 2026-10-07. Branch `careerops-integration` (worktree `.claude/work
 | 0 | Read-only audit | Done (in conversation; no document) |
 | 1 | Real headed discovery proof | **Done for one target (Figma / Greenhouse).** Evidence: `docs/evidence/v1-slice1-discovery-proof.md` |
 | 1.1 | Protect authoritative job persistence | **Done.** See section below |
+| search demo | Visible-browser search discovery (Stripe) | **Done**, live-verified. Evidence: `docs/evidence/search-demo-stripe.md` |
 | 2 | Structured JD contract + provider validation | **Contract, validator, fixture-provider wiring done; autonomous parser gate PENDING.** Evidence: `docs/evidence/v1-slice2-structured-jd.md` |
 | 3-6 | Candidate facts, ResumePlan, ATS form path, readiness | Not started (Slice 3 next, see `docs/NEXT_TASKS.md`) |
 
@@ -36,6 +37,8 @@ Rejections become typed failures in `<data-dir>/job-failures.jsonl` (`POSTING_UN
 | Slice 1.1 live re-run | `discover ... --reset-checkpoint` on `data/slice1-proof` | 0 unresolved, 2 duplicates merged, 2 records, 0 owned Chrome processes after |
 | After Slice 2 | `npx vitest run` | 64 files, **704 passed**, 0 failed (94 new: 69 `structured-job`, 25 `parse-job`) |
 | After Slice 2 | `npx tsc --noEmit` | clean |
+| After search demo | `npx vitest run` | 66 files, **733 passed**, 0 failed (+29: 11 browser E2E, 18 search-input/CLI) |
+| After search demo | `npx tsc --noEmit` | clean |
 | Slice 2 demonstration | `npm run parse-jd ...` on the saved Figma JD | ACCEPTED, MANUAL_ANNOTATION / FIXTURE_PROVIDER only |
 | Live success + dedupe + failure | see evidence file | pass (Figma / Greenhouse only) |
 
@@ -60,6 +63,12 @@ Guarantees on the supported environment (Windows 11 / NTFS, local disk): all-or-
 Decision note: existing implementation = none (no lock anywhere; `launcher.ts` lock handling is Chrome-specific). Alternatives: (a) `proper-lockfile` (new dependency, mkdir + mtime heartbeat; staleness by time can steal a slow live writer's lock); (b) SQLite (out of scope, large migration); (c) chosen: ~100 lines, zero dependencies, exclusive-create with owner token and pid-liveness staleness (never time-only). Tradeoff: own code to maintain and no heartbeat, so a live-but-hung writer blocks others until the 10 s timeout fails loudly. Reversal: callers revert to `loadJobs` + `saveJobs`, which still refuse corrupt stores.
 
 Intentional change to an existing test: `tests/storage/jsonl-store.test.ts` "skips malformed lines instead of crashing" asserted the bug; it now asserts `CORRUPT_RECORD`.
+
+## Headed-browser search demo (2026-10-07)
+
+`npm run search -- --input config/job-search-inputs.example.json --data-dir data/search-demo --evidence-dir data/search-demo/evidence` opens a visible Chrome on Stripe's official careers search, types each query key by key into the real search field, runs the search through the page's own control, waits for the result list to change (or the page's own empty state), opens a real result and saves the posting extracted from the rendered DOM (`extractionMethod: "browser-dom"`) through the canonical gate and the protected `updateJobs` store. Core: `src/discovery/browser-search.ts` (`runSearchDiscovery`); CLI `src/discovery/search-cli.ts`; input schema `src/config/search-input.ts` (company, https careers URL, queries, maxJobs, optional observed selectors; the careers host must belong to the registry employer or its board). Typed failures (`DISCOVERY_FAILED`: `SEARCH_CONTROL_NOT_FOUND`, `SEARCH_NO_RESPONSE`, `NAVIGATION_FAILED`; plus the existing JD failures) go to `<data-dir>/job-failures.jsonl`.
+
+Verification: 11 offline browser E2E tests (`tests/e2e/offline/browser-search.e2e.test.ts`: real headed Chrome through the production launcher, loopback fixture site, non-loopback requests aborted and counted), 18 unit tests (`tests/config/search-input.test.ts`), full suite 66 files / 733 passed, `tsc` clean. Live run and repeat on Stripe: see the evidence file. Not exercised live: verification pauses, other sites.
 
 ## Slice 2 — structured JD contracts (2026-10-07)
 

@@ -15,3 +15,4 @@ output/*.json
 
 # V1 Slice 1 live-proof outputs (private to this machine; evidence summary lives in docs/evidence)
 data/slice1-*/
+data/search-demo/
