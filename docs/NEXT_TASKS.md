@@ -3,9 +3,10 @@
 ## Search demo follow-ups (not blocking Slice 3)
 
 - Run the search flow on a second, different careers site (a native Greenhouse board such as `job-boards.greenhouse.io/<board>` needs Enter to apply `?keyword=`; Lever boards differ again) and record which default selectors hold.
-- Strip page chrome from the extracted JD (breadcrumb, fact panel, Apply label) once a second site shows what is reusable.
+- Page-chrome removal is done for Stripe (default selectors + per-target `descriptionRemove`); confirm the defaults on a second site.
 - Feed `job-search-inputs.json` entries from the registry for several companies in one run, with a per-run job cap and the existing bounded-retry policy.
-- A relevance gate before opening results (use `config/roles.yml` evaluation on the result titles) so the demo opens the most relevant listing, not just the first.
+- Title targeting is done (MATCH/REVIEW/NO_MATCH). Open question for the user, not decided here: whether entry-level / new-grad titles should be excluded; the repository has no seniority rule and none was added.
+- Resolve REVIEW entries: decide whether to open them (`selection.openReview`) or add explicit roles to `config/roles.yml`.
 
 ## V1 Slice 3 — approved candidate facts and deterministic decision (next, one bounded task)
 

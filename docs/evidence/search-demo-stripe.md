@@ -1,5 +1,7 @@
 # Headed-browser search demo — Stripe
 
+> Iteration 2 (title-targeted shortlist, cleaned descriptions, tightened identity rule) is in `docs/evidence/search-shortlist-stripe.md`. Where this file says the first result is opened, page chrome is kept in the saved text, or a trailing numeric URL segment yields an identity, that describes the first iteration and is superseded.
+
 Date: 2026-10-07. Branch `careerops-integration`. Gate: official careers page -> real visible search field -> visible typing -> search through the page's controls -> results -> open a real result -> DOM extraction -> canonical validation -> protected save -> clean Chrome exit.
 
 ## Replay
@@ -60,5 +62,5 @@ An independent headless Playwright load of the saved URL, comparing `main.innerT
 
 - One site, one ATS family (Greenhouse-backed). The default result-link and empty-state selectors are generic guesses; Stripe needs the explicit selectors in the example input.
 - Verification (CAPTCHA) was not triggered, so the pause path was not exercised live; it uses the existing `pauseForVerification`, which waits on stdin without a timeout.
-- The first result is taken as-is; no ranking or relevance gate decides which result to open.
+- (Superseded by iteration 2) The first result was taken as-is; no relevance gate decided which result to open.
 - Search relevance of the site is its own: "ARG Engineering Manager" is what Stripe returned first for "security engineer".

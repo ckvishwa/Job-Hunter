@@ -223,18 +223,6 @@ export function extractGreenhouseJidParam(url: string): string | null {
   return jid && /^\d+$/.test(jid) ? jid : null;
 }
 
-/**
- * Job id carried as the last path segment of a company-hosted listing URL
- * (e.g. https://stripe.com/careers/listing/some-role/8172503). Only used for employers whose
- * registry ATS is Greenhouse; the 6+ digit floor keeps years and page numbers from passing as ids.
- */
-export function extractTrailingNumericId(url: string): string | null {
-  const parsed = parseHttpUrl(url);
-  if (!parsed) return null;
-  const last = parsed.pathname.split("/").filter(Boolean).at(-1) ?? "";
-  return /^\d{6,}$/.test(last) ? last : null;
-}
-
 function normalizeName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -264,6 +252,12 @@ export function verifyOfficialPosting(input: {
   discoveredCompany: string;
   registryEntry: CompanyRegistryEntry | null;
   apiJobId?: string | null;
+  /**
+   * A Greenhouse job id that the CALLER has confirmed against the employer's registered board (the id
+   * exists there and its listing URL belongs to the employer). Only then may a company-hosted URL that
+   * has no `gh_jid` parameter receive an ATS identity. A bare number in a URL never does.
+   */
+  confirmedGreenhouseJobId?: string | null;
 }): OfficialPostingVerdict {
   const fail = (code: JobFailureCode, detail: string): OfficialPostingVerdict => ({
     ok: false,
@@ -305,7 +299,7 @@ export function verifyOfficialPosting(input: {
     hostKind = "company-domain";
     if (entry.atsType === "greenhouse" && entry.atsTenantOrBoardId) {
       board = entry.atsTenantOrBoardId;
-      jobId = extractGreenhouseJidParam(input.finalUrl) ?? extractTrailingNumericId(input.finalUrl);
+      jobId = extractGreenhouseJidParam(input.finalUrl) ?? input.confirmedGreenhouseJobId ?? null;
     }
   } else if (entry.atsType === "workday" && entry.atsWorkdayHostname && host === entry.atsWorkdayHostname.toLowerCase()) {
     hostKind = "ats-board";
@@ -346,6 +340,7 @@ export function stampResolution(
     discoveredCompany: string;
     registryEntry: CompanyRegistryEntry | null;
     apiJobId?: string | null;
+    confirmedGreenhouseJobId?: string | null;
     now: string;
   },
 ): JobPosting {
@@ -354,6 +349,7 @@ export function stampResolution(
     discoveredCompany: input.discoveredCompany,
     registryEntry: input.registryEntry,
     apiJobId: input.apiJobId,
+    confirmedGreenhouseJobId: input.confirmedGreenhouseJobId,
   });
   const failure = verdict.ok ? assessJobDescription(posting.descriptionText) : verdict.failure!;
 

@@ -6,7 +6,7 @@ import { ConfigValidationError } from "../../src/config/loader.js";
 import { loadSearchInput, resolveSearchTarget, searchInputFileSchema, searchTargetSchema } from "../../src/config/search-input.js";
 import { companyRegistrySchema } from "../../src/config/schema.js";
 import { parseSearchArgs } from "../../src/discovery/search-cli.js";
-import { extractTrailingNumericId, verifyOfficialPosting } from "../../src/domain/canonical-job.js";
+import { verifyOfficialPosting } from "../../src/domain/canonical-job.js";
 
 const base = { company: "Stripe", careersUrl: "https://stripe.com/careers/search", queries: ["SDET"], maxJobs: 1, registry: "config/fortune500-registry.validation.json" };
 
@@ -64,25 +64,57 @@ describe("resolveSearchTarget ties the careers URL to the registry employer befo
   });
 });
 
-describe("company-hosted listing ids", () => {
+describe("company-hosted listings: a bare number in a URL is never an ATS identity", () => {
   const entry = companyRegistrySchema.parse([
     { company: "Acme", fortuneRank: null, corporateDomain: "acme-corp.com", careersUrl: "https://acme-corp.com/careers", atsType: "greenhouse", atsTenantOrBoardId: "acme", atsWorkdaySite: null, atsWorkdayHostname: null, enabled: true, verificationStatus: "verified", verificationNote: null, sourceProvenance: ["t"], lastVerifiedAt: "2026-10-07" },
   ])[0]!;
+  const verify = (finalUrl: string, extra: Record<string, unknown> = {}, registryEntry = entry) =>
+    verifyOfficialPosting({ finalUrl, discoveredCompany: "Acme", registryEntry, ...extra });
 
-  it("extracts only a 6+ digit trailing path segment", () => {
-    expect(extractTrailingNumericId("https://acme-corp.com/careers/listing/some-role/8172503")).toBe("8172503");
-    expect(extractTrailingNumericId("https://acme-corp.com/careers/2024")).toBeNull();
-    expect(extractTrailingNumericId("https://acme-corp.com/careers/listing/some-role/8172503/apply")).toBeNull();
-    expect(extractTrailingNumericId("not a url")).toBeNull();
+  it("gives no identity to a numeric URL suffix on its own", () => {
+    for (const url of ["https://acme-corp.com/careers/listing/some-role/8172503", "https://acme-corp.com/blog/post/8172503", "https://acme-corp.com/careers/2024001"]) {
+      const v = verify(url);
+      expect(v.ok).toBe(false);
+      expect(v.atsIdentity).toBeNull();
+      expect(v.failure?.code).toBe("JOB_ID_MISSING");
+    }
   });
 
-  it("derives a stable ATS identity from a company-hosted listing URL, and rejects look-alike hosts", () => {
-    const ok = verifyOfficialPosting({ finalUrl: "https://acme-corp.com/careers/listing/some-role/8172503", discoveredCompany: "Acme", registryEntry: entry });
-    expect(ok).toMatchObject({ ok: true, atsIdentity: "greenhouse:acme:8172503", hostKind: "company-domain" });
-    const bad = verifyOfficialPosting({ finalUrl: "https://acme-corp.com.evil.example/careers/listing/some-role/8172503", discoveredCompany: "Acme", registryEntry: entry });
+  it("accepts the identity only when the caller supplies an id it confirmed on the registered board", () => {
+    expect(verify("https://acme-corp.com/careers/listing/some-role/8172503", { confirmedGreenhouseJobId: "8172503" })).toMatchObject({ ok: true, atsIdentity: "greenhouse:acme:8172503", hostKind: "company-domain" });
+  });
+
+  it("still accepts gh_jid on a company page without any confirmation", () => {
+    expect(verify("https://acme-corp.com/jobs/search?gh_jid=8172503")).toMatchObject({ ok: true, atsIdentity: "greenhouse:acme:8172503" });
+  });
+
+  it("a confirmed id never invents an identity for a non-Greenhouse employer or a look-alike host", () => {
+    const lever = { ...entry, atsType: "lever" as const };
+    expect(verify("https://acme-corp.com/careers/listing/some-role/8172503", { confirmedGreenhouseJobId: "8172503" }, lever).atsIdentity).toBeNull();
+    const bad = verify("https://acme-corp.com.evil.example/careers/listing/some-role/8172503", { confirmedGreenhouseJobId: "8172503" });
     expect(bad.failure?.code).toBe("UNOFFICIAL_HOST");
-    const noId = verifyOfficialPosting({ finalUrl: "https://acme-corp.com/careers/search", discoveredCompany: "Acme", registryEntry: entry });
-    expect(noId.failure?.code).toBe("JOB_ID_MISSING");
+    expect(bad.atsIdentity).toBeNull();
+  });
+});
+
+describe("listingIdPattern and selection settings", () => {
+  it("requires a valid regular expression with exactly one capture group", () => {
+    const withPattern = (listingIdPattern: string) => searchTargetSchema.safeParse({ ...base, selectors: { listingIdPattern } }).success;
+    expect(withPattern("^/careers/listing/[^/]+/(\\d{6,})/?$")).toBe(true);
+    expect(withPattern("^/careers/listing/[^/]+/\\d{6,}$")).toBe(false); // no group
+    expect(withPattern("^/(a)/(b)$")).toBe(false); // two groups
+    expect(withPattern("([unclosed")).toBe(false); // invalid regex
+  });
+
+  it("defaults to not opening REVIEW results and to team-based review", () => {
+    expect(searchTargetSchema.parse(base).selection).toEqual({ openReview: false, reviewByTeam: true });
+    expect(searchTargetSchema.safeParse({ ...base, selection: { openReview: true, stealth: true } }).success).toBe(false);
+  });
+
+  it("the shipped example declares its URL shape explicitly", () => {
+    const t = loadSearchInput(path.resolve("config/job-search-inputs.example.json")).searches[0]!;
+    expect(new RegExp(t.selectors.listingIdPattern!).exec("/careers/listing/arg-engineering-manager/8113337")?.[1]).toBe("8113337");
+    expect(new RegExp(t.selectors.listingIdPattern!).exec("/careers/2024001")).toBeNull();
   });
 });
 

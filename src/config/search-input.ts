@@ -33,6 +33,29 @@ const selectorsSchema = z
     emptyStateText: z.string().min(1).max(200).default("no (open )?(roles|jobs|results|positions) (match|found)|no matching"),
     // CSS selector of the container holding the rendered job description on a posting page.
     descriptionContainer: z.string().min(1).max(200).default("main, article, [role=main]"),
+    // Optional CSS selectors, relative to a result row (the closest li/tr/article), for the team label and
+    // the location tag shown in the results list. Without them, team/location are read from the row's text lines.
+    resultTeam: z.string().min(1).max(200).optional(),
+    resultLocation: z.string().min(1).max(200).optional(),
+    // Extra CSS selectors hidden before the description text is read (on top of the built-in page-chrome list).
+    descriptionRemove: z.array(z.string().min(1).max(200)).max(20).default([]),
+    // Regular expression, matched against the posting URL's PATH, with exactly one capture group: the Greenhouse
+    // job id of company-hosted listings that carry no gh_jid parameter (e.g. "^/careers/listing/[^/]+/(\d{6,})/?$").
+    // The id only becomes an ATS identity after it is confirmed on the employer's registered Greenhouse board.
+    // Absent: such URLs get no identity and are not saved.
+    listingIdPattern: z
+      .string()
+      .min(1)
+      .max(200)
+      .refine((source) => {
+        try {
+          // Appending an empty alternative guarantees a match, so exec() reports one slot per capture group.
+          return (new RegExp(`${source}|`).exec("")?.length ?? 0) === 2;
+        } catch {
+          return false;
+        }
+      }, "listingIdPattern must be a valid regular expression with exactly one capture group")
+      .optional(),
   })
   .strict()
   .default({});
@@ -45,6 +68,15 @@ export const searchTargetSchema = z
     maxJobs: z.number().int().min(1).max(25),
     // Registry file that holds this company's verified identity (corporate domain + ATS board).
     registry: z.string().min(1).default("config/fortune500-registry.json"),
+    // Which results may be opened. MATCH (title matches config/roles.yml) is always eligible; REVIEW (team label
+    // in a configured profile domain, title unmatched) is only opened when openReview is true. NO_MATCH never is.
+    selection: z
+      .object({
+        openReview: z.boolean().default(false),
+        reviewByTeam: z.boolean().default(true),
+      })
+      .strict()
+      .default({}),
     selectors: selectorsSchema,
   })
   .strict();

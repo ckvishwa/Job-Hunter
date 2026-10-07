@@ -48,19 +48,40 @@ export function printSearchSummary(summary: SearchRunSummary, log: (line: string
   log("\n=== Search discovery summary ===");
   log(`Company: ${summary.company}   Page: ${summary.careersUrl}`);
   for (const q of summary.queries) {
-    log(`Query "${q.query}": ${q.status}${q.status === "results" ? ` (${q.resultCount} result(s))` : ""}${q.typedValue !== null ? `   typed value in field: "${q.typedValue}"` : ""}`);
+    const counts = q.status === "results" ? ` (${q.resultCount} result(s): ${q.matchCount} MATCH, ${q.reviewCount} REVIEW, ${q.noMatchCount} NO_MATCH)` : "";
+    log(`Query "${q.query}": ${q.status}${counts}${q.typedValue !== null ? `   typed value in field: "${q.typedValue}"` : ""}`);
   }
+
+  log("\n--- Shortlist (title-based targeting against config/roles.yml; not candidate eligibility) ---");
+  const order = { MATCH: 0, REVIEW: 1, NO_MATCH: 2 } as const;
+  const sorted = [...summary.shortlist].sort((a, b) => order[a.classification] - order[b.classification]);
+  if (sorted.length === 0) log("(no results were returned for any query)");
+  for (const e of sorted) {
+    log(`[${e.classification}] ${e.title}`);
+    log(`    ${e.company} | ${e.location ?? "location not shown in the results list"}${e.team ? ` | team: ${e.team}` : ""}`);
+    log(`    ${e.url}`);
+    log(`    rule:   ${e.rule}`);
+    log(`    reason: ${e.reason}`);
+    log(`    opened: ${e.opened ? "yes" : "no"}   extracted: ${e.extracted ? "yes" : "no"}   saved: ${e.saved ? "yes" : "no"}   (${e.selection})${e.failureCode ? `   failure: ${e.failureCode}` : ""}`);
+  }
+
   for (const job of summary.jobs) {
-    log(`\n[${job.status.toUpperCase()}] ${job.title ?? "(no title)"}`);
+    log(`
+[${job.status.toUpperCase()}] ${job.title ?? "(no title)"}`);
     log(`  Employer: ${job.employer}${job.employerSeenOnPage ? " (name seen on the posting page)" : " (from registry; name not found in page text)"}`);
     log(`  Location: ${job.location ?? "(not shown on the page)"}`);
     log(`  URL:      ${job.url}`);
-    log(`  JD:       ${job.jdChars} characters from the rendered page (extractionMethod: ${job.extractionMethod})`);
+    log(`  JD:       ${job.jdChars} characters of cleaned rendered text (extractionMethod: ${job.extractionMethod}${job.jdHash ? `, sha256 ${job.jdHash.slice(0, 12)}...` : ""})`);
+    log(`  Sections: ${job.sections.length > 0 ? job.sections.join(" / ") : "(no section headings found)"}`);
     if (job.atsIdentity) log(`  Identity: ${job.atsIdentity}   job id ${job.jobId}`);
     if (job.failure) log(`  Rejected: ${job.failure.category}/${job.failure.code} - ${job.failure.detail}`);
   }
-  log(`\nOutcome: ${summary.outcome}   saved this run: ${summary.persistedCount}   failures: ${summary.failures.length}`);
+  const reviewLeft = summary.shortlist.filter((e) => e.classification === "REVIEW" && !e.opened).length;
+  log(`
+Outcome: ${summary.outcome}   saved this run: ${summary.persistedCount}   failures: ${summary.failures.length}   left for review: ${reviewLeft}`);
+  if (summary.outcome === "NO_MATCH") log("Results existed, but no result title matches a configured role, so nothing was opened or saved.");
   log(`Store: ${summary.jobsPath}`);
+  log(`Shortlist: ${summary.shortlistPath}`);
   if (summary.failures.length > 0) log(`Failure log: ${summary.failuresPath}`);
   log(`Browser closed: ${summary.browserClosed}`);
   log("================================\n");

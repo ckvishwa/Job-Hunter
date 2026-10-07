@@ -38,6 +38,7 @@ Rejections become typed failures in `<data-dir>/job-failures.jsonl` (`POSTING_UN
 | After Slice 2 | `npx vitest run` | 64 files, **704 passed**, 0 failed (94 new: 69 `structured-job`, 25 `parse-job`) |
 | After Slice 2 | `npx tsc --noEmit` | clean |
 | After search demo | `npx vitest run` | 66 files, **733 passed**, 0 failed (+29: 11 browser E2E, 18 search-input/CLI) |
+| After shortlist iteration | `npx vitest run` | 67 files, **760 passed**, 0 failed (+27) |
 | After search demo | `npx tsc --noEmit` | clean |
 | Slice 2 demonstration | `npm run parse-jd ...` on the saved Figma JD | ACCEPTED, MANUAL_ANNOTATION / FIXTURE_PROVIDER only |
 | Live success + dedupe + failure | see evidence file | pass (Figma / Greenhouse only) |
@@ -63,6 +64,10 @@ Guarantees on the supported environment (Windows 11 / NTFS, local disk): all-or-
 Decision note: existing implementation = none (no lock anywhere; `launcher.ts` lock handling is Chrome-specific). Alternatives: (a) `proper-lockfile` (new dependency, mkdir + mtime heartbeat; staleness by time can steal a slow live writer's lock); (b) SQLite (out of scope, large migration); (c) chosen: ~100 lines, zero dependencies, exclusive-create with owner token and pid-liveness staleness (never time-only). Tradeoff: own code to maintain and no heartbeat, so a live-but-hung writer blocks others until the 10 s timeout fails loudly. Reversal: callers revert to `loadJobs` + `saveJobs`, which still refuse corrupt stores.
 
 Intentional change to an existing test: `tests/storage/jsonl-store.test.ts` "skips malformed lines instead of crashing" asserted the bug; it now asserts `CORRUPT_RECORD`.
+
+## Search demo iteration 2: shortlist and clean text (2026-10-07)
+
+Result titles are classified MATCH / REVIEW / NO_MATCH against `config/roles.yml` before anything is opened (`src/discovery/title-targeting.ts`); only MATCH results (REVIEW only with `selection.openReview`) are opened, up to `maxJobs`; a shortlist with the exact rule, reason and opened/extracted/saved flags is printed and written to `<data-dir>/search-shortlist.json`. Page chrome (breadcrumb, nav, facts sidebar, buttons, Apply links, duplicate title heading) is removed from the DOM before the description is read; text, hash and HTML are consistent and `rawMetadata.extractionStrategy` records how. Company-hosted numeric URL ids no longer imply a Greenhouse identity: a configured `listingIdPattern` plus confirmation on the employer's registered board is required. Evidence: `docs/evidence/search-shortlist-stripe.md`. Verification: 67 files / 760 passed (18 headed-Chrome E2E, 15 title-targeting, 23 input/identity), `tsc` clean; live Stripe run and repeat verified.
 
 ## Headed-browser search demo (2026-10-07)
 
