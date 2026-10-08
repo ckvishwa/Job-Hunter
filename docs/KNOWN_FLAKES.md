@@ -24,3 +24,11 @@ Record a test here only when it has failed without a code change and passed on r
 - **Seen:** once in a full `npx vitest run` on 2026-10-08 (1016 passed, 2 failed of 1018; this test failed after 8.7 s with `page.goto: net::ERR_CONNECTION_TIMED_OUT` at the loopback `/check` URL in the second launch). Run alone, the file passed 22/22 and this test took 3.6 s. No code changed between the runs.
 - **Likely cause (unconfirmed):** second headed launch of the same profile while many other headed-Chrome files run in parallel; the loopback request timed out. No product defect was found.
 - **What to do:** `npx vitest run tests/pipeline/discovery/linkedin-discoverer.test.ts`. If it fails alone, treat it as real.
+
+## Headed-Chrome offline pipeline discovery step (fourth entry)
+
+- **Test:** `offline headed discovery-to-form pipeline > persists one canonical JD, renders sourced PDF, fills and reconciles the local ATS form without submit`
+- **File:** `tests/pipeline/offline-e2e.test.ts`
+- **Seen:** once in a full `npm test` in a clean clone on 2026-10-09 (Windows, 1060 passed / 1 failed of 1061; this test ran 4.05 s). Failure: `expected +0 to be 1` at `summary.persistedCount` (line 171), i.e. the headed search step persisted no job. The same file passed alone twice (12.9 s and 12.5 s), and the immediately repeated full suite passed 96 files / 1,061 tests. No code changed between the runs.
+- **Likely cause (unconfirmed):** timing under parallel headed-Chrome load in the search/settle step; no product defect was found. The Linux/Xvfb container run did not show it.
+- **What to do:** `npx vitest run tests/pipeline/offline-e2e.test.ts`. If it fails alone, treat it as real. If it recurs in CI, raise the settle timeout or serialize browser test files (backlog `SDLC-T06`) rather than adding retries silently.

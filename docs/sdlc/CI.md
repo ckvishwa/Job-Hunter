@@ -20,7 +20,7 @@
 
 ## Browser and runner compatibility
 
-The suite launches **real headed Google Chrome** (`channel: "chrome"`) against loopback fixtures, and one test uses Playwright's bundled Chromium (revision pinned by the lockfile's Playwright 1.62.0). It therefore needs a display on Linux. The launcher already has a Linux code path (`ps`-based profile ownership). No test was skipped, excluded or weakened to obtain a green result; `docs/KNOWN_FLAKES.md` lists the three headed-Chrome flakes seen so far.
+The suite launches **real headed Google Chrome** (`channel: "chrome"`) against loopback fixtures, and one test uses Playwright's bundled Chromium (revision pinned by the lockfile's Playwright 1.62.0). It therefore needs a display on Linux. The launcher already has a Linux code path (`ps`-based profile ownership). No test was skipped, excluded or weakened to obtain a green result; `docs/KNOWN_FLAKES.md` lists the four headed-Chrome flakes seen so far (the fourth appeared in the first clean-clone full run on Windows, passed alone twice and passed on the repeated full run).
 
 | Environment | Result | Evidence quality |
 |---|---|---|
