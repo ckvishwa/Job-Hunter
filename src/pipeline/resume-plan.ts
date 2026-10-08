@@ -62,7 +62,7 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-function flattenPdfText(items: Array<{ str?: string; hasEOL?: boolean }>): string {
+export function flattenPdfText(items: Array<{ str?: string; hasEOL?: boolean }>): string {
   return items.map((item) => `${item.str ?? ""}${item.hasEOL ? "\n" : " "}`).join("").replace(/[ \t]+\n/g, "\n").replace(/\n{2,}/g, "\n").trim();
 }
 

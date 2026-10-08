@@ -57,6 +57,10 @@ export const factAttributesSchema = z
     technologies: z.array(textValue).max(40).optional(),
     // education / certification / clearance / authorization: free approved detail
     detail: z.string().max(300).optional(),
+    // legal_name: the approved given/family split used for separate first-name and last-name form fields.
+    // A full name is never split by guesswork; without these two attributes such fields stay unresolved.
+    givenName: textValue.optional(),
+    familyName: textValue.optional(),
   })
   .strict();
 

@@ -14,6 +14,8 @@ export interface ObservedControl {
   disabled: boolean;
   options: string[];
   accept: string | null;
+  /** ARIA role when present (a custom dropdown exposes `combobox`). Optional so older saved inspections stay valid. */
+  role?: string | null;
 }
 
 export interface ApplicationInspection {
@@ -186,7 +188,7 @@ export async function inspectApplicationForm(page: Page): Promise<ApplicationIns
         const helpIds = control.getAttribute("aria-describedby")?.split(/\s+/) ?? [];
         const help = helpIds.map((helpId) => document.getElementById(helpId)?.innerText ?? "").join(" ").trim();
         const options = control instanceof HTMLSelectElement ? Array.from(control.options).map((option) => option.label).filter(Boolean) : [];
-        return { id, label: label || control.getAttribute("aria-label") || "", help, type: control.type, required: control.required || control.getAttribute("aria-required") === "true", disabled: control.disabled, options, accept: control instanceof HTMLInputElement ? control.accept || null : null };
+        return { id, label: label || control.getAttribute("aria-label") || "", help, type: control.type, required: control.required || control.getAttribute("aria-required") === "true", disabled: control.disabled, options, accept: control instanceof HTMLInputElement ? control.accept || null : null, role: control.getAttribute("role") };
       }),
       submitControls: document.querySelectorAll("button[type=submit],input[type=submit]").length,
       verificationDetected: /captcha|verify you are human|security challenge/i.test(document.body.innerText),

@@ -12,6 +12,7 @@ Playwright-based job search automation. Discovers job postings against official 
 
 ```bash
 npm run typecheck                       # tsc --noEmit
+npm run packet -- run --ats <greenhouse:board:id> --source-store <jobs.jsonl>   # one job to a reviewable application packet; never submits (docs/V1-GOLDEN-PATH.md)
 npm test                                # vitest run (whole suite)
 npx vitest run tests/hunt/eligibility.test.ts   # single test file
 npx vitest run -t "some test name"      # single test by name

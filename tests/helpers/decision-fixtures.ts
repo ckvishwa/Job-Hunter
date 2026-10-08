@@ -1,4 +1,4 @@
-import { candidateFactSchema, parseCandidateProfile, type CandidateFact, type CandidateProfile } from "../../src/domain/candidate-profile.js";
+import { candidateFactSchema, parseCandidateProfile, SENSITIVE_FACT_KINDS, type CandidateFact, type CandidateProfile } from "../../src/domain/candidate-profile.js";
 import type { ExtractionReview } from "../../src/decision/evaluate.js";
 import type { StructuredJob } from "../../src/domain/structured-job.js";
 
@@ -18,7 +18,7 @@ type FactInput = Partial<Omit<CandidateFact, "attributes" | "verification">> & {
 /** An APPROVED, verified fact unless `pending` (then unverified). */
 export function fact(input: FactInput): CandidateFact {
   const { pending, attributes, verification, ...rest } = input;
-  const sensitive = ["clearance", "work_authorization", "sponsorship_need"].includes(input.kind);
+  const sensitive = SENSITIVE_FACT_KINDS.includes(input.kind);
   return candidateFactSchema.parse({
     polarity: "has",
     sensitivity: sensitive ? "sensitive" : "normal",
