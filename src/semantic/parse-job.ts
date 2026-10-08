@@ -12,6 +12,7 @@ import {
 } from "../domain/structured-job.js";
 import { appendJsonlRecords } from "../storage/jsonl-store.js";
 import { upsertStructuredJob } from "../storage/structured-store.js";
+import { AnnotationValidationError } from "./compact-annotations.js";
 import type { JobSemanticProvider } from "./provider.js";
 
 // Production boundary for Slice 2:
@@ -21,6 +22,8 @@ import type { JobSemanticProvider } from "./provider.js";
 // proposal is rejected as a whole: nothing partial is stored or returned as accepted.
 
 export interface ParseOptions {
+  /** Cancellation propagates to providers that support it; cleanup uses a separate signal. */
+  signal?: AbortSignal;
   /** Where accepted results are stored (locked, atomic). Omit to validate without persisting. */
   structuredPath?: string;
   /** Append-only SEMANTIC_PARSE_FAILED log. Omit to skip logging. */
@@ -63,8 +66,11 @@ export async function parseCanonicalJob(job: JobPosting, provider: JobSemanticPr
 
   let output: unknown;
   try {
-    output = await provider.extractJob({ rawJd: job.descriptionText, jdHash: job.jdContentHash });
+    output = await provider.extractJob({ rawJd: job.descriptionText, jdHash: job.jdContentHash, signal: options.signal });
   } catch (err) {
+    // The provider answered but its output failed source validation: not a provider failure.
+    // Message omitted: it quotes model output and JD text. Deterministic at temperature 0, so not retryable.
+    if (err instanceof AnnotationValidationError) return fail("EVIDENCE_INVALID", [{ code: "EVIDENCE_INVALID", path: "(provider annotations)", message: "provider annotations failed source-evidence validation after bounded repair" }], false);
     // Class name only: an error message could echo provider or JD content.
     const name = err instanceof Error ? err.name : "UnknownError";
     const retryable = name !== "FixtureNotFoundError" && name !== "FixtureInputMismatchError";
@@ -79,7 +85,22 @@ export async function parseCanonicalJob(job: JobPosting, provider: JobSemanticPr
     }
   }
 
-  const outcome = validateStructuredProposal(job.descriptionText, trusted, output);
+  let outcome = validateStructuredProposal(job.descriptionText, trusted, output);
+  if (!outcome.ok && provider.repairJob) {
+    try {
+      const repaired = await provider.repairJob({
+        rawJd: job.descriptionText,
+        jdHash: job.jdContentHash,
+        proposal: output,
+        issues: outcome.issues.map(({ code, path, message }) => ({ code, path, message })),
+      });
+      outcome = validateStructuredProposal(job.descriptionText, trusted, repaired);
+    } catch (err) {
+      if (err instanceof AnnotationValidationError) return fail("EVIDENCE_INVALID", [{ code: "EVIDENCE_INVALID", path: "(provider repair annotations)", message: "provider repair failed source-evidence validation" }], false);
+      const name = err instanceof Error ? err.name : "UnknownError";
+      return fail("PROVIDER_FAILED", [{ code: "PROVIDER_FAILED", path: "(provider repair)", message: `provider repair threw ${name}` }]);
+    }
+  }
   if (!outcome.ok) return fail(outcome.code, outcome.issues);
 
   // Persist before reporting success. A storage failure throws (JobStoreError) and is NOT a parse failure.

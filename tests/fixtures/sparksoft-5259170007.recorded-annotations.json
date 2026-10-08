@@ -1,0 +1,191 @@
+{
+ "recordedFrom": "ollama qwen2.5:3b-instruct-q4_K_M, route ollama-job-extraction@15, source-annotations@8; Sparksoft Greenhouse 5259170007; first request batch",
+ "jdSha256": "08ecd92bb60390e03bafd59927bfe57ccce9d9e22a4e14a6a3b98640d19a68ac",
+ "doneReasons": [
+  "stop",
+  "stop"
+ ],
+ "outputTokens": [
+  290,
+  536
+ ],
+ "responses": [
+  {
+   "version": 1,
+   "annotations": [
+    {
+     "sourceId": "s2us",
+     "kind": "role_experience",
+     "minimumYears": 1,
+     "scope": "role",
+     "logic": {
+      "op": "any_of",
+      "args": [
+       "software testing",
+       "quality assurance",
+       "software development"
+      ]
+     }
+    },
+    {
+     "sourceId": "s319",
+     "kind": "skill",
+     "logic": {
+      "op": "all_of",
+      "args": [
+       "experience with test automation tools",
+       "Selenium",
+       "Playwright",
+       "Cucumber",
+       "TestNG",
+       "JUnit"
+      ]
+     }
+    },
+    {
+     "sourceId": "s35b",
+     "kind": "skill",
+     "logic": {
+      "op": "any_of",
+      "args": [
+       "API testing experience",
+       "ReadyAPI",
+       "SoapUI",
+       "Postman",
+       "RestAssured"
+      ]
+     }
+    },
+    {
+     "sourceId": "s38s",
+     "kind": "skill",
+     "logic": {
+      "op": "all_of",
+      "args": [
+       "basic to intermediate programming experience",
+       "Java",
+       "JavaScript"
+      ]
+     }
+    },
+    {
+     "sourceId": "s3c4",
+     "kind": "domain_knowledge"
+    },
+    {
+     "sourceId": "s3it",
+     "kind": "domain_knowledge"
+    },
+    {
+     "sourceId": "s3ls",
+     "kind": "domain_knowledge"
+    },
+    {
+     "sourceId": "s3o6",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3q7",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3sk",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3tu",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3xe",
+     "kind": "skill"
+    }
+   ]
+  },
+  {
+   "version": 1,
+   "annotations": [
+    {
+     "sourceId": "s2us",
+     "kind": "role_experience",
+     "minimumYears": 1,
+     "scope": "role",
+     "logic": {
+      "op": "any_of",
+      "args": [
+       "software testing",
+       "quality assurance",
+       "software development",
+       "related technical role"
+      ]
+     }
+    },
+    {
+     "sourceId": "s319",
+     "kind": "skill",
+     "logic": {
+      "op": "all_of",
+      "args": [
+       "experience with test automation tools or frameworks such as Selenium, Playwright, Cucumber, TestNG, JUnit, or similar technologies",
+       "working knowledge of API testing using tools such as ReadyAPI, SoapUI, Postman, RestAssured, or similar tools"
+      ]
+     }
+    },
+    {
+     "sourceId": "s35b",
+     "kind": "skill",
+     "logic": {
+      "op": "all_of",
+      "args": [
+       "experience or working knowledge of API testing using tools such as ReadyAPI, SoapUI, Postman, RestAssured, or similar tools",
+       "understanding of relational databases and experience writing simple SQL queries for data validation"
+      ]
+     }
+    },
+    {
+     "sourceId": "s38s",
+     "kind": "skill",
+     "logic": {
+      "op": "any_of",
+      "args": [
+       "basic to intermediate programming or scripting experience using Java, JavaScript, or a comparable programming language",
+       "understanding of software development concepts and ability to read, troubleshoot, and make basic modifications to automation code"
+      ]
+     }
+    },
+    {
+     "sourceId": "s3c4",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3it",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3ls",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3o6",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3q7",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3sk",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3tu",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3xe",
+     "kind": "skill"
+    }
+   ]
+  }
+ ]
+}

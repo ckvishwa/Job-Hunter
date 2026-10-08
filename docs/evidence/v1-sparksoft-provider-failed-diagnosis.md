@@ -1,0 +1,11 @@
+# Sparksoft 5259170007 PROVIDER_FAILED diagnosis (V1 / Slice 2, 2026-10-08)
+
+## Decision Note
+- **Problem.** Real Qwen extraction of Greenhouse job `5259170007` (canonical `0c7da8c8ee74e26e`, JD SHA-256 `08ecd92b…68ac`) was recorded as `PROVIDER_FAILED`. Affected path: `src/semantic/parse-job.ts` catch blocks. Metric: failure code correct or not.
+- **Root cause.** `OllamaJobSemanticProvider` throws `AnnotationValidationError` after its one repair when model annotations fail source validation. `parseCanonicalJob` treated every provider throw as `PROVIDER_FAILED` (retryable). Transport worked: two HTTP responses, `done_reason: stop`, 290 and 536 output tokens against a 2048 budget. Output was valid JSON and passed the annotation Zod schema. Evidence offsets are assembled deterministically from the source inventory, not the model, and `raw.slice` matched. Class: **evidence quote mismatch** (logic terms not verbatim source terms for item `s319`).
+  - Attempt 0: terms `experience with test automation tools` + `Selenium` + … `no ordered source match` (the source has `or frameworks such as` between them; model also chose `all_of` for an `or` clause).
+  - Attempt 1 (repair): term copied from another item (`s35b`, ReadyAPI/SoapUI text) `is not a verbatim source term for s319`.
+- **Alternatives.** (a) Do nothing; label stays wrong, retry logic would loop on a deterministic failure. (b) New failure code; unnecessary, `EVIDENCE_INVALID` exists. (c) Loosen the validator; rejected, it would admit source bleed.
+- **Choice.** In `parse-job.ts`, map `AnnotationValidationError` (extract and repair sites) to `SEMANTIC_PARSE_FAILED` / `EVIDENCE_INVALID`, `retryable:false`, fixed message with no model or JD text. Other provider errors (timeout, truncation, context limit, malformed JSON) are unchanged. Limit: `MALFORMED_JSON` thrown inside the provider still maps to `PROVIDER_FAILED`; separate follow-up.
+- **Acceptance / rollback.** `tests/semantic/sparksoft-5259170007.regression.test.ts` replays the recorded responses through the real provider and `parseCanonicalJob`; it failed with `PROVIDER_FAILED` before the change and passes after. Revert the two `if` lines to roll back.
+- **Not fixed.** The extraction itself still fails. Model quality is a separate question; the manual-annotation proposal remains review-only.

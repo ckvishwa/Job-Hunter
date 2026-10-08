@@ -1,0 +1,102 @@
+{
+ "recordedFrom": "ollama qwen2.5:3b-instruct-q4_K_M, ollama-job-extraction@16, source-annotations@9, live run 2026-10-08; Sparksoft Greenhouse 5259170007",
+ "jdSha256": "08ecd92bb60390e03bafd59927bfe57ccce9d9e22a4e14a6a3b98640d19a68ac",
+ "doneReasons": [
+  "stop",
+  "stop"
+ ],
+ "tokens": {
+  "input": 1157,
+  "output": 406
+ },
+ "responses": [
+  {
+   "version": 1,
+   "annotations": [
+    {
+     "sourceId": "s2us",
+     "kind": "role_experience",
+     "minimumYears": 1,
+     "scope": "role"
+    },
+    {
+     "sourceId": "s319",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s35b",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s38s",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3c4",
+     "kind": "domain_knowledge"
+    },
+    {
+     "sourceId": "s3fr",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3it",
+     "kind": "domain_knowledge"
+    },
+    {
+     "sourceId": "s3ls",
+     "kind": "domain_knowledge"
+    },
+    {
+     "sourceId": "s3o6",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3q7",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3sk",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3tu",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s3xe",
+     "kind": "skill"
+    }
+   ]
+  },
+  {
+   "version": 1,
+   "annotations": [
+    {
+     "sourceId": "s45p",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s4dx",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s4g7",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s4hy",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s4jv",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s4mr",
+     "kind": "skill"
+    }
+   ]
+  }
+ ]
+}

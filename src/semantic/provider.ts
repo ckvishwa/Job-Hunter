@@ -10,7 +10,9 @@ import { computeJdContentHash } from "../domain/canonical-job.js";
 export interface JobSemanticProvider {
   /** Identifies the proposer (model + prompt/schema revision, or fixture file hash). Bound by orchestration, not by the output. */
   readonly revision: string;
-  extractJob(input: { rawJd: string; jdHash: string }): Promise<unknown>;
+  extractJob(input: { rawJd: string; jdHash: string; signal?: AbortSignal }): Promise<unknown>;
+  /** One bounded validation repair; orchestration calls this at most once. */
+  repairJob?(input: { rawJd: string; jdHash: string; proposal: unknown; issues: Array<{ code: string; path: string; message: string }> }): Promise<unknown>;
 }
 
 export class FixtureNotFoundError extends Error {
