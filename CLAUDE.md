@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Product/agent startup: read `docs/AGENT-OPERATING-SYSTEM.md` §0 and the local `.agent-runtime/HANDOFF.md` if present. For product scope check `docs/product/PRD-JOB-HUNTER-SAAS.md`; for design use the relevant `docs/ard/` contracts and `docs/architecture/SAAS-SYSTEM-ARCHITECTURE.md`. None of these documents proves a feature is implemented; verify current source and tests. The latest requirement-by-requirement audit is `docs/audit/2026-10-09-prd-coverage.md`.
+
 ## What this is
 
 Playwright-based job search automation. Discovers job postings against official company career pages (Fortune-500-style registry) plus optional generic job portals, filters/dedupes/resolves them to canonical postings, classifies eligibility (seniority/years) and location, scores them deterministically, and produces a ranked daily report. No LLM matching anywhere — every decision (relevance, eligibility, location, score) is a deterministic rule over stored evidence, never fabricated.

@@ -34,3 +34,6 @@ candidate-profile.reviewed*.json
 candidate-answer-observations*.json
 pending-facts*.json
 canonical-resume-registry*.json
+
+# Local agent working notes (compact handoff); never tracked
+.agent-runtime/
