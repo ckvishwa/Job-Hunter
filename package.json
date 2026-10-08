@@ -13,6 +13,7 @@
     "discover": "tsx src/discovery/cli.ts",
     "parse-jd": "tsx src/semantic/cli.ts",
     "decide": "tsx src/decision/cli.ts",
+    "tracker": "tsx src/tracker/cli.ts",
     "candidate:import": "tsx src/candidate/cli.ts",
     "search": "tsx src/discovery/search-cli.ts",
     "hunt": "tsx src/hunt/cli.ts",
