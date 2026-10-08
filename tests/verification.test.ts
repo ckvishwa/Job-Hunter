@@ -2,6 +2,28 @@ import { describe, expect, it, vi } from "vitest";
 import { detectVerification, pauseForVerification, type PageLike } from "../src/browser/verification.js";
 
 describe("detectVerification", () => {
+  it("does not treat a loaded reCAPTCHA script or passive badge as a visible challenge", () => {
+    const result = detectVerification({
+      url: "https://job-boards.greenhouse.io/discord/jobs/8703614002",
+      title: "Job Application for QA/DevOps Engineer at Discord",
+      html: `<script src="https://www.google.com/recaptcha/api.js"></script><h1>QA/DevOps Engineer</h1><div class="grecaptcha-badge"><iframe title="reCAPTCHA"></iframe></div>`,
+    });
+    expect(result.detected).toBe(false);
+  });
+  it("still flags a visible reCAPTCHA v2 widget or challenge frame even when a badge and scripts are present", () => {
+    const base = { url: "https://example.test/apply", title: "Apply" };
+    const script = '<script src="https://www.google.com/recaptcha/api.js"></script><div class="grecaptcha-badge"><iframe title="reCAPTCHA"></iframe></div>';
+    expect(detectVerification({ ...base, html: `${script}<form><div class="g-recaptcha" data-sitekey="k"></div></form>` })).toMatchObject({ detected: true, reason: "reCAPTCHA detected" });
+    expect(detectVerification({ ...base, html: `${script}<iframe src="https://www.google.com/recaptcha/api2/bframe"></iframe>` })).toMatchObject({ detected: true });
+  });
+  it("still flags visible human-verification text on a page that also loads scripts", () => {
+    const html = '<script src="/app.js"></script><h1>Please verify you are human to continue</h1>';
+    expect(detectVerification({ url: "https://example.test/", html })).toMatchObject({ detected: true, reason: "Generic human-verification phrasing detected" });
+  });
+  it("ignores challenge-provider names that appear only inside script or style content", () => {
+    const html = '<script>window.hcaptcha = {}; var cfg = "cf-turnstile";</script><style>.cf-turnstile{display:none}</style><p>Open roles</p><script src="https://js.hcaptcha.com/1/api.js"></script>';
+    expect(detectVerification({ url: "https://example.test/careers", html })).toEqual({ detected: false });
+  });
   it("flags reCAPTCHA", () => {
     const result = detectVerification({
       html: `<div class="g-recaptcha" data-sitekey="abc"></div>`,

@@ -35,7 +35,14 @@ const SIGNALS: Signal[] = [
  * the wrapper below.
  */
 export function detectVerification(input: VerificationCheckInput): VerificationResult {
-  const haystack = `${input.title ?? ""}\n${input.html}`;
+  // Loaded CAPTCHA libraries and a passive reCAPTCHA badge are common on ordinary
+  // application pages. They are not evidence that a challenge is being shown.
+  const visibleMarkup = input.html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<script\b[^>]*\/>/gi, "")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]*class=["'][^"']*grecaptcha-badge[^"']*["'][^>]*>[\s\S]*?<\/[^>]+>/gi, "");
+  const haystack = `${input.title ?? ""}\n${visibleMarkup}`;
   for (const signal of SIGNALS) {
     if (signal.pattern.test(haystack)) {
       return { detected: true, reason: signal.reason };
