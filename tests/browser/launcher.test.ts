@@ -65,7 +65,7 @@ describe("commandLineOwnsProfile", () => {
   // in-use guard and the orphan-cleanup force-kill both silently no-op against a real, live
   // process, which is the exact failure this whole module exists to prevent.
   it("matches a whole-token-quoted --user-data-dir when the profile path contains a space", () => {
-    const spacedDir = "C:\\Users\\ckvis\\AppData\\Local\\Google\\Chrome\\User Data";
+    const spacedDir = "C:\\Users\\alice\\AppData\\Local\\Google\\Chrome\\User Data";
     const realCapturedShape =
       `"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --type=crashpad-handler ` +
       `"--user-data-dir=${spacedDir}" /prefetch:4`;
@@ -77,7 +77,7 @@ describe("commandLineOwnsProfile", () => {
     // this shape doesn't actually occur on Windows for a spaced path, but the function must
     // not accidentally match it either -- it's neither the real quoted form nor the real
     // unquoted form (a stray leading quote sits where "--user-data-dir=" should start).
-    const spacedDir = "C:\\Users\\ckvis\\AppData\\Local\\Google\\Chrome\\User Data";
+    const spacedDir = "C:\\Users\\alice\\AppData\\Local\\Google\\Chrome\\User Data";
     expect(commandLineOwnsProfile(`chrome.exe --user-data-dir="${spacedDir}" --headless`, spacedDir)).toBe(false);
   });
 

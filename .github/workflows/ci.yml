@@ -1,0 +1,167 @@
+# Continuous integration for Job Hunter (SDLC-T01). CI only: nothing here deploys, releases, publishes
+# artifacts or contacts an employer. All inputs are the repository's synthetic fixtures; the workflow has no
+# access to candidate data, browser sessions, resumes, credentials or any repository secret.
+#
+# Design notes live in docs/sdlc/CI.md. Required check for branch protection (owner action): "CI gate".
+name: CI
+
+on:
+  pull_request:
+    branches: [careerops-integration, main]
+  push:
+    branches: [careerops-integration, main]
+  workflow_dispatch:
+
+# Least privilege: read-only token for every job. `pull_request` (never `pull_request_target`) is used, so a
+# fork's code never runs with repository secrets or a write token.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NO_COLOR: "1"
+
+jobs:
+  static:
+    name: Static checks (typecheck, build, isolation)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (clean, no credentials persisted)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Setup Node.js (version pinned in .nvmrc)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Confirm the checkout holds no private candidate data
+        run: test ! -e private-runtime
+      - name: Install dependencies (npm ci fails if package.json and the lockfile disagree)
+        run: npm ci
+      - name: Lockfile unchanged by install
+        run: git diff --exit-code -- package-lock.json
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Tests do not read private candidate data (static)
+        run: npm run ci:isolation -- static
+
+  test-linux:
+    name: Full tests (Linux, headed Chrome under Xvfb)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout (clean, no credentials persisted)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Setup Node.js (version pinned in .nvmrc)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Checkout holds no private data
+        run: npm run ci:isolation -- before
+      - name: Install browsers (Playwright-pinned Chromium and Google Chrome for the headed channel) and Xvfb
+        run: |
+          npx playwright install --with-deps chromium chrome
+          sudo apt-get install -y --no-install-recommends xvfb
+      - name: Full test suite (headed Chrome on a virtual display; loopback fixtures only)
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" npm test
+      - name: Test run left the checkout clean and created no private data
+        run: npm run ci:isolation -- after
+
+  test-windows:
+    name: Full tests (Windows, headed Chrome)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout (clean, no credentials persisted)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Setup Node.js (version pinned in .nvmrc)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Checkout holds no private data
+        run: npm run ci:isolation -- before
+      - name: Install browsers (Playwright-pinned Chromium and Google Chrome for the headed channel)
+        run: npx playwright install chromium chrome
+      - name: Full test suite (headed Chrome; loopback fixtures only)
+        run: npm test
+      - name: Test run left the checkout clean and created no private data
+        run: npm run ci:isolation -- after
+
+  secret-scan:
+    name: Secret and private-data scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: "8.30.1"
+      # Published sha256 of gitleaks_8.30.1_linux_x64.tar.gz (from the release's checksums file).
+      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+    steps:
+      - name: Checkout full history (no credentials persisted)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install gitleaks (pinned version, checksum verified)
+        run: |
+          curl -fsSL -o gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum --check --strict
+          mkdir -p "${RUNNER_TEMP}/gitleaks" && tar -xzf gitleaks.tgz -C "${RUNNER_TEMP}/gitleaks" gitleaks
+          rm gitleaks.tgz
+      - name: Scan Git history (values redacted in logs; fingerprints in .gitleaksignore are reviewed history)
+        run: '"${RUNNER_TEMP}/gitleaks/gitleaks" detect --source . --config .gitleaks.toml --redact --no-banner --exit-code 1'
+      - name: Scan the checked-out tree (catches content not visible in commit diffs)
+        run: '"${RUNNER_TEMP}/gitleaks/gitleaks" detect --source . --no-git --config .gitleaks.toml --redact --no-banner --exit-code 1'
+
+  dependency-audit:
+    name: Dependency advisory triage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout (clean, no credentials persisted)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Setup Node.js (version pinned in .nvmrc)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies without running install scripts
+        run: npm ci --ignore-scripts
+      - name: Advisory gate (production advisories fail; dev critical or high need an unexpired reviewed entry)
+        run: npm run ci:audit
+
+  ci-gate:
+    name: CI gate
+    if: always()
+    needs: [static, test-linux, test-windows, secret-scan, dependency-audit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every required job must have succeeded (a skipped or cancelled job is a failure)
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "job results: ${RESULTS}"
+          for r in ${RESULTS}; do
+            if [ "$r" != "success" ]; then echo "CI gate FAILED: a required job did not succeed"; exit 1; fi
+          done
+          echo "CI gate passed"

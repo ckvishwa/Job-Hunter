@@ -1,0 +1,38 @@
+# Secret and private-data policy for CI (gitleaks 8.x, RE2 regex syntax: no lookahead).
+# Default ruleset plus repository-specific rules that protect candidate privacy in a public repository.
+# Findings fail the job; values are redacted in logs (--redact).
+title = "job-hunter gitleaks policy"
+
+[extend]
+useDefault = true
+
+# Candidate data must never be tracked: private runtime output, browser profiles, reviewed profiles,
+# pending facts, generated resumes and local agent notes. Path-only rule: any tracked file at such a path fails.
+[[rules]]
+id = "private-candidate-artifact-path"
+description = "A path reserved for private candidate data, browser state or local agent notes was committed"
+path = '''(?i)(^|/)(private-runtime|\.chrome-profile[^/]*|\.agent-runtime|browser-profiles)/|(^|/)(candidate-profile[^/]*|pending-facts|canonical-resume-registry[^/]*)\.json$'''
+tags = ["privacy", "candidate"]
+
+  [[rules.allowlists]]
+  description = "The committed template approves nothing and carries no candidate data"
+  paths = ['''(^|/)config/candidate-profile\.template\.json$''']
+
+# Absolute home-directory paths identify a person's machine and username.
+[[rules]]
+id = "local-user-home-path"
+description = "An absolute user-profile path (Windows, macOS or Linux home directory) appears in tracked content"
+regex = '''(?i)\b[a-z]:[\\/]+users[\\/]+[a-z0-9._-]{2,}[\\/]|/(?:home|users)/[a-z0-9._-]{2,}/'''
+tags = ["privacy", "paths"]
+
+  [[rules.allowlists]]
+  description = "Generic or synthetic account names used in examples and fixtures"
+  regexTarget = "match"
+  regexes = ['''(?i)(users|home)[\\/]+(public|default|runner|alice|bob|example|user|ubuntu)[\\/]''']
+
+# Session material from a real browser or ATS account.
+[[rules]]
+id = "browser-session-material"
+description = "A cookie header, session cookie or LinkedIn session value appears in tracked content"
+regex = '''(?i)(?:\bset-cookie:|\bcookie:\s*[a-z0-9_.-]+=|\bli_at=|\bJSESSIONID=|\bsessionid=)[^\s'"]{12,}'''
+tags = ["privacy", "session"]

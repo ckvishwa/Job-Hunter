@@ -25,7 +25,9 @@
     "candidate:review": "tsx src/candidate/review-cli.ts",
     "search": "tsx src/discovery/search-cli.ts",
     "hunt": "tsx src/hunt/cli.ts",
-    "audit:fortune500": "tsx src/config/fortune500-audit-cli.ts"
+    "audit:fortune500": "tsx src/config/fortune500-audit-cli.ts",
+    "ci:audit": "tsx src/ci/audit-gate.ts",
+    "ci:isolation": "tsx src/ci/private-isolation.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.1",

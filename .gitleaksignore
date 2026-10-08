@@ -1,0 +1,6 @@
+# Accepted HISTORICAL findings. Published Git history is not rewritten, so these stay visible to a full-history scan.
+# Each line is a gitleaks fingerprint (commit:file:rule:line). Reviewed 2026-10-09.
+# A local Windows account name sat in a launcher test fixture added by db2cbce (2026-07-28). It was replaced with a
+# synthetic name in the working tree by the SDLC-T01 change; the two lines below only cover the old commit.
+db2cbce270056b885f10918dfc631b96bbf08f5a:tests/browser/launcher.test.ts:local-user-home-path:68
+db2cbce270056b885f10918dfc631b96bbf08f5a:tests/browser/launcher.test.ts:local-user-home-path:80
