@@ -1,0 +1,11 @@
+{
+  "referenceVersion": 1,
+  "provenance": "AGENT_AUTHORED_SOURCE_COMPARISON_NOT_HUMAN_ATTESTATION",
+  "frozenBeforeTuning": "2026-10-08",
+  "source": "Existing saved AHEAD AI Platform Engineer posting, parent data/jobs.jsonl, id 0bf51eebfc0111f4",
+  "limitations": "Saved excerpt contains company context and a role overview, no qualification section. Not a verified complete live JD. No inference made about missing restrictions or experience thresholds.",
+  "requiredYears": [],
+  "explicitQualificationItems": [],
+  "expectedState": "REVIEW",
+  "preserve": ["design, deploy, and optimize AI/ML infrastructure", "training and deploying machine learning models", "You will collaborate with data scientists and platform engineers"]
+}
