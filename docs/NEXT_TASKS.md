@@ -1,13 +1,17 @@
 # Next tasks
 
-## Open gates after Slice 3 (in this order)
+## V1 readiness gates (in this order)
 
-1. **Real candidate facts (needs the user).** Review `private-runtime/candidate/pending-facts.json` (128 pending facts from the four resumes): approve what is true (`approvalStatus`, `verification.verifiedBy/verifiedAt`), reject comma-split fragments, add `roleTags` to the employment fact, `experienceIds` to skills used there, explicit `work_authorization` / `clearance` facts if wanted, and any location preference. Then run `npm run decide` with that file. Until then every real decision is REVIEW.
-2. **Extraction review (needs a person other than the annotator).** Have the Figma annotation checked against the JD and record `coverage: complete`, `reviewedBy`, `reviewedAt` in an extraction review file; without that no job can be ELIGIBLE.
-3. **Curated requirement vocabulary.** Requirement values are free text and match only exactly (or via approved `matchTerms` / the tiny synonym list). Decide how annotated values map to skill names (a reviewed vocabulary file) before judging many jobs; do not add fuzzy matching.
-4. **Autonomous parser admission** (below). 
-5. **V1 Slice 4 (next code task):** ResumePlan from approved facts only, with every claim mapped to an approved fact id, validated before any rendering. Out of scope until gate 1 yields approved facts to select from.
+Candidate-specific detail is intentionally kept out of this public file; it lives in the gitignored `private-runtime/`.
 
+1. **Real candidate facts (needs the candidate).** Review the pending facts and approve only what is true. Contact details, work authorization, future sponsorship need, residence history, clearance and application certifications are sensitive: they stay pending and cause `REVIEW`/`WAITING_FOR_USER` until the candidate supplies and approves them. Never infer them.
+2. **Independent extraction coverage review (needs a person other than the annotator).** Compare the structured extraction to the saved JD and record `coverage: complete`, `reviewedBy`, `reviewedAt` bound to the job ID, structured-extraction ID and extraction digest. Without it no job can be `ELIGIBLE`. A deterministic diagnostic is not an attestation.
+3. **Live extraction.** The local model path must produce a validated StructuredJob on a real saved JD without source bleed; until a reviewed dataset and independent evaluation exist, "autonomous parsing: PENDING" stays true.
+4. **Lane decision.** Ambiguous lane proposals stay `UNKNOWN_REVIEW` until role evidence supports one dominant lane.
+5. **ATS adapter from observed evidence.** Extend the Greenhouse path only from read-only inspection of a real form (custom controls, attachment readback). Unknown required controls block readiness.
+6. **Readiness.** Persist `READY_TO_SUBMIT` only after fresh reconciliation and a same-identity rerun. V1 never submits.
+
+Replay commands and private evidence locations are kept in the local, untracked notes.
 
 ## Search demo follow-ups (not blocking Slice 3)
 

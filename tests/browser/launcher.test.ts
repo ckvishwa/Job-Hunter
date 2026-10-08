@@ -147,6 +147,56 @@ describe("launchPersistentChrome", () => {
   });
 });
 
+describe("launchPersistentChrome profile races", () => {
+  it("translates a lost launch race into ChromeProfileInUseError when a second probe finds an exact owner", async () => {
+    launchPersistentContextMock.mockRejectedValue(new Error("browserType.launchPersistentContext: Opening in existing browser session."));
+    const findOwningProcessIds = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([777]);
+    const deps = makeFakeDeps({ findOwningProcessIds });
+
+    await expect(launchPersistentChrome("./.fake-profile", {}, deps)).rejects.toThrow(/pid 777/);
+    expect(findOwningProcessIds).toHaveBeenCalledTimes(2);
+    expect(launchPersistentContextMock).toHaveBeenCalledTimes(1);
+    // The winner's process is never touched and its lock file is never removed after the fact.
+    expect(deps.killProcessTree).not.toHaveBeenCalled();
+    expect(deps.removeLockFile).not.toHaveBeenCalled();
+  });
+
+  it.each(["ProcessSingleton: profile is in use by another process", "The profile appears to be in use by another Chrome"])(
+    "recognizes the contention wording %j",
+    async (message) => {
+      launchPersistentContextMock.mockRejectedValue(new Error(message));
+      const deps = makeFakeDeps({ findOwningProcessIds: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([9]) });
+      await expect(launchPersistentChrome("./.fake-profile", {}, deps)).rejects.toBeInstanceOf(ChromeProfileInUseError);
+    },
+  );
+
+  it("rethrows the original launch error when contention is claimed but no exact owner is found", async () => {
+    const original = new Error("Opening in existing browser session.");
+    launchPersistentContextMock.mockRejectedValue(original);
+    const deps = makeFakeDeps();
+
+    await expect(launchPersistentChrome("./.fake-profile", {}, deps)).rejects.toBe(original);
+    expect(deps.findOwningProcessIds).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not probe again or translate an unrelated launch failure", async () => {
+    const original = new Error("Executable doesn't exist at C:\chrome.exe");
+    launchPersistentContextMock.mockRejectedValue(original);
+    const deps = makeFakeDeps({ findOwningProcessIds: vi.fn().mockResolvedValue([5]).mockResolvedValueOnce([]) });
+
+    await expect(launchPersistentChrome("./.fake-profile", {}, deps)).rejects.toBe(original);
+    expect(deps.findOwningProcessIds).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes viewport and device scale factor through and keeps the headed real-Chrome defaults", async () => {
+    await launchPersistentChrome("./.fake-profile", { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 }, makeFakeDeps());
+    expect(launchPersistentContextMock).toHaveBeenCalledWith(
+      expect.stringContaining(".fake-profile"),
+      expect.objectContaining({ channel: "chrome", headless: false, viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 }),
+    );
+  });
+});
+
 describe("closePersistentChrome", () => {
   it("clean shutdown: closes every page, then the context, and never force-kills when the process exits on its own", async () => {
     const page1 = { close: vi.fn().mockResolvedValue(undefined) };

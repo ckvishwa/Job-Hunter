@@ -18,10 +18,13 @@ export const FACT_KINDS = [
   "clearance",
   "work_authorization",
   "sponsorship_need",
+  "legal_name",
+  "email",
+  "phone",
 ] as const;
 export type FactKind = (typeof FACT_KINDS)[number];
 
-export const SENSITIVE_FACT_KINDS: readonly FactKind[] = ["clearance", "work_authorization", "sponsorship_need"];
+export const SENSITIVE_FACT_KINDS: readonly FactKind[] = ["clearance", "work_authorization", "sponsorship_need", "legal_name", "email", "phone"];
 
 const idString = z.string().regex(/^[A-Za-z0-9._-]{1,64}$/, "id must be 1-64 chars of [A-Za-z0-9._-]");
 const textValue = z.string().trim().min(1).max(300);

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { candidateProfileSchema, factUsability, parseCandidateProfile, unionMonths } from "../../src/domain/candidate-profile.js";
+import { candidateProfileSchema, factUsability, parseCandidateProfile, profileDigest, unionMonths } from "../../src/domain/candidate-profile.js";
 import { fact, profile } from "../helpers/decision-fixtures.js";
 
 const raw = (over: Record<string, unknown> = {}) => ({
@@ -39,6 +39,26 @@ describe("candidate profile contract", () => {
   it.each(["clearance", "work_authorization", "sponsorship_need"])("rejects a %s fact that is not marked sensitive", (kind) => {
     expect(parses([baseFact({ kind })]).success).toBe(false);
     expect(parses([baseFact({ kind, sensitivity: "sensitive" })]).success).toBe(true);
+  });
+
+  it.each(["legal_name", "email", "phone"])("contact kind %s must be marked sensitive, and is accepted once it is", (kind) => {
+    expect(parses([baseFact({ kind, value: "synthetic" })]).success).toBe(false);
+    expect(parses([baseFact({ kind, value: "synthetic", sensitivity: "sensitive" })]).success).toBe(true);
+    // A pending contact fact is still schema-valid but never usable for an answer.
+    const pending = parseCandidateProfile(raw({ facts: [baseFact({ kind, value: "synthetic", sensitivity: "sensitive", approvalStatus: "pending", verification: { verifiedBy: null, verifiedAt: null, validUntil: null } })] }));
+    expect(factUsability(pending.facts[0]!, "2026-10-01").usable).toBe(false);
+  });
+
+  it("an approved sensitive contact fact is usable until it expires, and its value is part of the profile digest", () => {
+    const withEmail = (value: string, validUntil: string | null = null) => parseCandidateProfile(raw({ facts: [baseFact({ kind: "email", value, sensitivity: "sensitive", verification: { verifiedBy: "me", verifiedAt: "2026-09-01", validUntil } })] }));
+    const live = withEmail("a@example.test");
+    expect(factUsability(live.facts[0]!, "2026-10-01").usable).toBe(true);
+    expect(factUsability(withEmail("a@example.test", "2026-09-15").facts[0]!, "2026-10-01").usable).toBe(false);
+    expect(profileDigest(live)).not.toBe(profileDigest(withEmail("b@example.test")));
+  });
+
+  it("still rejects a kind that is not in the contract", () => {
+    expect(parses([baseFact({ kind: "ssn", sensitivity: "sensitive" })]).success).toBe(false);
   });
 
   it("rejects duplicate fact ids, malformed ids and unknown fields", () => {

@@ -1,6 +1,26 @@
 # Status
 
-Last updated: 2026-10-07. Branch `careerops-integration` (worktree `.claude/worktrees/universal-job-discovery`). Nothing here is pushed or merged to `master`.
+Last updated: 2026-10-09. Branch `careerops-integration`. Nothing here is merged to `master`.
+
+> Public-repository note: this file records redacted summaries only. Candidate facts, answers, resume content, immigration or eligibility details, target-employer selections, application identifiers and the hashes of private files live under the gitignored `private-runtime/` and are deliberately not described here.
+
+## V1 status summary (2026-10-09)
+
+**V1 is not complete.** No live application form has been filled or uploaded, and no application has been submitted (submit count is zero everywhere). The end-to-end path is proven only against a headed localhost fixture with synthetic facts.
+
+What exists and is covered by tests:
+
+- `npm run pipeline` orchestrates one bounded job: headed search or a saved job, canonical JD persistence, local MiniLM lane proposal (prototype similarity, a ranking signal only), configured semantic extraction (fixture provider or local Ollama adapter), production StructuredJob validation, approved-fact retrieval, deterministic decision, a source-mapped job-specific PDF, and a supported labeled-form inspection/fill path. `npm run pipeline:offline` runs all of it against a headed loopback search/ATS fixture with synthetic approved facts, temporary storage and a real multipart upload endpoint (upload hash, failed-upload recovery, idempotent rerun, one application record, zero submits). It reads no private file.
+- The protected employment identity (employer, title, dates) in every job-specific resume is taken from the approved profile's own employment facts and checked against each canonical lane resume; nothing candidate-specific is hard-coded.
+- A coverage review authorizes `ELIGIBLE` only when it is bound to the job ID, the exact structured-extraction ID and a digest of the validated extraction, plus the JD hash. Legacy unbound reviews are treated as unreviewed.
+- Local extraction: section-aware source inventory and compact annotations with the unchanged production validator. On one saved reference JD, cold runs took 11.7-13.5 s (two requests, zero repairs, 1,138 input / 469 output tokens, Ollama `qwen2.5:3b-instruct-q4_K_M` Q4_K_M, 8,192/2,048 context/output), against a 91.6 s baseline for the earlier revision. Peak sampled GPU memory was 2,339 MiB of 4,096 MiB; the model is unloaded after extraction. These are six-run observations on one JD, not a p95 and not parser admission. Comparisons were authored in-task and are not an independent human attestation.
+- `npm run tracker` (xlsx projection, never authoritative; ENTRY_SIGNAL column), `npm run boards:discover` (public Greenhouse/Lever board APIs for a candidate-supplied company list), `npm run dashboard` (read-only loopback page) and an append-only redacted run-event log (`private-runtime/run-events.jsonl`). See `docs/DASHBOARD.md`.
+
+Not achieved: autonomous parser admission (no reviewed dataset or independent evaluation); independent human coverage attestation on any real job; a real candidate decision of `ELIGIBLE`; any live ATS form fill or upload; verification of the sensitive and contact answers a real form requires (they remain pending candidate review and are never inferred).
+
+Verification: see the Verification log section at the end of this summary block (filled in on integration).
+
+
 
 ## V1 (working vertical slice) progress
 
@@ -9,10 +29,11 @@ Last updated: 2026-10-07. Branch `careerops-integration` (worktree `.claude/work
 | 0 | Read-only audit | Done (in conversation; no document) |
 | 1 | Real headed discovery proof | **Done for one target (Figma / Greenhouse).** Evidence: `docs/evidence/v1-slice1-discovery-proof.md` |
 | 1.1 | Protect authoritative job persistence | **Done.** See section below |
-| 3 | Approved candidate facts and evidence-based decision | **Engine, contract, importer and command done; real candidate decision PENDING (no fact approved).** Evidence: `docs/evidence/v1-slice3-decision.md` |
+| 3 | Approved candidate facts and evidence-based decision | **Engine and approved profile available; real-job decision pending validated live extraction and independent JD coverage review.** Evidence: `docs/evidence/v1-slice3-decision.md` |
 | search demo | Visible-browser search discovery (Stripe) | **Done**, live-verified. Evidence: `docs/evidence/search-demo-stripe.md` |
-| 2 | Structured JD contract + provider validation | **Contract, validator, fixture-provider wiring done; autonomous parser gate PENDING.** Evidence: `docs/evidence/v1-slice2-structured-jd.md` |
-| 4-6 | ResumePlan, ATS form path, readiness | Not started (see `docs/NEXT_TASKS.md`) |
+| 2 | Structured JD contract + provider validation | **Contract, validator, fixture provider and local Ollama adapter implemented; coverage/interpretation and autonomous parser admission remain PENDING.** Evidence: `docs/evidence/v1-slice2-structured-jd.md` |
+| 4 | ResumePlan and rendering | **Source-mapped PDF plan/rendering implemented and offline-verified; no real-job plan until extraction and lane review pass.** |
+| 5-6 | ATS form path and readiness | **One supported local Greenhouse-style path implemented; offline fill/reconciliation verified. No live application form opened for filling or submitted.** |
 
 V2-V5 are untouched.
 

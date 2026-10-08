@@ -5,6 +5,8 @@ import path from "node:path";
 
 export interface LaunchPersistentChromeOptions extends LaunchOptions {
   headless?: boolean;
+  viewport?: { width: number; height: number } | null;
+  deviceScaleFactor?: number;
 }
 
 const DEFAULT_USER_DATA_DIR = "./.chrome-profile";
@@ -214,11 +216,22 @@ export async function launchPersistentChrome(
   }
 
   const { headless = false, ...rest } = options;
-  return chromium.launchPersistentContext(absoluteUserDataDir, {
-    channel: "chrome",
-    headless,
-    ...rest,
-  });
+  try {
+    return await chromium.launchPersistentContext(absoluteUserDataDir, {
+      channel: "chrome",
+      headless,
+      ...rest,
+    });
+  } catch (error) {
+    // A second owner can win the race after our first process check. Confirm an exact
+    // profile owner before translating that launch failure into profile contention.
+    const launchMessage = error instanceof Error ? error.message : "";
+    if (/profile.*in use|opening in existing browser session|processsingleton/i.test(launchMessage)) {
+      const owners = await deps.findOwningProcessIds(absoluteUserDataDir);
+      if (owners.length > 0) throw new ChromeProfileInUseError(absoluteUserDataDir, owners);
+    }
+    throw error;
+  }
 }
 
 /**

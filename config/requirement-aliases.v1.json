@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "purpose": "Lexical retrieval normalization only; never substitutes for deterministic requirement validation.",
+  "aliases": [
+    { "canonical": "PostgreSQL", "forms": ["PostgreSQL", "Postgres"] },
+    { "canonical": "JavaScript", "forms": ["JavaScript", "JS"] },
+    { "canonical": "TypeScript", "forms": ["TypeScript", "TS"] },
+    { "canonical": "Amazon Web Services", "forms": ["Amazon Web Services", "AWS"] },
+    { "canonical": "REST API", "forms": ["REST API", "RESTful API"] },
+    { "canonical": "quality engineering", "forms": ["quality engineering", "QA automation", "software test automation"] }
+  ]
+}
