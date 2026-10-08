@@ -18,7 +18,7 @@ What exists and is covered by tests:
 
 Not achieved: autonomous parser admission (no reviewed dataset or independent evaluation); independent human coverage attestation on any real job; a real candidate decision of `ELIGIBLE`; any live ATS form fill or upload; verification of the sensitive and contact answers a real form requires (they remain pending candidate review and are never inferred).
 
-Verification: see the Verification log section at the end of this summary block (filled in on integration).
+Verification on integration (2026-10-09): `npm run typecheck` and `npm run build` clean; full `npm test` passed 91 files / 1,036 tests (headed-Chrome tests included; earlier headed-Chrome flakes are logged in `docs/KNOWN_FLAKES.md`); the commits were also installed with `npm ci` and re-run in a separate clean clone. LinkedIn listing discovery is deliberately not part of this branch (see the `linkedin-discovery` branch, on hold).
 
 
 
