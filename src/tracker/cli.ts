@@ -17,6 +17,8 @@ export interface TrackerArgs {
   out?: string;
   /** Board-list config whose manualWatch entries become MANUAL_WATCH rows. */
   boards?: string;
+  /** Application packets root; packet readiness overrides the row state when it matches the row's JD hash. */
+  packets?: string;
 }
 
 export function parseTrackerArgs(argv: string[]): TrackerArgs {
@@ -26,12 +28,13 @@ export function parseTrackerArgs(argv: string[]): TrackerArgs {
     else if (argv[i] === "--output-dir") args.outputDir = argv[++i];
     else if (argv[i] === "--out") args.out = argv[++i];
     else if (argv[i] === "--boards") args.boards = argv[++i];
+    else if (argv[i] === "--packets") args.packets = argv[++i];
   }
   return args;
 }
 
-export function writeTracker(args: { jobsPath: string; outputDir: string; out: string; now?: string; watch?: ManualWatchEntry[] }): { rows: number; problems: string[] } {
-  const { rows, problems } = buildTrackerRows({ jobsPath: args.jobsPath, outputDir: args.outputDir, watch: args.watch, now: args.now });
+export function writeTracker(args: { jobsPath: string; outputDir: string; out: string; now?: string; watch?: ManualWatchEntry[]; packetsDir?: string }): { rows: number; problems: string[] } {
+  const { rows, problems } = buildTrackerRows({ jobsPath: args.jobsPath, outputDir: args.outputDir, watch: args.watch, now: args.now, packetsDir: args.packetsDir });
   const bytes = buildXlsx([
     { name: "Tracker", header: [...TRACKER_COLUMNS], rows: rows.map(rowToCells), widths: [24, 36, 10, 16, 28, 20, 18, 50, 20, 50, 9, 50, 20, 50, 11, 48, 20, 11, 14, 20, 24, 60] },
     {
@@ -59,7 +62,7 @@ export async function runTracker(args: TrackerArgs, log: (line: string) => void 
     return 2;
   }
   try {
-    const result = writeTracker({ jobsPath: path.resolve(args.dataDir, "jobs.jsonl"), outputDir: path.resolve(args.outputDir ?? path.join(args.dataDir, "output")), out: path.resolve(args.out), watch: args.boards ? boardListSchema.parse(JSON.parse(readFileSync(path.resolve(args.boards), "utf8"))).manualWatch : undefined });
+    const result = writeTracker({ jobsPath: path.resolve(args.dataDir, "jobs.jsonl"), outputDir: path.resolve(args.outputDir ?? path.join(args.dataDir, "output")), out: path.resolve(args.out), packetsDir: args.packets ? path.resolve(args.packets) : undefined, watch: args.boards ? boardListSchema.parse(JSON.parse(readFileSync(path.resolve(args.boards), "utf8"))).manualWatch : undefined });
     log(`Tracker written: ${path.resolve(args.out)} (${result.rows} rows${result.problems.length ? `, ${result.problems.length} unreadable files noted in About` : ""})`);
     return 0;
   } catch (error) {

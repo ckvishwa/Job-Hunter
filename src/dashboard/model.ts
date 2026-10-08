@@ -10,7 +10,7 @@ import { buildTrackerRows, type TrackerRow } from "../tracker/rows.js";
 // facts, form answers, resume text or blocking-reason prose ever leaves this module.
 
 export const DAILY_TARGET = { total: 30, SECURITY: 24, QA: 6 } as const;
-export const FUNNEL_ORDER = ["MANUAL_WATCH", "DISCOVERED", "RESOLVED", "WAITING_FOR_USER", "BLOCKED", "REJECT", "READY_TO_SUBMIT"] as const;
+export const FUNNEL_ORDER = ["MANUAL_WATCH", "DISCOVERED", "RESOLVED", "JD_VERIFIED", "ELIGIBILITY_REVIEWED", "RESUME_PREPARED", "FORM_PREPARED", "FORM_VERIFIED", "WAITING_FOR_USER", "BLOCKED", "REJECT", "READY_TO_SUBMIT", "SUBMITTED"] as const;
 export const ACTIVE_WINDOW_MS = 10 * 60 * 1000;
 
 /** What each stage persists and whether it appends run events (src/events/run-events.ts). */
@@ -29,6 +29,8 @@ export interface DashboardSources {
   boardsPath?: string;
   /** Run-event JSONL. Defaults to private-runtime/run-events.jsonl under the working directory. */
   eventsPath?: string;
+  /** Application packets root; a packet matching a job's JD hash supplies its readiness state. */
+  packetsDir?: string;
   now?: string;
 }
 
@@ -169,7 +171,7 @@ function eventsActivity(eventsPath: string, nowMs: number): Pick<ActivityView, "
 export function buildDashboardSnapshot(sources: DashboardSources): DashboardSnapshot {
   const now = sources.now ?? new Date().toISOString();
   const jobsPath = path.join(sources.dataDir, "jobs.jsonl");
-  const { rows, problems } = buildTrackerRows({ jobsPath, outputDir: sources.outputDir, now });
+  const { rows, problems } = buildTrackerRows({ jobsPath, outputDir: sources.outputDir, now, packetsDir: sources.packetsDir });
 
   const counts = new Map<string, number>();
   for (const r of rows) counts.set(r.state, (counts.get(r.state) ?? 0) + 1);

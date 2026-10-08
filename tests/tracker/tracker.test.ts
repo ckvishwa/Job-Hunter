@@ -190,3 +190,33 @@ describe("tracker CLI", () => {
     expect(readFileSync(w.jobsPath, "utf8")).toBe(before);
   });
 });
+
+describe("tracker shows application packet readiness", () => {
+  const packet = (state: string, jdHash: string | null, blockers: string[] = []) => ({ generatedAt: "2026-10-09T12:00:00.000Z", hashes: { jdHash }, readiness: { state, blockers } });
+  const writePacket = (root: string, jobId: string, value: unknown) => { mkdirSync(path.join(root, jobId), { recursive: true }); writeFileSync(path.join(root, jobId, "application-packet.json"), JSON.stringify(value)); };
+
+  it("uses the packet state only when the packet was built for this exact JD revision", () => {
+    const w = workspace();
+    saveJobs(w.jobsPath, [job({})]);
+    const packets = path.join(w.dir, "packets");
+    writePacket(packets, "job-1", packet("FORM_PREPARED", HASH_A, ["Eligibility is REVIEW", "No approved resume", "third"]));
+    const [row] = buildTrackerRows({ jobsPath: w.jobsPath, outputDir: w.out, packetsDir: packets }).rows;
+    expect(row).toMatchObject({ state: "FORM_PREPARED", lastUpdate: "2026-10-09T12:00:00.000Z", blockingReason: "Eligibility is REVIEW; No approved resume" });
+    writePacket(packets, "job-1", packet("READY_TO_SUBMIT", "e".repeat(64)));
+    const [stale] = buildTrackerRows({ jobsPath: w.jobsPath, outputDir: w.out, packetsDir: packets }).rows;
+    expect(stale!.state).toBe("RESOLVED");
+    expect(stale!.blockingReason).toContain("different job description revision");
+  });
+
+  it("ignores an absent or unreadable packet and reports the unreadable file instead of failing", () => {
+    const w = workspace();
+    saveJobs(w.jobsPath, [job({})]);
+    const packets = path.join(w.dir, "packets");
+    expect(buildTrackerRows({ jobsPath: w.jobsPath, outputDir: w.out, packetsDir: packets }).rows[0]!.state).toBe("RESOLVED");
+    mkdirSync(path.join(packets, "job-1"), { recursive: true });
+    writeFileSync(path.join(packets, "job-1", "application-packet.json"), "{not json");
+    const built = buildTrackerRows({ jobsPath: w.jobsPath, outputDir: w.out, packetsDir: packets });
+    expect(built.rows[0]!.state).toBe("RESOLVED");
+    expect(built.problems.join(" ")).toContain("application-packet.json");
+  });
+});

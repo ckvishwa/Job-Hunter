@@ -47,6 +47,8 @@ export interface TrackerSources {
   /** Employers to check by hand (no adapter); emitted as MANUAL_WATCH rows. */
   watch?: ManualWatchEntry[];
   now?: string;
+  /** Application packets root (<root>/<jobId>/application-packet.json). When a packet matches a row's JD hash, its readiness state is shown. */
+  packetsDir?: string;
 }
 
 export interface TrackerBuild {
@@ -156,16 +158,27 @@ function rowFromRun(job: JobPosting | undefined, run: RunDir, problems: string[]
 }
 
 /** One row per (job, JD revision). A job with no run output yet appears once, from its stored record. */
+/** Readiness from the application packet, only when the packet was built for this exact JD revision. */
+function withPacket(row: TrackerRow, packetsDir: string | undefined, jobId: string, problems: string[]): TrackerRow {
+  if (!packetsDir) return row;
+  const file = path.join(packetsDir, jobId, "application-packet.json");
+  if (!existsSync(file)) return row;
+  const packet = readJson(file, problems) as { generatedAt?: string; hashes?: { jdHash?: string | null }; readiness?: { state?: string; blockers?: string[] } } | null;
+  if (!packet?.readiness?.state) return row;
+  if (packet.hashes?.jdHash !== row.jdHash) return { ...row, blockingReason: row.blockingReason || "An application packet exists for a different job description revision; rebuild it." };
+  return { ...row, state: packet.readiness.state, lastUpdate: text(packet.generatedAt) || row.lastUpdate, blockingReason: (packet.readiness.blockers ?? []).slice(0, 2).join("; ") || row.blockingReason };
+}
+
 export function buildTrackerRows(sources: TrackerSources): TrackerBuild {
   const problems: string[] = [];
   const jobs = existsSync(sources.jobsPath) ? loadJobs(sources.jobsPath) : [];
   const byId = new Map(jobs.map((j) => [j.id, j]));
   const runs = listRunDirs(sources.outputDir);
-  const rows: TrackerRow[] = runs.map((run) => rowFromRun(byId.get(run.jobId), run, problems));
+  const rows: TrackerRow[] = runs.map((run) => withPacket(rowFromRun(byId.get(run.jobId), run, problems), sources.packetsDir, run.jobId, problems));
   const covered = new Set(runs.map((r) => `${r.jobId}::${r.jdHash}`));
   for (const job of jobs) {
     if (covered.has(`${job.id}::${job.jdContentHash ?? ""}`)) continue;
-    rows.push({
+    rows.push(withPacket({
       company: job.company,
       title: job.title,
       track: trackOf(job),
@@ -181,7 +194,7 @@ export function buildTrackerRows(sources: TrackerSources): TrackerBuild {
       state: job.resolutionStatus === "resolved" ? "RESOLVED" : "DISCOVERED",
       lastUpdate: job.extractedAt || job.lastSeenAt || job.discoveredAt,
       blockingReason: "",
-    });
+    }, sources.packetsDir, job.id, problems));
   }
   for (const w of sources.watch ?? []) {
     rows.push({

@@ -11,6 +11,7 @@ export interface DashboardArgs {
   outputDir: string;
   boardsPath?: string;
   eventsPath?: string;
+  packetsDir?: string;
   port: number;
 }
 
@@ -21,6 +22,7 @@ export function parseDashboardArgs(argv: string[]): DashboardArgs {
     else if (argv[i] === "--output-dir") args.outputDir = argv[++i] ?? args.outputDir;
     else if (argv[i] === "--boards") args.boardsPath = argv[++i];
     else if (argv[i] === "--events") args.eventsPath = argv[++i];
+    else if (argv[i] === "--packets") args.packetsDir = argv[++i];
     else if (argv[i] === "--port") {
       const n = Number(argv[++i]);
       if (!Number.isInteger(n) || n < 0 || n > 65535) throw new Error("--port must be an integer 0-65535");
@@ -37,7 +39,7 @@ export function parseDashboardArgs(argv: string[]): DashboardArgs {
 const isMainModule = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMainModule) {
   const args = parseDashboardArgs(process.argv.slice(2));
-  const server = createDashboardServer({ dataDir: path.resolve(args.dataDir), outputDir: path.resolve(args.outputDir), boardsPath: args.boardsPath ? path.resolve(args.boardsPath) : undefined, eventsPath: args.eventsPath ? path.resolve(args.eventsPath) : undefined });
+  const server = createDashboardServer({ dataDir: path.resolve(args.dataDir), outputDir: path.resolve(args.outputDir), boardsPath: args.boardsPath ? path.resolve(args.boardsPath) : undefined, eventsPath: args.eventsPath ? path.resolve(args.eventsPath) : undefined, packetsDir: path.resolve(args.packetsDir ?? "private-runtime/application-packets") });
   listenLoopback(server, args.port).then(
     (addr) => console.log(`Dashboard (read-only): http://127.0.0.1:${addr.port}/`),
     (error: Error) => {
