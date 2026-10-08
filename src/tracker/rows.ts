@@ -10,13 +10,15 @@ import { loadJobs } from "../storage/job-store.js";
 // application records under the output directory). Nothing here writes to those stores, and no code
 // reads the generated workbook back: a deleted or edited tracker is simply rebuilt.
 
-export const TRACKER_COLUMNS = ["Company", "Title", "Track", "Location", "Location flag", "No sponsorship", "No sponsorship quote", "Clearance required", "Clearance quote", "Years required", "Years quote", "Remote excludes CT", "Excludes CT quote", "ATS", "Official URL", "JD hash", "Decision", "Resume variant", "State", "Last update", "Blocking reason"] as const;
+export const TRACKER_COLUMNS = ["Company", "Title", "Track", "Entry signal", "Location", "Location flag", "No sponsorship", "No sponsorship quote", "Clearance required", "Clearance quote", "Years required", "Years quote", "Remote excludes CT", "Excludes CT quote", "ATS", "Official URL", "JD hash", "Decision", "Resume variant", "State", "Last update", "Blocking reason"] as const;
 
 export interface TrackerRow {
   company: string;
   title: string;
   /** SECURITY, QA, or empty when the job did not come through a tracked title search. */
   track: string;
+  /** Entry-level words (Junior, Associate, ...) found in a title that also matched SECURITY or QA. */
+  entrySignal: string;
   location: string;
   /** LOCATION_UNKNOWN when the location is empty or ambiguous (a non-US location is dropped before it gets here). */
   locationFlag: string;
@@ -71,8 +73,12 @@ function reasonText(value: unknown): string {
 }
 
 // Discovery records the matched track in matchedProfiles (lower-case); older profile ids map to the same two tracks.
-const TRACK_BY_PROFILE: Record<string, string> = { security: "SECURITY", cybersecurity: "SECURITY", qa: "QA", sdet: "QA", entry_level: "ENTRY_LEVEL" };
-const TRACK_ORDER = ["SECURITY", "QA", "ENTRY_LEVEL"];
+const TRACK_BY_PROFILE: Record<string, string> = { security: "SECURITY", cybersecurity: "SECURITY", qa: "QA", sdet: "QA" };
+const TRACK_ORDER = ["SECURITY", "QA"];
+
+export function entrySignalOf(job: JobPosting | undefined): string {
+  return (job?.matchedKeywords ?? []).filter((k) => k.startsWith("entry:")).map((k) => k.slice("entry:".length)).join(", ");
+}
 
 export function trackOf(job: JobPosting | undefined): string {
   const tracks = (job?.matchedProfiles ?? []).map((p) => TRACK_BY_PROFILE[p.toLowerCase()]).filter((t): t is string => t !== undefined);
@@ -134,6 +140,7 @@ function rowFromRun(job: JobPosting | undefined, run: RunDir, problems: string[]
     company: job?.company ?? "",
     title: job?.title ?? "",
     track: trackOf(job),
+    entrySignal: entrySignalOf(job),
     location: job?.location ?? "",
     locationFlag: job ? locationFlag(job.location) : "",
     ...jdFlagFields(job),
@@ -162,6 +169,7 @@ export function buildTrackerRows(sources: TrackerSources): TrackerBuild {
       company: job.company,
       title: job.title,
       track: trackOf(job),
+      entrySignal: entrySignalOf(job),
       location: job.location ?? "",
       locationFlag: locationFlag(job.location),
       ...jdFlagFields(job),
@@ -180,6 +188,7 @@ export function buildTrackerRows(sources: TrackerSources): TrackerBuild {
       company: w.company,
       title: "(no adapter: check the careers site manually)",
       track: w.track ?? "",
+      entrySignal: "",
       location: "",
       locationFlag: "",
       ...NO_FLAGS,
@@ -197,4 +206,4 @@ export function buildTrackerRows(sources: TrackerSources): TrackerBuild {
   return { rows, problems };
 }
 
-export const rowToCells = (r: TrackerRow): string[] => [r.company, r.title, r.track, r.location, r.locationFlag, r.noSponsorship, r.noSponsorshipQuote, r.clearanceRequired, r.clearanceQuote, r.yearsRequired, r.yearsQuote, r.remoteExcludesCt, r.excludesCtQuote, r.ats, r.officialUrl, r.jdHash, r.decision, r.resumeVariant, r.state, r.lastUpdate, r.blockingReason].map((v) => v.trim());
+export const rowToCells = (r: TrackerRow): string[] => [r.company, r.title, r.track, r.entrySignal, r.location, r.locationFlag, r.noSponsorship, r.noSponsorshipQuote, r.clearanceRequired, r.clearanceQuote, r.yearsRequired, r.yearsQuote, r.remoteExcludesCt, r.excludesCtQuote, r.ats, r.officialUrl, r.jdHash, r.decision, r.resumeVariant, r.state, r.lastUpdate, r.blockingReason].map((v) => v.trim());

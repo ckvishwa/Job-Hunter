@@ -16,6 +16,7 @@ const CANDIDATE_FILE = {
       QA: { priority: 2, reviewShare: 0.2, keywords: ["QA Engineer", "SDET", "Test Automation", "Security QA"] },
       SECURITY: { priority: 1, reviewShare: 0.8, keywords: ["SOC Analyst", "SOC", "IDR", "Security Engineer", "Detection Engineer", "Threat Intelligence"] },
     },
+    entrySignalKeywords: ["Associate", "Junior", "Jr", "New Grad"],
     excludeTitleKeywords: ["Senior", "Sr.", "Staff", "Lead", "Manager", "Intern", "Sales"],
     locationKeywords: ["Remote"],
   },
@@ -28,6 +29,7 @@ describe("candidate list import (maps to the real schema, schema unchanged)", ()
     expect(list.tracks!.map((t) => t.name)).toEqual(["SECURITY", "QA"]);
     expect(list.companies).toEqual([{ company: "Acme", ats: "greenhouse", board: "acme" }]);
     expect(list.excludeTitleKeywords).toContain("Sr.");
+    expect(list.entrySignalKeywords).toEqual(["Associate", "Junior", "Jr", "New Grad"]);
     expect(dropped).toEqual(["_note", "companies[].why", "titleMatching.locationKeywords", "titleMatching.mode", "tracks.reviewShare"]);
     expect(boardListSchema.safeParse(list).success).toBe(true);
   });

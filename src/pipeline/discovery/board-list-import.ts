@@ -14,6 +14,7 @@ const candidateFileSchema = z
       .object({
         tracks: z.record(z.string(), z.object({ priority: z.number(), keywords: z.array(z.string()).min(1) }).passthrough()),
         excludeTitleKeywords: z.array(z.string()).optional(),
+        entrySignalKeywords: z.array(z.string()).optional(),
       })
       .passthrough(),
     companies: z.array(z.object({ company: z.string(), ats: z.enum(["greenhouse", "lever"]), boardToken: z.string() }).passthrough()).min(1),
@@ -30,7 +31,7 @@ export function convertCandidateBoardList(input: unknown): ImportedBoardList {
   const parsed = candidateFileSchema.parse(input);
   const dropped = new Set<string>();
   for (const key of Object.keys(parsed)) if (!["titleMatching", "companies"].includes(key)) dropped.add(key);
-  for (const key of Object.keys(parsed.titleMatching)) if (!["tracks", "excludeTitleKeywords"].includes(key)) dropped.add(`titleMatching.${key}`);
+  for (const key of Object.keys(parsed.titleMatching)) if (!["tracks", "excludeTitleKeywords", "entrySignalKeywords"].includes(key)) dropped.add(`titleMatching.${key}`);
   const tracks = Object.entries(parsed.titleMatching.tracks)
     .sort(([, a], [, b]) => a.priority - b.priority)
     .map(([name, track]) => {
@@ -45,6 +46,7 @@ export function convertCandidateBoardList(input: unknown): ImportedBoardList {
     version: 1,
     tracks,
     ...(parsed.titleMatching.excludeTitleKeywords ? { excludeTitleKeywords: parsed.titleMatching.excludeTitleKeywords } : {}),
+    ...(parsed.titleMatching.entrySignalKeywords ? { entrySignalKeywords: parsed.titleMatching.entrySignalKeywords } : {}),
     companies,
   });
   return { list, dropped: [...dropped].sort() };

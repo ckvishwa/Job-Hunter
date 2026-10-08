@@ -33,7 +33,7 @@ export function parseTrackerArgs(argv: string[]): TrackerArgs {
 export function writeTracker(args: { jobsPath: string; outputDir: string; out: string; now?: string; watch?: ManualWatchEntry[] }): { rows: number; problems: string[] } {
   const { rows, problems } = buildTrackerRows({ jobsPath: args.jobsPath, outputDir: args.outputDir, watch: args.watch, now: args.now });
   const bytes = buildXlsx([
-    { name: "Tracker", header: [...TRACKER_COLUMNS], rows: rows.map(rowToCells), widths: [24, 36, 10, 28, 20, 18, 50, 20, 50, 9, 50, 20, 50, 11, 48, 20, 11, 14, 20, 24, 60] },
+    { name: "Tracker", header: [...TRACKER_COLUMNS], rows: rows.map(rowToCells), widths: [24, 36, 10, 16, 28, 20, 18, 50, 20, 50, 9, 50, 20, 50, 11, 48, 20, 11, 14, 20, 24, 60] },
     {
       name: "About",
       header: ["Note"],

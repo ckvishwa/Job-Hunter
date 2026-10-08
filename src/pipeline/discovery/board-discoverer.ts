@@ -67,6 +67,9 @@ export const boardListSchema = z
     // Drop postings whose location is clearly outside the US (default true). Unknown or ambiguous
     // locations are never dropped; the tracker flags them instead.
     dropNonUsLocations: z.boolean().optional(),
+    // Words such as Junior, Associate or New Grad. They never admit a title on their own: they only mark a
+    // title that already matches a track (ENTRY_SIGNAL). A title with only an entry word is dropped.
+    entrySignalKeywords: z.array(z.string().trim().min(1).max(60)).max(50).optional(),
     manualWatch: z.array(watchSchema).max(100).optional(),
     companies: z.array(companySchema).min(1).max(300),
   })
@@ -104,18 +107,21 @@ export interface TitleClassification {
   track: string | null;
   keywords: string[];
   excludedBy: string[];
+  /** Entry-level words found in a title that also matched a track. */
+  entrySignal: string[];
 }
 
 /** Exclusions first, then tracks in configured order; the first track that matches claims the title. */
-export function classifyTitle(title: string, list: Pick<BoardList, "titleKeywords" | "tracks" | "excludeTitleKeywords">): TitleClassification {
+export function classifyTitle(title: string, list: Pick<BoardList, "titleKeywords" | "tracks" | "excludeTitleKeywords" | "entrySignalKeywords">): TitleClassification {
   const excludedBy = titleMatches(title, list.excludeTitleKeywords ?? []);
-  if (excludedBy.length > 0) return { track: null, keywords: [], excludedBy };
+  if (excludedBy.length > 0) return { track: null, keywords: [], excludedBy, entrySignal: [] };
+  const entry = () => titleMatches(title, list.entrySignalKeywords ?? []);
   for (const track of list.tracks ?? []) {
     const keywords = titleMatches(title, track.keywords);
-    if (keywords.length > 0) return { track: track.name, keywords, excludedBy: [] };
+    if (keywords.length > 0) return { track: track.name, keywords, excludedBy: [], entrySignal: entry() };
   }
   const flat = titleMatches(title, list.titleKeywords ?? []);
-  return flat.length > 0 ? { track: "", keywords: flat, excludedBy: [] } : { track: null, keywords: [], excludedBy: [] };
+  return flat.length > 0 ? { track: "", keywords: flat, excludedBy: [], entrySignal: entry() } : { track: null, keywords: [], excludedBy: [], entrySignal: [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -313,7 +319,7 @@ function registryEntryFor(company: BoardCompany): CompanyRegistryEntry {
   });
 }
 
-function toPosting(company: BoardCompany, raw: BoardPosting, matchedKeywords: string[], track: string, now: string): JobPosting {
+function toPosting(company: BoardCompany, raw: BoardPosting, matchedKeywords: string[], entrySignal: string[], track: string, now: string): JobPosting {
   return {
     id: computeJobId(raw.url),
     source: `board-api::${company.ats}::${company.board}`,
@@ -337,8 +343,9 @@ function toPosting(company: BoardCompany, raw: BoardPosting, matchedKeywords: st
     matchedProfiles: track ? [track.toLowerCase()] : [],
     discoveredFrom: ["board-api"],
     discoveredUrl: raw.url,
-    matchedKeywords,
-    relevanceReason: `${track ? track + ": " : ""}title matched: ${matchedKeywords.join(", ")}`,
+    // "entry:<word>" entries record the ENTRY_SIGNAL words; the tracker reads them back.
+    matchedKeywords: [...matchedKeywords, ...entrySignal.map((w) => `entry:${w}`)],
+    relevanceReason: `${track ? track + ": " : ""}title matched: ${matchedKeywords.join(", ")}${entrySignal.length ? `; entry signal: ${entrySignal.join(", ")}` : ""}`,
     rawMetadata: {},
   } as JobPosting;
 }
@@ -383,8 +390,8 @@ export async function runBoardDiscovery(options: BoardDiscoveryOptions): Promise
       result.droppedLocation = titleMatched.length - matched.length;
       result.matched = matched.length;
       for (const m of matched) result.byTrack[m.track!] = (result.byTrack[m.track!] ?? 0) + 1;
-      for (const { p, keywords, track } of matched.slice(0, options.maxPerCompany ?? matched.length)) {
-        const stamped = stampResolution(toPosting(company, p, keywords, track!, now()), {
+      for (const { p, keywords, entrySignal, track } of matched.slice(0, options.maxPerCompany ?? matched.length)) {
+        const stamped = stampResolution(toPosting(company, p, keywords, entrySignal, track!, now()), {
           sourceKind: "board-api",
           observedUrl: boardApiUrl(company),
           observedAt: now(),
