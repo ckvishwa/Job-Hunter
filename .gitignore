@@ -19,3 +19,18 @@ data/search-demo/
 
 # Private candidate data (pending/approved facts, reviews); never commit
 private-runtime/
+
+# Private and generated artifacts: never commit
+*.xlsx
+tmp/
+generated-resumes/
+resumes/
+resume-preview*.pdf
+output/**/resume*.pdf
+output/**/resume-plan.json
+output/**/application-*.json
+candidate-facts/
+candidate-profile.reviewed*.json
+candidate-answer-observations*.json
+pending-facts*.json
+canonical-resume-registry*.json
