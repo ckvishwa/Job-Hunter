@@ -24,3 +24,7 @@ Read-only page on `http://127.0.0.1:<port>/`. GET/HEAD only (other methods get 4
 No run-event log exists, so "last 20 events" and live stage show "no data". "Typed errors" are `errorCode` fields in the latest checkpoints. "Active run" only means a checkpoint was updated under 10 minutes ago. The daily queue (30/day: 24 SECURITY / 6 QA) has no stored counter, so progress shows "no data" and the targets are labelled targets. Board health shows ledger job counts per configured company, labelled as not verification, because `boards:verify` persists nothing.
 
 Next gate if live panels are wanted: add an append-only run-event writer in the pipeline and discovery stages (separate task; not done here).
+
+## Test prerequisite
+
+The render test uses the Chromium bundled with the pinned Playwright (1.62.0, revision 1234). If it reports a missing executable after a Playwright upgrade, run `npx playwright install chromium`.

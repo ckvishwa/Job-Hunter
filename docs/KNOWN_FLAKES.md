@@ -17,3 +17,10 @@ Record a test here only when it has failed without a code change and passed on r
 - **Likely cause (unconfirmed):** same suspect as above, headed Chrome cold start under parallel load.
 - **What to do:** `npx vitest run tests/pipeline/offline-e2e.test.ts` (or `npm run pipeline:offline`). If it fails alone, treat it as real. Fill in the exact test name and timings the next time it is seen.
 
+## Headed-Chrome LinkedIn profile persistence (third entry)
+
+- **Test:** `dedicated LinkedIn browser profile > keeps cookies and localStorage across two real headed launches and extracts observed DOM identities`
+- **File:** `tests/pipeline/discovery/linkedin-discoverer.test.ts`
+- **Seen:** once in a full `npx vitest run` on 2026-10-08 (1016 passed, 2 failed of 1018; this test failed after 8.7 s with `page.goto: net::ERR_CONNECTION_TIMED_OUT` at the loopback `/check` URL in the second launch). Run alone, the file passed 22/22 and this test took 3.6 s. No code changed between the runs.
+- **Likely cause (unconfirmed):** second headed launch of the same profile while many other headed-Chrome files run in parallel; the loopback request timed out. No product defect was found.
+- **What to do:** `npx vitest run tests/pipeline/discovery/linkedin-discoverer.test.ts`. If it fails alone, treat it as real.

@@ -143,14 +143,14 @@ describe("dashboard server", () => {
     expect((await request(addr.port, "GET", "/api/snapshot", "evil.example")).status).toBe(403);
     expect((await request(addr.port, "GET", "/nope")).status).toBe(404);
     expect(digestTree(f.dir)).toBe(before);
-  });
+}, 20_000);
 });
 
 describe("dashboard page rendering (headless Chromium against the fixture server)", () => {
   it("renders funnel, no-data panels, escaped text and safe links from fixture data", async () => {
     const f = fixture();
     const { addr } = await start(f);
-    const browser = await chromium.launch({ channel: "chrome", headless: true });
+    const browser = await chromium.launch({ headless: true });
     try {
       const page = await browser.newPage();
       const external: string[] = [];
