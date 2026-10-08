@@ -9,3 +9,11 @@ Record a test here only when it has failed without a code change and passed on r
 - **Seen:** once in a full `npm test` run on 2026-10-08 (947 passed, 1 failed; the failing test took about 5.2 s). The same file passed 18/18 when run alone (this test about 3.1 s), and the next full run passed 987/987.
 - **Likely cause (unconfirmed):** timing under load. The suite starts headed Chrome while other test files run in parallel, and this is the first browser test in the file, so it pays the cold-start cost. No product defect was found.
 - **What to do:** `npx vitest run tests/e2e/offline/browser-search.e2e.test.ts`. If it fails alone, treat it as a real failure. If it fails repeatedly in full runs, raise its timeout or serialize browser test files rather than ignoring it.
+
+## Headed-Chrome offline pipeline E2E (second entry)
+
+- **Test file:** `tests/pipeline/offline-e2e.test.ts` (headed Chrome against the loopback form fixture).
+- **Seen:** reported by the user as a second headed-Chrome flake; logged 2026-10-08. The failing test name, run size, duration and rerun result were not supplied and were not reproduced in this session, so they are unrecorded.
+- **Likely cause (unconfirmed):** same suspect as above, headed Chrome cold start under parallel load.
+- **What to do:** `npx vitest run tests/pipeline/offline-e2e.test.ts` (or `npm run pipeline:offline`). If it fails alone, treat it as real. Fill in the exact test name and timings the next time it is seen.
+
