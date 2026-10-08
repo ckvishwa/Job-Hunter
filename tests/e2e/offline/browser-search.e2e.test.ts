@@ -312,6 +312,7 @@ describe("visible search flow against a loopback careers site (headed Chrome)", 
     for (const kept of ["payments platform", "What you'll do", "Design and maintain automated test suites", "Minimum requirements", "5+ years of experience", "Pay and benefits", "$150,000 - $200,000"]) {
       expect(rec.descriptionText).toContain(kept);
     }
+    expect(rec.descriptionText).toContain("• Design and maintain automated test suites.\n• Partner with developers on test strategy.");
     // ... page chrome gone: breadcrumb, duplicate title heading, fact sidebar, action labels.
     for (const noise of ["Roles at Acme", "Role details", "Apply now", "Apply for this role", "Employment type", "Office locations", "Full time"]) {
       expect(rec.descriptionText).not.toContain(noise);

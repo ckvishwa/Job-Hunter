@@ -188,7 +188,13 @@ function slug(text: string): string {
 }
 
 function collapse(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
+  return text
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/[\t\f\v ]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function sleep(ms: number): Promise<void> {
@@ -360,7 +366,17 @@ async function extractPostingFromDom(page: Page, container: string, removeSelect
         .filter((h) => h.getClientRects().length > 0)
         .map((h) => clean(h.innerText))
         .filter(Boolean);
+      // Preserve list item boundaries in the text artifact. `innerText` needs a rendered node to
+      // retain block newlines, so mark list items on the live DOM synchronously, read it, then
+      // remove every marker before returning control to the page.
+      const markers: Text[] = [];
+      for (const item of Array.from(root.querySelectorAll("li"))) {
+        const marker = document.createTextNode("• ");
+        item.insertBefore(marker, item.firstChild);
+        markers.push(marker);
+      }
       const text = root.innerText;
+      markers.forEach((marker) => marker.remove());
       const clone = root.cloneNode(true) as HTMLElement;
       clone.querySelectorAll<HTMLElement>("[style*='display: none']").forEach((e) => e.remove());
       const html = clone.innerHTML;
