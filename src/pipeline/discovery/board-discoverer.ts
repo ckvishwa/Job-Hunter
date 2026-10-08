@@ -1,0 +1,370 @@
+import { randomBytes } from "node:crypto";
+import path from "node:path";
+import { readFileSync } from "node:fs";
+import { z } from "zod";
+import type { JobPosting } from "../../adapters/types.js";
+import { companyRegistryEntrySchema, type CompanyRegistryEntry } from "../../config/schema.js";
+import { computeJobId } from "../../dedup/canonicalize-url.js";
+import { mergeJobs } from "../../dedup/deduplicator.js";
+import {
+  buildJobFailure,
+  evaluatePersistable,
+  stampResolution,
+  type JobFailure,
+  type JobFailureCode,
+} from "../../domain/canonical-job.js";
+import { stripHtml, unescapeEscapedHtml } from "../../extraction/jd-cleaner.js";
+import { appendJobFailures, updateJobs } from "../../storage/jsonl-store.js";
+
+// Discovery source: the public Greenhouse and Lever board APIs, for a company list the candidate
+// provides. No browser, no LinkedIn, no scraping: one JSON GET per company board. Every posting
+// still passes the same official-board verification, description gate and merge/dedupe as any other
+// discovery source before it reaches jobs.jsonl.
+
+const DOMAIN_RE = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
+
+const companySchema = z
+  .object({
+    company: z.string().trim().min(1).max(120),
+    ats: z.enum(["greenhouse", "lever"]),
+    // The board token / site slug exactly as it appears in the employer's own job-board URL.
+    board: z.string().regex(/^[A-Za-z0-9._-]{1,64}$/, "board must be the token from the employer's board URL"),
+    // Only needed when the employer's Greenhouse posting URLs live on its own domain (?gh_jid=...).
+    corporateDomain: z.string().regex(DOMAIN_RE).optional(),
+    region: z.enum(["global", "eu"]).optional(),
+  })
+  .strict();
+
+export const boardListSchema = z
+  .object({
+    version: z.literal(1),
+    // A posting is only kept when its title contains one of these phrases. There is no "keep everything" mode.
+    titleKeywords: z.array(z.string().trim().min(2).max(60)).min(1).max(50),
+    companies: z.array(companySchema).min(1).max(300),
+  })
+  .strict()
+  .superRefine((list, ctx) => {
+    const seen = new Set<string>();
+    list.companies.forEach((c, i) => {
+      const key = `${c.ats}:${c.board.toLowerCase()}`;
+      if (seen.has(key)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["companies", i], message: `duplicate board ${key}` });
+      seen.add(key);
+    });
+  });
+export type BoardList = z.infer<typeof boardListSchema>;
+export type BoardCompany = BoardList["companies"][number];
+
+export function loadBoardList(filePath: string): BoardList {
+  return boardListSchema.parse(JSON.parse(readFileSync(filePath, "utf8")));
+}
+
+export function titleMatches(title: string, keywords: string[]): string[] {
+  const lowered = title.toLowerCase();
+  return keywords.filter((keyword) => {
+    const k = keyword.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[^a-z0-9])${k}([^a-z0-9]|$)`).test(lowered);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Public API payloads (untrusted JSON: parsed narrowly, unknown fields ignored)
+// ---------------------------------------------------------------------------
+
+const greenhouseBoardSchema = z.object({
+  jobs: z.array(
+    z
+      .object({
+        id: z.union([z.number().int(), z.string().regex(/^\d+$/)]),
+        title: z.string(),
+        absolute_url: z.string().url(),
+        location: z.object({ name: z.string().optional() }).passthrough().optional(),
+        departments: z.array(z.object({ name: z.string() }).passthrough()).optional(),
+        content: z.string().optional(),
+        updated_at: z.string().optional(),
+      })
+      .passthrough(),
+  ),
+});
+
+const leverBoardSchema = z.array(
+  z
+    .object({
+      id: z.string().min(1),
+      text: z.string(),
+      hostedUrl: z.string().url(),
+      applyUrl: z.string().url().optional(),
+      categories: z.object({ location: z.string().optional(), team: z.string().optional(), department: z.string().optional(), commitment: z.string().optional() }).passthrough().optional(),
+      descriptionPlain: z.string().optional(),
+      description: z.string().optional(),
+      lists: z.array(z.object({ text: z.string().optional(), content: z.string().optional() }).passthrough()).optional(),
+      additionalPlain: z.string().optional(),
+      createdAt: z.number().optional(),
+    })
+    .passthrough(),
+);
+
+interface BoardPosting {
+  externalId: string;
+  title: string;
+  url: string;
+  applyUrl: string;
+  location: string | null;
+  department: string | null;
+  employmentType: string | null;
+  postingDate: string | null;
+  descriptionText: string;
+  descriptionHtml: string | null;
+}
+
+export class BoardError extends Error {
+  constructor(readonly code: Extract<JobFailureCode, "BOARD_FETCH_FAILED" | "BOARD_NOT_FOUND" | "BOARD_RESPONSE_INVALID">, message: string) {
+    super(message);
+    this.name = "BoardError";
+  }
+}
+
+const MAX_RESPONSE_CHARS = 25_000_000;
+
+export function boardApiUrl(company: BoardCompany): string {
+  if (company.ats === "greenhouse") return `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(company.board)}/jobs?content=true`;
+  const host = company.region === "eu" ? "api.eu.lever.co" : "api.lever.co";
+  return `https://${host}/v0/postings/${encodeURIComponent(company.board)}?mode=json`;
+}
+
+async function getJson(url: string, fetchImpl: typeof fetch, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const onAbort = () => controller.abort();
+  signal?.addEventListener("abort", onAbort, { once: true });
+  try {
+    const response = await fetchImpl(url, { headers: { Accept: "application/json" }, signal: controller.signal });
+    if (response.status === 404) throw new BoardError("BOARD_NOT_FOUND", "Board token not found (HTTP 404); check the token in the employer's board URL.");
+    if (!response.ok) throw new BoardError("BOARD_FETCH_FAILED", `Board API answered HTTP ${response.status}.`);
+    const body = await response.text();
+    if (body.length > MAX_RESPONSE_CHARS) throw new BoardError("BOARD_RESPONSE_INVALID", "Board response exceeded the size limit.");
+    try {
+      return JSON.parse(body) as unknown;
+    } catch {
+      throw new BoardError("BOARD_RESPONSE_INVALID", "Board API returned a non-JSON response.");
+    }
+  } catch (error) {
+    if (error instanceof BoardError) throw error;
+    throw new BoardError("BOARD_FETCH_FAILED", controller.signal.aborted ? "Board request timed out or was cancelled." : `Board request failed (${error instanceof Error ? error.name : "UnknownError"}).`);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", onAbort);
+  }
+}
+
+export async function fetchBoardPostings(company: BoardCompany, fetchImpl: typeof fetch, timeoutMs = 20_000, signal?: AbortSignal): Promise<BoardPosting[]> {
+  const json = await getJson(boardApiUrl(company), fetchImpl, timeoutMs, signal);
+  if (company.ats === "greenhouse") {
+    const parsed = greenhouseBoardSchema.safeParse(json);
+    if (!parsed.success) throw new BoardError("BOARD_RESPONSE_INVALID", "Greenhouse board response has an unexpected shape.");
+    return parsed.data.jobs.map((job) => {
+      const html = job.content ?? "";
+      return {
+        externalId: String(job.id),
+        title: job.title,
+        url: job.absolute_url,
+        applyUrl: job.absolute_url,
+        location: job.location?.name?.trim() || null,
+        department: job.departments?.[0]?.name ?? null,
+        employmentType: null,
+        postingDate: job.updated_at ?? null,
+        descriptionText: stripHtml(unescapeEscapedHtml(html)),
+        descriptionHtml: html || null,
+      };
+    });
+  }
+  const parsed = leverBoardSchema.safeParse(json);
+  if (!parsed.success) throw new BoardError("BOARD_RESPONSE_INVALID", "Lever board response has an unexpected shape.");
+  return parsed.data.map((posting) => {
+    const sections = (posting.lists ?? []).map((l) => [l.text ?? "", stripHtml(l.content ?? "")].filter(Boolean).join(": ")).filter(Boolean);
+    const body = posting.descriptionPlain ?? stripHtml(posting.description ?? "");
+    return {
+      externalId: posting.id,
+      title: posting.text,
+      url: posting.hostedUrl,
+      applyUrl: posting.applyUrl ?? posting.hostedUrl,
+      location: posting.categories?.location ?? null,
+      department: posting.categories?.team ?? posting.categories?.department ?? null,
+      employmentType: posting.categories?.commitment ?? null,
+      postingDate: posting.createdAt ? new Date(posting.createdAt).toISOString() : null,
+      descriptionText: [body, ...sections, posting.additionalPlain ?? ""].filter((part) => part.trim()).join("\n\n"),
+      descriptionHtml: posting.description ?? null,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Discovery run
+// ---------------------------------------------------------------------------
+
+export interface BoardCompanyResult {
+  company: string;
+  ats: "greenhouse" | "lever";
+  board: string;
+  status: "OK" | "FAILED";
+  fetched: number;
+  matched: number;
+  /** New canonical records plus changed JD revisions written this run. */
+  saved: number;
+  unchanged: number;
+  rejected: number;
+  failure?: { code: JobFailureCode; detail: string };
+}
+
+export interface BoardDiscoveryResult {
+  runId: string;
+  companies: BoardCompanyResult[];
+  totals: { fetched: number; matched: number; saved: number; unchanged: number; rejected: number; failedCompanies: number };
+}
+
+export interface BoardDiscoveryOptions {
+  configPath: string;
+  dataDir: string;
+  fetchImpl?: typeof fetch;
+  now?: () => string;
+  /** Pause between companies; the public APIs are polled politely, one board at a time. */
+  delayMs?: number;
+  timeoutMs?: number;
+  /** Optional cap on matched postings processed per company. */
+  maxPerCompany?: number;
+  signal?: AbortSignal;
+  log?: (line: string) => void;
+}
+
+function registryEntryFor(company: BoardCompany): CompanyRegistryEntry {
+  return companyRegistryEntrySchema.parse({
+    company: company.company,
+    fortuneRank: null,
+    corporateDomain: company.corporateDomain ?? null,
+    careersUrl: null,
+    atsType: company.ats,
+    atsTenantOrBoardId: company.board,
+    atsWorkdaySite: null,
+    atsWorkdayHostname: null,
+    enabled: true,
+    verificationStatus: "pending",
+    verificationNote: "Board token supplied by the candidate's company list; official-board relationship is checked per posting.",
+    sourceProvenance: ["candidate-company-list"],
+    lastVerifiedAt: null,
+  });
+}
+
+function toPosting(company: BoardCompany, raw: BoardPosting, matchedKeywords: string[], now: string): JobPosting {
+  return {
+    id: computeJobId(raw.url),
+    source: `board-api::${company.ats}::${company.board}`,
+    sourceType: company.ats,
+    company: company.company,
+    title: raw.title.trim(),
+    location: raw.location,
+    remoteType: null,
+    employmentType: raw.employmentType,
+    department: raw.department,
+    requisitionId: raw.externalId,
+    postingDate: raw.postingDate,
+    discoveredAt: now,
+    lastSeenAt: now,
+    canonicalUrl: raw.url,
+    applyUrl: raw.applyUrl,
+    descriptionText: raw.descriptionText,
+    descriptionHtml: raw.descriptionHtml,
+    requiredYears: null,
+    salaryText: null,
+    matchedProfiles: [],
+    discoveredFrom: ["board-api"],
+    discoveredUrl: raw.url,
+    matchedKeywords,
+    relevanceReason: `title matched: ${matchedKeywords.join(", ")}`,
+    rawMetadata: {},
+  } as JobPosting;
+}
+
+const wait = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    if (ms <= 0 || signal?.aborted) return resolve();
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
+  });
+
+export async function runBoardDiscovery(options: BoardDiscoveryOptions): Promise<BoardDiscoveryResult> {
+  const list = loadBoardList(options.configPath);
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const now = options.now ?? (() => new Date().toISOString());
+  const log = options.log ?? (() => {});
+  const runId = `boards-${now().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`;
+  const jobsPath = path.resolve(options.dataDir, "jobs.jsonl");
+  const failuresPath = path.resolve(options.dataDir, "job-failures.jsonl");
+  const results: BoardCompanyResult[] = [];
+
+  for (const [index, company] of list.companies.entries()) {
+    if (options.signal?.aborted) break;
+    if (index > 0) await wait(options.delayMs ?? 750, options.signal);
+    const result: BoardCompanyResult = { company: company.company, ats: company.ats, board: company.board, status: "OK", fetched: 0, matched: 0, saved: 0, unchanged: 0, rejected: 0 };
+    const failures: JobFailure[] = [];
+    const fail = (code: JobFailureCode, detail: string, target: string, title: string, sourceJobId: string | null) =>
+      failures.push(buildJobFailure({ code, stage: "search", runId, targetUrl: target, company: company.company, title, sourceJobId, detail, at: now() }));
+    try {
+      const postings = await fetchBoardPostings(company, fetchImpl, options.timeoutMs, options.signal);
+      result.fetched = postings.length;
+      const registryEntry = registryEntryFor(company);
+      const accepted: JobPosting[] = [];
+      const matched = postings.map((p) => ({ p, keywords: titleMatches(p.title, list.titleKeywords) })).filter((m) => m.keywords.length > 0);
+      result.matched = matched.length;
+      for (const { p, keywords } of matched.slice(0, options.maxPerCompany ?? matched.length)) {
+        const stamped = stampResolution(toPosting(company, p, keywords, now()), {
+          sourceKind: "board-api",
+          observedUrl: boardApiUrl(company),
+          observedAt: now(),
+          finalUrl: p.url,
+          extractionMethod: "ats-api",
+          discoveredCompany: company.company,
+          registryEntry,
+          apiJobId: p.externalId,
+          confirmedGreenhouseJobId: company.ats === "greenhouse" ? p.externalId : null,
+          now: now(),
+        });
+        const gate = evaluatePersistable(stamped);
+        if (!gate.ok) {
+          result.rejected += 1;
+          failures.push(buildJobFailure({ code: gate.failure.code as JobFailureCode, stage: "resolution", runId, targetUrl: p.url, company: company.company, title: p.title, sourceJobId: p.externalId, detail: gate.failure.detail, at: now() }));
+          continue;
+        }
+        accepted.push(gate.posting);
+      }
+      if (accepted.length > 0) {
+        let before: JobPosting[] = [];
+        const merged = await updateJobs(jobsPath, (current) => {
+          before = current;
+          return mergeJobs(current, accepted, now());
+        });
+        const known = new Map(before.map((j) => [`${j.atsIdentity ?? j.id}::${j.jdContentHash ?? ""}`, j]));
+        const written = new Map(merged.map((j) => [`${j.atsIdentity ?? j.id}::${j.jdContentHash ?? ""}`, j]));
+        for (const job of accepted) {
+          const key = `${job.atsIdentity ?? job.id}::${job.jdContentHash ?? ""}`;
+          if (known.has(key)) result.unchanged += 1;
+          else if (written.has(key)) result.saved += 1;
+        }
+      }
+    } catch (error) {
+      result.status = "FAILED";
+      const code: JobFailureCode = error instanceof BoardError ? error.code : "BOARD_FETCH_FAILED";
+      const detail = error instanceof BoardError ? error.message : "Unexpected error while reading the board.";
+      result.failure = { code, detail };
+      fail(code, detail, boardApiUrl(company), "(board)", null);
+    }
+    if (failures.length > 0) appendJobFailures(failuresPath, failures);
+    results.push(result);
+    log(`[boards] ${company.company} (${company.ats}:${company.board}) ${result.status} fetched=${result.fetched} matched=${result.matched} saved=${result.saved} unchanged=${result.unchanged} rejected=${result.rejected}${result.failure ? ` ${result.failure.code}` : ""}`);
+  }
+
+  const sum = (pick: (r: BoardCompanyResult) => number) => results.reduce((n, r) => n + pick(r), 0);
+  return {
+    runId,
+    companies: results,
+    totals: { fetched: sum((r) => r.fetched), matched: sum((r) => r.matched), saved: sum((r) => r.saved), unchanged: sum((r) => r.unchanged), rejected: sum((r) => r.rejected), failedCompanies: results.filter((r) => r.status === "FAILED").length },
+  };
+}
