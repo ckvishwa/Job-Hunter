@@ -32,3 +32,11 @@ Record a test here only when it has failed without a code change and passed on r
 - **Seen:** once in a full `npm test` in a clean clone on 2026-10-09 (Windows, 1060 passed / 1 failed of 1061; this test ran 4.05 s). Failure: `expected +0 to be 1` at `summary.persistedCount` (line 171), i.e. the headed search step persisted no job. The same file passed alone twice (12.9 s and 12.5 s), and the immediately repeated full suite passed 96 files / 1,061 tests. No code changed between the runs.
 - **Likely cause (unconfirmed):** timing under parallel headed-Chrome load in the search/settle step; no product defect was found. The Linux/Xvfb container run did not show it.
 - **What to do:** `npx vitest run tests/pipeline/offline-e2e.test.ts`. If it fails alone, treat it as real. If it recurs in CI, raise the settle timeout or serialize browser test files (backlog `SDLC-T06`) rather than adding retries silently.
+
+## Loopback connection timeouts in the dashboard tests (fifth entry)
+
+- **Tests:** `dashboard server > serves GET endpoints and rejects every write method, bad hosts and unknown paths` and `dashboard page rendering (headless Chromium against the fixture server) > renders funnel, no-data panels, escaped text and safe links from fixture data`
+- **File:** `tests/dashboard/dashboard.test.ts`
+- **Seen:** once in the first full `npm test` of a clean clone on 2026-10-09 (Windows; 2 failed of 1,131): `Error: connect ETIMEDOUT 127.0.0.1:<port>` after 364 ms, and `page.goto: net::ERR_CONNECTION_TIMED_OUT` after 21.6 s. The file passed alone (7/7, 0.46 s) and the repeated full suite passed 103 files / 1,131 tests. No code changed between the runs.
+- **Likely cause (unconfirmed):** loopback connections timing out while many headed-Chrome test files start at once on the same machine; the same error class as the LinkedIn profile flake above (`ERR_CONNECTION_TIMED_OUT`). No product defect found.
+- **What to do:** `npx vitest run tests/dashboard`. If it fails alone, treat it as real. If it recurs in CI, serialize browser-launching files (backlog `SDLC-T06`).
