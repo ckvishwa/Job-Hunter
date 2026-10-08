@@ -7,11 +7,13 @@ import { loadJobs } from "../storage/job-store.js";
 // application records under the output directory). Nothing here writes to those stores, and no code
 // reads the generated workbook back: a deleted or edited tracker is simply rebuilt.
 
-export const TRACKER_COLUMNS = ["Company", "Title", "ATS", "Official URL", "JD hash", "Decision", "Resume variant", "State", "Last update", "Blocking reason"] as const;
+export const TRACKER_COLUMNS = ["Company", "Title", "Track", "ATS", "Official URL", "JD hash", "Decision", "Resume variant", "State", "Last update", "Blocking reason"] as const;
 
 export interface TrackerRow {
   company: string;
   title: string;
+  /** SECURITY, QA, or empty when the job did not come through a tracked title search. */
+  track: string;
   ats: string;
   officialUrl: string;
   jdHash: string;
@@ -50,6 +52,17 @@ function reasonText(value: unknown): string {
   return text(value);
 }
 
+// Discovery records the matched track in matchedProfiles (lower-case); older profile ids map to the same two tracks.
+const TRACK_BY_PROFILE: Record<string, string> = { security: "SECURITY", cybersecurity: "SECURITY", qa: "QA", sdet: "QA" };
+const TRACK_ORDER = ["SECURITY", "QA"];
+
+export function trackOf(job: JobPosting | undefined): string {
+  const tracks = (job?.matchedProfiles ?? []).map((p) => TRACK_BY_PROFILE[p.toLowerCase()]).filter((t): t is string => t !== undefined);
+  return TRACK_ORDER.find((t) => tracks.includes(t)) ?? "";
+}
+
+const trackRank = (track: string) => (TRACK_ORDER.includes(track) ? TRACK_ORDER.indexOf(track) : TRACK_ORDER.length);
+
 interface RunDir {
   jobId: string;
   jdHash: string;
@@ -85,6 +98,7 @@ function rowFromRun(job: JobPosting | undefined, run: RunDir, problems: string[]
   return {
     company: job?.company ?? "",
     title: job?.title ?? "",
+    track: trackOf(job),
     ats: atsIdentity.split(":")[0] ?? "",
     officialUrl: job?.canonicalUrl ?? "",
     jdHash: run.jdHash,
@@ -109,6 +123,7 @@ export function buildTrackerRows(sources: TrackerSources): TrackerBuild {
     rows.push({
       company: job.company,
       title: job.title,
+      track: trackOf(job),
       ats: (job.atsIdentity ?? "").split(":")[0] ?? "",
       officialUrl: job.canonicalUrl,
       jdHash: job.jdContentHash ?? "",
@@ -119,8 +134,8 @@ export function buildTrackerRows(sources: TrackerSources): TrackerBuild {
       blockingReason: "",
     });
   }
-  rows.sort((a, b) => a.company.localeCompare(b.company) || a.title.localeCompare(b.title) || a.jdHash.localeCompare(b.jdHash));
+  rows.sort((a, b) => trackRank(a.track) - trackRank(b.track) || a.company.localeCompare(b.company) || a.title.localeCompare(b.title) || a.jdHash.localeCompare(b.jdHash));
   return { rows, problems };
 }
 
-export const rowToCells = (r: TrackerRow): string[] => [r.company, r.title, r.ats, r.officialUrl, r.jdHash, r.decision, r.resumeVariant, r.state, r.lastUpdate, r.blockingReason].map((v) => v.trim());
+export const rowToCells = (r: TrackerRow): string[] => [r.company, r.title, r.track, r.ats, r.officialUrl, r.jdHash, r.decision, r.resumeVariant, r.state, r.lastUpdate, r.blockingReason].map((v) => v.trim());

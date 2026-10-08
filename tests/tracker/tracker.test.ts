@@ -59,7 +59,7 @@ function readZip(bytes: Buffer): Map<string, string> {
 describe("tracker rows (projection of the ledger)", () => {
   it("projects company, ATS, URL, JD hash, decision, resume variant, state, last update and blocking reason", () => {
     const w = workspace();
-    saveJobs(w.jobsPath, [job({})]);
+    saveJobs(w.jobsPath, [job({ matchedProfiles: ["qa"] })]);
     writeRun(w.out, "job-1", HASH_A, {
       "application-1.json": { outcome: "WAITING_FOR_USER", reason: ["fact missing", "coverage partial"], createdAt: "2026-10-08T10:00:00.000Z", atsIdentity: "greenhouse:acme:1" },
       "resume-plan.json": { lane: "sdet", decisionOutcome: "REVIEW" },
@@ -68,7 +68,7 @@ describe("tracker rows (projection of the ledger)", () => {
     expect(problems).toEqual([]);
     expect(rows).toEqual([
       {
-        company: "Acme", title: "QA Engineer", ats: "greenhouse", officialUrl: "https://boards.greenhouse.io/acme/jobs/1", jdHash: HASH_A,
+        company: "Acme", title: "QA Engineer", track: "QA", ats: "greenhouse", officialUrl: "https://boards.greenhouse.io/acme/jobs/1", jdHash: HASH_A,
         decision: "REVIEW", resumeVariant: "sdet", state: "WAITING_FOR_USER", lastUpdate: "2026-10-08T10:00:00.000Z", blockingReason: "fact missing; coverage partial",
       },
     ]);
@@ -96,6 +96,21 @@ describe("tracker rows (projection of the ledger)", () => {
     expect(problems).toHaveLength(1);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.state).toBe("RESOLVED");
+  });
+});
+
+describe("tracker track column", () => {
+  it("sorts SECURITY first, then QA, then untracked; a job matched to both is SECURITY", () => {
+    const w = workspace();
+    saveJobs(w.jobsPath, [
+      job({ id: "a", company: "Zeta", title: "QA Engineer", atsIdentity: "greenhouse:zeta:1", canonicalUrl: "https://boards.greenhouse.io/zeta/jobs/1", matchedProfiles: ["qa"] }),
+      job({ id: "b", company: "Beta", title: "Other", atsIdentity: "greenhouse:beta:2", canonicalUrl: "https://boards.greenhouse.io/beta/jobs/2", matchedProfiles: [] }),
+      job({ id: "c", company: "Yank", title: "SOC Analyst", atsIdentity: "greenhouse:yank:3", canonicalUrl: "https://boards.greenhouse.io/yank/jobs/3", matchedProfiles: ["security"] }),
+      job({ id: "d", company: "Alpha", title: "Security QA", atsIdentity: "greenhouse:alpha:4", canonicalUrl: "https://boards.greenhouse.io/alpha/jobs/4", matchedProfiles: ["qa", "security"] }),
+      job({ id: "e", company: "Legacy", title: "SDET", atsIdentity: "greenhouse:legacy:5", canonicalUrl: "https://boards.greenhouse.io/legacy/jobs/5", matchedProfiles: ["sdet"] }),
+    ]);
+    const { rows } = buildTrackerRows({ jobsPath: w.jobsPath, outputDir: w.out });
+    expect(rows.map((r) => [r.track, r.company])).toEqual([["SECURITY", "Alpha"], ["SECURITY", "Yank"], ["QA", "Legacy"], ["QA", "Zeta"], ["", "Beta"]]);
   });
 });
 

@@ -35,15 +35,29 @@ const companySchema = z
   })
   .strict();
 
+const keywordList = z.array(z.string().trim().min(1).max(60)).min(1).max(100);
+
+// A track is a named group of title phrases. Tracks are ordered: when a title matches several, the
+// earliest track wins (so SECURITY listed before QA claims a title that matches both).
+const trackSchema = z.object({ name: z.string().regex(/^[A-Z][A-Z0-9_]{1,19}$/, "track name must be upper-case, e.g. SECURITY"), keywords: keywordList }).strict();
+
 export const boardListSchema = z
   .object({
     version: z.literal(1),
-    // A posting is only kept when its title contains one of these phrases. There is no "keep everything" mode.
-    titleKeywords: z.array(z.string().trim().min(2).max(60)).min(1).max(50),
+    // Either one flat phrase list (no track label) or ordered tracks. There is no "keep everything" mode.
+    titleKeywords: keywordList.optional(),
+    tracks: z.array(trackSchema).min(1).max(5).optional(),
+    // Applied before any track: a title containing one of these phrases is dropped.
+    excludeTitleKeywords: z.array(z.string().trim().min(1).max(60)).max(100).optional(),
     companies: z.array(companySchema).min(1).max(300),
   })
   .strict()
   .superRefine((list, ctx) => {
+    if ((list.titleKeywords === undefined) === (list.tracks === undefined)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["titleKeywords"], message: "provide exactly one of titleKeywords or tracks" });
+    }
+    const trackNames = (list.tracks ?? []).map((t) => t.name);
+    if (new Set(trackNames).size !== trackNames.length) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tracks"], message: "duplicate track name" });
     const seen = new Set<string>();
     list.companies.forEach((c, i) => {
       const key = `${c.ats}:${c.board.toLowerCase()}`;
@@ -64,6 +78,25 @@ export function titleMatches(title: string, keywords: string[]): string[] {
     const k = keyword.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     return new RegExp(`(^|[^a-z0-9])${k}([^a-z0-9]|$)`).test(lowered);
   });
+}
+
+export interface TitleClassification {
+  /** Track name, "" for a flat titleKeywords list, null when the title is not wanted. */
+  track: string | null;
+  keywords: string[];
+  excludedBy: string[];
+}
+
+/** Exclusions first, then tracks in configured order; the first track that matches claims the title. */
+export function classifyTitle(title: string, list: Pick<BoardList, "titleKeywords" | "tracks" | "excludeTitleKeywords">): TitleClassification {
+  const excludedBy = titleMatches(title, list.excludeTitleKeywords ?? []);
+  if (excludedBy.length > 0) return { track: null, keywords: [], excludedBy };
+  for (const track of list.tracks ?? []) {
+    const keywords = titleMatches(title, track.keywords);
+    if (keywords.length > 0) return { track: track.name, keywords, excludedBy: [] };
+  }
+  const flat = titleMatches(title, list.titleKeywords ?? []);
+  return flat.length > 0 ? { track: "", keywords: flat, excludedBy: [] } : { track: null, keywords: [], excludedBy: [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -208,6 +241,10 @@ export interface BoardCompanyResult {
   status: "OK" | "FAILED";
   fetched: number;
   matched: number;
+  /** Titles dropped by excludeTitleKeywords before any track was tried. */
+  excluded: number;
+  /** Matched postings per track (key "" for a flat keyword list). */
+  byTrack: Record<string, number>;
   /** New canonical records plus changed JD revisions written this run. */
   saved: number;
   unchanged: number;
@@ -218,7 +255,7 @@ export interface BoardCompanyResult {
 export interface BoardDiscoveryResult {
   runId: string;
   companies: BoardCompanyResult[];
-  totals: { fetched: number; matched: number; saved: number; unchanged: number; rejected: number; failedCompanies: number };
+  totals: { fetched: number; matched: number; excluded: number; saved: number; unchanged: number; rejected: number; failedCompanies: number };
 }
 
 export interface BoardDiscoveryOptions {
@@ -253,7 +290,7 @@ function registryEntryFor(company: BoardCompany): CompanyRegistryEntry {
   });
 }
 
-function toPosting(company: BoardCompany, raw: BoardPosting, matchedKeywords: string[], now: string): JobPosting {
+function toPosting(company: BoardCompany, raw: BoardPosting, matchedKeywords: string[], track: string, now: string): JobPosting {
   return {
     id: computeJobId(raw.url),
     source: `board-api::${company.ats}::${company.board}`,
@@ -274,11 +311,11 @@ function toPosting(company: BoardCompany, raw: BoardPosting, matchedKeywords: st
     descriptionHtml: raw.descriptionHtml,
     requiredYears: null,
     salaryText: null,
-    matchedProfiles: [],
+    matchedProfiles: track ? [track.toLowerCase()] : [],
     discoveredFrom: ["board-api"],
     discoveredUrl: raw.url,
     matchedKeywords,
-    relevanceReason: `title matched: ${matchedKeywords.join(", ")}`,
+    relevanceReason: `${track ? track + ": " : ""}title matched: ${matchedKeywords.join(", ")}`,
     rawMetadata: {},
   } as JobPosting;
 }
@@ -303,7 +340,7 @@ export async function runBoardDiscovery(options: BoardDiscoveryOptions): Promise
   for (const [index, company] of list.companies.entries()) {
     if (options.signal?.aborted) break;
     if (index > 0) await wait(options.delayMs ?? 750, options.signal);
-    const result: BoardCompanyResult = { company: company.company, ats: company.ats, board: company.board, status: "OK", fetched: 0, matched: 0, saved: 0, unchanged: 0, rejected: 0 };
+    const result: BoardCompanyResult = { company: company.company, ats: company.ats, board: company.board, status: "OK", fetched: 0, matched: 0, excluded: 0, byTrack: {}, saved: 0, unchanged: 0, rejected: 0 };
     const failures: JobFailure[] = [];
     const fail = (code: JobFailureCode, detail: string, target: string, title: string, sourceJobId: string | null) =>
       failures.push(buildJobFailure({ code, stage: "search", runId, targetUrl: target, company: company.company, title, sourceJobId, detail, at: now() }));
@@ -312,10 +349,13 @@ export async function runBoardDiscovery(options: BoardDiscoveryOptions): Promise
       result.fetched = postings.length;
       const registryEntry = registryEntryFor(company);
       const accepted: JobPosting[] = [];
-      const matched = postings.map((p) => ({ p, keywords: titleMatches(p.title, list.titleKeywords) })).filter((m) => m.keywords.length > 0);
+      const classified = postings.map((p) => ({ p, ...classifyTitle(p.title, list) }));
+      result.excluded = classified.filter((c) => c.excludedBy.length > 0).length;
+      const matched = classified.filter((c) => c.track !== null);
       result.matched = matched.length;
-      for (const { p, keywords } of matched.slice(0, options.maxPerCompany ?? matched.length)) {
-        const stamped = stampResolution(toPosting(company, p, keywords, now()), {
+      for (const m of matched) result.byTrack[m.track!] = (result.byTrack[m.track!] ?? 0) + 1;
+      for (const { p, keywords, track } of matched.slice(0, options.maxPerCompany ?? matched.length)) {
+        const stamped = stampResolution(toPosting(company, p, keywords, track!, now()), {
           sourceKind: "board-api",
           observedUrl: boardApiUrl(company),
           observedAt: now(),
@@ -358,13 +398,13 @@ export async function runBoardDiscovery(options: BoardDiscoveryOptions): Promise
     }
     if (failures.length > 0) appendJobFailures(failuresPath, failures);
     results.push(result);
-    log(`[boards] ${company.company} (${company.ats}:${company.board}) ${result.status} fetched=${result.fetched} matched=${result.matched} saved=${result.saved} unchanged=${result.unchanged} rejected=${result.rejected}${result.failure ? ` ${result.failure.code}` : ""}`);
+    log(`[boards] ${company.company} (${company.ats}:${company.board}) ${result.status} fetched=${result.fetched} matched=${result.matched} excluded=${result.excluded} saved=${result.saved} unchanged=${result.unchanged} rejected=${result.rejected}${result.failure ? ` ${result.failure.code}` : ""}`);
   }
 
   const sum = (pick: (r: BoardCompanyResult) => number) => results.reduce((n, r) => n + pick(r), 0);
   return {
     runId,
     companies: results,
-    totals: { fetched: sum((r) => r.fetched), matched: sum((r) => r.matched), saved: sum((r) => r.saved), unchanged: sum((r) => r.unchanged), rejected: sum((r) => r.rejected), failedCompanies: results.filter((r) => r.status === "FAILED").length },
+    totals: { fetched: sum((r) => r.fetched), matched: sum((r) => r.matched), excluded: sum((r) => r.excluded), saved: sum((r) => r.saved), unchanged: sum((r) => r.unchanged), rejected: sum((r) => r.rejected), failedCompanies: results.filter((r) => r.status === "FAILED").length },
   };
 }
