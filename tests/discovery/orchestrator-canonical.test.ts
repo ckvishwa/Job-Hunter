@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BrowserContext } from "playwright";
 import type { DiscoveryContext, PortalDiscoveryAdapter } from "../../src/discovery/types.js";
 import { JobStoreError, loadJobFailures, loadJobs } from "../../src/storage/jsonl-store.js";
+import { createRunEventLog, readRunEvents } from "../../src/events/run-events.js";
 import {
   ACME,
   FULL_JD_HTML,
@@ -394,5 +395,50 @@ describe("authoritative store failures (V1 Slice 1.1)", () => {
 
     const ids = loadJobs(paths.jobsStorePath).map((j) => j.atsIdentity).sort();
     expect(ids).toEqual(["greenhouse:acme:101", "greenhouse:acme:102", "greenhouse:other:9"]);
+  });
+});
+
+describe("run events from runDiscover (wiring)", () => {
+  it("records run start, per-source stages, per-job resolution and run end, with no JD text", async () => {
+    const dir = tempDataDir();
+    const router = makeFetchRouter({ greenhouse: { "101": greenhousePayload(101) } });
+    vi.stubGlobal("fetch", vi.fn(router.impl));
+    discoverJobs(discoveredJob("101"));
+    const eventsPath = path.join(dir, "run-events.jsonl");
+    const events = createRunEventLog("discovery", { filePath: eventsPath });
+
+    await runDiscover(makePaths(dir), { ...FILTERS, registryPath: writeRegistry() }, makeLaunch(null).launch, makeClose(), events);
+
+    const { events: written, skippedLines } = readRunEvents(eventsPath);
+    expect(skippedLines).toBe(0);
+    const shape = written.map((e) => `${e.kind}:${e.stage ?? ""}`);
+    expect(shape[0]).toBe("run.start:");
+    expect(shape.at(-1)).toBe("run.end:");
+    expect(written.at(-1)).toMatchObject({ outcome: "OK" });
+    // Source stages come first (every start has its end), then exactly one resolution stage wrapping one job.
+    const firstResolution = shape.indexOf("stage.start:resolution");
+    expect(firstResolution).toBeGreaterThan(0);
+    expect(shape.slice(1, firstResolution).every((s) => s.endsWith(":source:company-careers"))).toBe(true);
+    expect(shape.slice(firstResolution)).toEqual(["stage.start:resolution", "stage.start:resolve_job", "stage.end:resolve_job", "stage.end:resolution", "run.end:"]);
+    const job = written.find((e) => e.stage === "resolve_job")!;
+    expect(job).toMatchObject({ company: "Acme", jobId: "101" });
+    expect(readFileSync(eventsPath, "utf8")).not.toContain("Software Development Engineer in Test");
+    expect(written.every((e, i) => e.seq === i + 1)).toBe(true);
+  });
+
+  it("records an ERROR run end with the typed code, and no message text, when the run itself fails", async () => {
+    const dir = tempDataDir();
+    vi.stubGlobal("fetch", vi.fn(makeFetchRouter({ greenhouse: { "101": greenhousePayload(101) } }).impl));
+    discoverJobs(discoveredJob("101"));
+    const eventsPath = path.join(dir, "run-events.jsonl");
+    const events = createRunEventLog("discovery", { filePath: eventsPath });
+    const launch = vi.fn(async () => { throw Object.assign(new Error("Chrome could not start for /secret/path"), { code: "BROWSER_LAUNCH_FAILED" }); });
+
+    await expect(runDiscover(makePaths(dir), { ...FILTERS, registryPath: writeRegistry() }, launch, makeClose(), events)).rejects.toThrow();
+
+    const { events: written } = readRunEvents(eventsPath);
+    expect(written.map((e) => e.kind)).toEqual(["run.start", "run.end"]);
+    expect(written[1]).toMatchObject({ outcome: "ERROR", errorCode: "BROWSER_LAUNCH_FAILED" });
+    expect(readFileSync(eventsPath, "utf8")).not.toContain("secret");
   });
 });

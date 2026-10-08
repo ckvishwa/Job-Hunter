@@ -1,5 +1,6 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { createRunEventLog, type RunEventLog } from "../../events/run-events.js";
 import { runBoardDiscovery } from "./board-discoverer.js";
 
 // npm run boards:discover -- --config config/company-boards.json --data-dir data [--max-per-company N]
@@ -29,13 +30,13 @@ export function parseBoardsArgs(argv: string[]): BoardsArgs {
   return args;
 }
 
-export async function runBoardsCli(args: BoardsArgs, log: (line: string) => void = console.log): Promise<number> {
+export async function runBoardsCli(args: BoardsArgs, log: (line: string) => void = console.log, events?: RunEventLog): Promise<number> {
   if (!args.config) {
     log("usage: boards:discover --config <company-boards.json> --data-dir <dir> [--max-per-company N]");
     return 2;
   }
   try {
-    const result = await runBoardDiscovery({ configPath: path.resolve(args.config), dataDir: path.resolve(args.dataDir), maxPerCompany: args.maxPerCompany, log });
+    const result = await runBoardDiscovery({ configPath: path.resolve(args.config), dataDir: path.resolve(args.dataDir), maxPerCompany: args.maxPerCompany, log, events });
     const t = result.totals;
     log(`Boards run ${result.runId}: fetched=${t.fetched} matched=${t.matched} saved=${t.saved} unchanged=${t.unchanged} rejected=${t.rejected} failedCompanies=${t.failedCompanies}`);
     return t.failedCompanies > 0 ? 1 : 0;
@@ -54,7 +55,7 @@ if (isMainModule) {
     console.error(error instanceof Error ? error.message : "invalid arguments");
     process.exit(2);
   }
-  runBoardsCli(args).then((code) => {
+  runBoardsCli(args, console.log, createRunEventLog("boards")).then((code) => {
     process.exitCode = code;
   });
 }

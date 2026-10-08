@@ -16,6 +16,7 @@ import {
 import { stripHtml, unescapeEscapedHtml } from "../../extraction/jd-cleaner.js";
 import { appendJobFailures, updateJobs } from "../../storage/jsonl-store.js";
 import { classifyLocation } from "./location.js";
+import { noopRunEventLog, type RunEventLog } from "../../events/run-events.js";
 
 // Discovery source: the public Greenhouse and Lever board APIs, for a company list the candidate
 // provides. No browser, no LinkedIn, no scraping: one JSON GET per company board. Every posting
@@ -290,6 +291,8 @@ export interface BoardDiscoveryOptions {
   maxPerCompany?: number;
   signal?: AbortSignal;
   log?: (line: string) => void;
+  /** Append-only run events (run start/end, one stage per company). Defaults to recording nothing. */
+  events?: RunEventLog;
 }
 
 function registryEntryFor(company: BoardCompany): CompanyRegistryEntry {
@@ -356,10 +359,13 @@ export async function runBoardDiscovery(options: BoardDiscoveryOptions): Promise
   const jobsPath = path.resolve(options.dataDir, "jobs.jsonl");
   const failuresPath = path.resolve(options.dataDir, "job-failures.jsonl");
   const results: BoardCompanyResult[] = [];
+  const events = options.events ?? noopRunEventLog("boards");
+  events.runStart();
 
   for (const [index, company] of list.companies.entries()) {
     if (options.signal?.aborted) break;
     if (index > 0) await wait(options.delayMs ?? 750, options.signal);
+    const companyStage = events.stageStart("board", { company: company.company });
     const result: BoardCompanyResult = { company: company.company, ats: company.ats, board: company.board, status: "OK", fetched: 0, matched: 0, excluded: 0, droppedLocation: 0, byTrack: {}, saved: 0, unchanged: 0, rejected: 0 };
     const failures: JobFailure[] = [];
     const fail = (code: JobFailureCode, detail: string, target: string, title: string, sourceJobId: string | null) =>
@@ -421,10 +427,13 @@ export async function runBoardDiscovery(options: BoardDiscoveryOptions): Promise
     }
     if (failures.length > 0) appendJobFailures(failuresPath, failures);
     results.push(result);
+    if (result.status === "FAILED") companyStage.end("ERROR", result.failure?.code);
+    else companyStage.end("OK");
     log(`[boards] ${company.company} (${company.ats}:${company.board}) ${result.status} fetched=${result.fetched} matched=${result.matched} excluded=${result.excluded} droppedLocation=${result.droppedLocation} saved=${result.saved} unchanged=${result.unchanged} rejected=${result.rejected}${result.failure ? ` ${result.failure.code}` : ""}`);
   }
 
   const sum = (pick: (r: BoardCompanyResult) => number) => results.reduce((n, r) => n + pick(r), 0);
+  events.runEnd(options.signal?.aborted ? "ABORTED" : results.some((r) => r.status === "FAILED") ? "PARTIAL" : "OK");
   return {
     runId,
     companies: results,

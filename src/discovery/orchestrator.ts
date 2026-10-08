@@ -20,6 +20,7 @@ import { runResolutionPhase, UNRESOLVED_PLACEHOLDER_PREFIX } from "./resolve-pha
 import { buildSummary, type DiscoveryRunSummary, type RawDiscoveryCounters } from "./report.js";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
+import { errorCodeOf, noopRunEventLog, type RunEventLog } from "../events/run-events.js";
 
 const DEFAULT_RESOLVE_CONCURRENCY = 3;
 const DEFAULT_RESOLVE_JOB_TIMEOUT_MS = 45_000;
@@ -89,7 +90,24 @@ function emptyCounters(): RawDiscoveryCounters {
 }
 
 export async function runDiscover(
-  paths: {
+  paths: DiscoverPaths,
+  filters: DiscoverFilters = {},
+  launchFn: typeof launchPersistentChrome = launchPersistentChrome,
+  closeFn: typeof closePersistentChrome = closePersistentChrome,
+  events: RunEventLog = noopRunEventLog("discovery"),
+): Promise<DiscoveryRunSummary> {
+  events.runStart();
+  try {
+    const summary = await runDiscoverInner(paths, filters, launchFn, closeFn, events);
+    events.runEnd(summary.sourcesFailed > 0 ? "PARTIAL" : "OK");
+    return summary;
+  } catch (error) {
+    events.runEnd("ERROR", errorCodeOf(error));
+    throw error;
+  }
+}
+
+export type DiscoverPaths = {
     sitesConfigPath: string;
     rolesConfigPath: string;
     portalsConfigPath: string;
@@ -99,10 +117,14 @@ export async function runDiscover(
     // Typed rejection log (see src/domain/canonical-job.ts JobFailure). Defaults to
     // job-failures.jsonl next to the jobs store.
     failuresPath?: string;
-  },
-  filters: DiscoverFilters = {},
-  launchFn: typeof launchPersistentChrome = launchPersistentChrome,
-  closeFn: typeof closePersistentChrome = closePersistentChrome,
+};
+
+async function runDiscoverInner(
+  paths: DiscoverPaths,
+  filters: DiscoverFilters,
+  launchFn: typeof launchPersistentChrome,
+  closeFn: typeof closePersistentChrome,
+  events: RunEventLog,
 ): Promise<DiscoveryRunSummary> {
   const roles = loadRolesConfig(paths.rolesConfigPath);
   const settings = loadCollectSettings(paths.sitesConfigPath);
@@ -272,6 +294,7 @@ export async function runDiscover(
           console.log(`[orchestrator] Starting discovery for source="${source}", keyword="${keyword}", location="${searchLocation}"`);
           counters.keywordsSearched += 1;
 
+          const sourceStage = events.stageStart(`source:${source}`);
           try {
             const adapter = resolveDiscoveryAdapter(source);
 
@@ -374,8 +397,10 @@ export async function runDiscover(
               pendingCompletions.push(checkpoint);
             }
             saveCheckpoints(paths.checkpointsPath, checkpoints);
+            sourceStage.end("OK");
 
           } catch (err) {
+            sourceStage.end("ERROR", errorCodeOf(err));
             sourceSuccess = false;
             console.error(`[orchestrator] Failure on ${source} for keyword "${keyword}": ${(err as Error).message}`);
             counters.errors.push({ source: `${source}::${keyword}`, message: (err as Error).message });
@@ -449,6 +474,7 @@ export async function runDiscover(
           detail,
         }),
       ]);
+      events.failed("resolve_job", { company: job.company, jobId: job.sourceJobId ?? undefined }, code);
       console.error(`[orchestrator] Rejected "${job.title}" at "${job.company}": ${code} - ${detail}`);
     };
     let saveChain: Promise<void> = Promise.resolve();
@@ -465,11 +491,11 @@ export async function runDiscover(
     };
 
     const resolutionStart = Date.now();
-    const resolvePhaseResult = await runResolutionPhase(
+    const resolvePhaseResult = await events.stage("resolution", {}, () => runResolutionPhase(
       jobsToResolve,
       (job) => {
         console.log(`[orchestrator] Resolving job: "${job.title}" at "${job.company}" (${job.resultUrl})`);
-        return resolver.resolve(job, playwrightContext);
+        return events.stage("resolve_job", { company: job.company, jobId: job.sourceJobId ?? undefined }, () => resolver.resolve(job, playwrightContext));
       },
       {
         concurrency: filters.resolveConcurrency ?? DEFAULT_RESOLVE_CONCURRENCY,
@@ -497,7 +523,7 @@ export async function runDiscover(
           await persistIncrementally();
         },
       },
-    );
+    ));
     await saveChain; // make sure the last incremental save has actually landed before Phase 3
     counters.resolutionTimeMs = Date.now() - resolutionStart;
     counters.resolutionsAttempted = resolvePhaseResult.attempted;

@@ -42,13 +42,27 @@ function fixture() {
   writeFileSync(path.join(run, "application-x.json"), JSON.stringify({ outcome: "WAITING_FOR_USER", reason: [SECRET_FACT], createdAt: "2026-10-08T10:00:00.000Z", application: { answers: [SECRET_FACT] } }));
   writeFileSync(path.join(run, "resume-plan.json"), JSON.stringify({ decisionOutcome: "REVIEW", lane: "security", facts: [SECRET_FACT] }));
   writeFileSync(path.join(run, "pipeline-checkpoint.json"), JSON.stringify({ outcome: "WAITING_FOR_USER", updatedAt: "2026-10-08T10:00:00.000Z", stages: { canonicalJob: { status: "DONE" }, extraction: { status: "BLOCKED", errorCode: "PROVIDER_UNAVAILABLE", note: SECRET_FACT } } }));
+  // Run events: an older boards run that ended PARTIAL, then a pipeline run still open on extraction,
+  // then a torn (partial) last line from a crash mid-append.
+  const ev = (seq: number, at: string, runId: string, runType: string, kind: string, extra: Record<string, unknown> = {}) => JSON.stringify({ v: 1, seq, at, runId, runType, kind, ...extra });
+  const events = path.join(dir, "run-events.jsonl");
+  writeFileSync(events, [
+    ev(1, "2026-10-08T10:00:00.000Z", "boards-y", "boards", "run.start"),
+    ev(2, "2026-10-08T10:00:01.000Z", "boards-y", "boards", "stage.start", { stage: "board", company: "Beta Sec" }),
+    ev(3, "2026-10-08T10:00:02.000Z", "boards-y", "boards", "stage.end", { stage: "board", company: "Beta Sec", outcome: "ERROR", errorCode: "BOARD_NOT_FOUND", durationMs: 1000 }),
+    ev(4, "2026-10-08T10:01:00.000Z", "boards-y", "boards", "run.end", { outcome: "PARTIAL", durationMs: 60000 }),
+    ev(1, "2026-10-08T10:04:00.000Z", "pipeline-x", "pipeline", "run.start", { jobId: "job-2" }),
+    ev(2, "2026-10-08T10:04:01.000Z", "pipeline-x", "pipeline", "stage.start", { stage: "lane", company: "Acme", jobId: "job-2" }),
+    ev(3, "2026-10-08T10:04:02.000Z", "pipeline-x", "pipeline", "stage.end", { stage: "lane", company: "Acme", jobId: "job-2", outcome: "OK", durationMs: 1000 }),
+    ev(4, "2026-10-08T10:04:03.000Z", "pipeline-x", "pipeline", "stage.start", { stage: "extraction", company: "Acme", jobId: "job-2" }),
+  ].join("\n") + '\n{"v":1,"seq":5,"at":"2026-10-08T10:04:0');
   const boards = path.join(dir, "boards.json");
   writeFileSync(boards, JSON.stringify({ version: 1, titleKeywords: ["QA"], companies: [{ company: "Acme", ats: "greenhouse", board: "acme" }, { company: "Delta", ats: "lever", board: "delta" }] }));
-  return { dir, data, out, boards };
+  return { dir, data, out, boards, events };
 }
 
 function snapshotSources(f: ReturnType<typeof fixture>, now: string) {
-  return { dataDir: f.data, outputDir: f.out, boardsPath: f.boards, now };
+  return { dataDir: f.data, outputDir: f.out, boardsPath: f.boards, eventsPath: f.events, now };
 }
 
 function digestTree(dir: string): string {
@@ -95,18 +109,33 @@ describe("dashboard snapshot (independent expected values from the fixture)", ()
     expect(funnel).toMatchObject({ RESOLVED: 1, DISCOVERED: 1, WAITING_FOR_USER: 1, READY_TO_SUBMIT: 0 });
     expect(Object.fromEntries(s.flags.map((f) => [f.flag, f.count]))).toMatchObject({ NO_SPONSORSHIP: 1, CLEARANCE_REQUIRED: 1 });
     expect(s.activity.active).toBe(true);
-    expect(s.activity.typedErrors).toEqual([{ company: "Beta Sec", title: "SOC Analyst", stage: "extraction", errorCode: "PROVIDER_UNAVAILABLE" }]);
+    expect(s.activity.typedErrors).toEqual([
+      { source: "checkpoint", company: "Beta Sec", title: "SOC Analyst", stage: "extraction", errorCode: "PROVIDER_UNAVAILABLE" },
+      { source: "events", company: "Beta Sec", title: "", stage: "board", errorCode: "BOARD_NOT_FOUND" },
+    ]);
+    expect(s.activity.run).toMatchObject({ runId: "pipeline-x", runType: "pipeline", endedAt: "" });
+    expect(s.activity.current).toMatchObject({ stage: "extraction", company: "Acme", jobId: "job-2" });
+    if (s.activity.events.status !== "ok") throw new Error("expected events");
+    expect(s.activity.events.items).toHaveLength(8);
+    expect(s.activity.events.skippedLines).toBe(1); // the torn last line
     expect(s.queue.byTrack).toEqual({ SECURITY: 1, QA: 1 });
     expect(s.boards.companies).toEqual([{ company: "Acme", ats: "greenhouse", board: "acme", ledgerJobs: 1 }, { company: "Delta", ats: "lever", board: "delta", ledgerJobs: 0 }]);
   });
 
   it("reports no data instead of inventing numbers", () => {
-    const s = buildDashboardSnapshot(snapshotSources(fixture(), "2026-10-08T12:00:00.000Z"));
+    const f = fixture();
+    // Two hours later the open pipeline run is stale: not active, and no stage is reported as current.
+    const stale = buildDashboardSnapshot(snapshotSources(f, "2026-10-08T12:00:00.000Z"));
+    expect(stale.activity.active).toBe(false);
+    expect(stale.activity.current).toBeNull();
+    // With no events file at all there is no feed to show.
+    const s = buildDashboardSnapshot({ ...snapshotSources(f, "2026-10-08T12:00:00.000Z"), eventsPath: path.join(f.dir, "missing.jsonl") });
     expect(s.activity.active).toBe(false);
     expect(s.activity.events.status).toBe("no data");
     expect(s.queue.status).toBe("no data");
     expect(s.boards.verifyResults.status).toBe("no data");
-    expect(s.stageEmitters.every((e) => e.emitsRunEvents === false)).toBe(true);
+    expect(s.stageEmitters.filter((e) => e.emitsRunEvents).length).toBe(3);
+    expect(s.stageEmitters.find((e) => e.stage === "board verify")!.emitsRunEvents).toBe(false);
   });
 
   it("works with empty or missing stores", () => {
@@ -159,8 +188,13 @@ describe("dashboard page rendering (headless Chromium against the fixture server
       await page.waitForSelector("#jobs tr");
       expect(await page.locator("#funnel .row").first().innerText()).toContain("MANUAL_WATCH");
       expect(await page.locator("#jobs tr").count()).toBe(3);
-      expect(await page.locator("#activity").innerText()).toContain("no data");
-      expect(await page.locator("#activity").innerText()).toContain("PROVIDER_UNAVAILABLE");
+      const activity = await page.locator("#activity").innerText();
+      expect(activity).toContain("RUN ACTIVE");
+      expect(activity).toContain("stage: extraction / Acme / job-2");
+      expect(activity).toContain("stage.end lane / Acme / job-2 -> OK");
+      expect(activity).toContain("1 unreadable line(s) skipped");
+      expect(activity).toContain("PROVIDER_UNAVAILABLE");
+      expect(activity).toContain("BOARD_NOT_FOUND");
       expect(await page.locator("#queue").innerText()).toContain("no data");
       expect(await page.locator("#jobs a").count()).toBe(2);
       expect(await page.locator("#jobs a").first().getAttribute("rel")).toBe("noopener noreferrer");

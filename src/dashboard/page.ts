@@ -48,13 +48,17 @@ function bars(parent,items){var max=Math.max.apply(null,[1].concat(items.map(fun
 var snap=null;
 function renderFunnel(s){var n=$("funnel");clear(n);bars(n,s.funnel.map(function(f){return{label:f.stage,count:f.count}}))}
 function renderActivity(s){var n=$("activity");clear(n);var a=s.activity;
- n.appendChild(el("div",a.active?"ok":"dim",a.active?"RUN ACTIVE (checkpoint updated < 10 min ago)":"no active run detected"));
- var ev=el("div");n.appendChild(el("div","dim","last 20 events:"));nodata(n,a.events.reason);
- if(a.latestCheckpoint){var c=a.latestCheckpoint;n.appendChild(el("div","dim","latest checkpoint: "+c.company+" / "+c.title+" ["+c.outcome+"] "+c.updatedAt));
-  var u=el("ul");c.stages.forEach(function(st){u.appendChild(el("li",st.errorCode?"bad":"",st.stage+": "+st.status+(st.errorCode?" ("+st.errorCode+")":"")))});n.appendChild(u)}
- n.appendChild(el("div","dim","typed errors (from checkpoints):"));
+ n.appendChild(el("div",a.active?"ok":"dim",a.active?"RUN ACTIVE":"no active run"));
+ if(a.run)n.appendChild(el("div","dim","run "+a.run.runId+" ["+a.run.runType+"] started "+a.run.startedAt+(a.run.endedAt?" ended "+a.run.endedAt+" -> "+a.run.outcome:"")));
+ if(a.current)n.appendChild(el("div","ok","stage: "+a.current.stage+(a.current.company?" / "+a.current.company:"")+(a.current.jobId?" / "+a.current.jobId:"")));
+ n.appendChild(el("div","dim","last 20 events:"));
+ if(a.events.status!=="ok")nodata(n,a.events.reason);
+ else{var u=el("ul");a.events.items.forEach(function(e){var t=e.at.slice(11,19)+" "+e.kind+(e.stage?" "+e.stage:"")+(e.company?" / "+e.company:"")+(e.jobId?" / "+e.jobId:"")+(e.outcome?" -> "+e.outcome:"")+(e.errorCode?" ("+e.errorCode+")":"")+(e.durationMs!==null?" "+e.durationMs+"ms":"");u.appendChild(el("li",e.errorCode?"bad":"",t))});n.appendChild(u);
+  if(a.events.skippedLines)n.appendChild(el("div","dim",a.events.skippedLines+" unreadable line(s) skipped"))}
+ if(a.latestCheckpoint){var c=a.latestCheckpoint;n.appendChild(el("div","dim","latest checkpoint: "+c.company+" / "+c.title+" ["+c.outcome+"] "+c.updatedAt))}
+ n.appendChild(el("div","dim","typed errors:"));
  if(!a.typedErrors.length)n.appendChild(el("div","ok","none recorded"));
- else{var e=el("ul");a.typedErrors.forEach(function(x){e.appendChild(el("li","bad",x.company+" / "+x.stage+": "+x.errorCode))});n.appendChild(e)}}
+ else{var e=el("ul");a.typedErrors.forEach(function(x){e.appendChild(el("li","bad",x.source+": "+(x.company?x.company+" / ":"")+x.stage+": "+x.errorCode))});n.appendChild(e)}}
 function renderQueue(s){var n=$("queue");clear(n);var q=s.queue;n.appendChild(el("div","dim","target "+q.target.total+"/day: "+q.target.SECURITY+" SECURITY / "+q.target.QA+" QA"));
  nodata(n,q.reason);n.appendChild(el("div","dim","ledger rows by track (not today's queue): SECURITY "+q.byTrack.SECURITY+", QA "+q.byTrack.QA))}
 function renderBoards(s){var n=$("boards");clear(n);var b=s.boards;

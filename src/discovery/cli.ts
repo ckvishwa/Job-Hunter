@@ -1,5 +1,6 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { createRunEventLog } from "../events/run-events.js";
 import { runDiscover, type DiscoverFilters } from "./orchestrator.js";
 import type { DiscoveryRunSummary } from "./report.js";
 
@@ -135,6 +136,9 @@ async function main(): Promise<void> {
       failuresPath: path.resolve(dataDir, "job-failures.jsonl"),
     },
     filters,
+    undefined,
+    undefined,
+    createRunEventLog("discovery"),
   );
   printDiscoverSummary(summary);
 }

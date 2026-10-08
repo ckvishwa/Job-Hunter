@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
+import { DEFAULT_RUN_EVENTS_PATH, readRunEvents, type RunEvent } from "../events/run-events.js";
 import { loadBoardList } from "../pipeline/discovery/board-discoverer.js";
 import { loadJobs } from "../storage/job-store.js";
 import { buildTrackerRows, type TrackerRow } from "../tracker/rows.js";
@@ -12,14 +13,13 @@ export const DAILY_TARGET = { total: 30, SECURITY: 24, QA: 6 } as const;
 export const FUNNEL_ORDER = ["MANUAL_WATCH", "DISCOVERED", "RESOLVED", "WAITING_FOR_USER", "BLOCKED", "REJECT", "READY_TO_SUBMIT"] as const;
 export const ACTIVE_WINDOW_MS = 10 * 60 * 1000;
 
-/** Stage-level persistence, stated honestly: what writes data the dashboard can read. */
+/** What each stage persists and whether it appends run events (src/events/run-events.ts). */
 export const STAGE_EMITTERS = [
-  { stage: "board discovery", emitsRunEvents: false, persists: "jobs.jsonl only (run totals are printed, not stored)" },
-  { stage: "JD resolution", emitsRunEvents: false, persists: "jobs.jsonl (resolutionStatus, jdContentHash)" },
-  { stage: "extraction / coverage", emitsRunEvents: false, persists: "pipeline-checkpoint.json, written once at run end" },
-  { stage: "decision", emitsRunEvents: false, persists: "pipeline-checkpoint.json, resume-plan.json" },
-  { stage: "resume plan / render", emitsRunEvents: false, persists: "resume-plan.json, application-*.json" },
-  { stage: "application form", emitsRunEvents: false, persists: "application-*.json" },
+  { stage: "board discovery (boards:discover)", emitsRunEvents: true, persists: "run + per-company stage events; jobs.jsonl" },
+  { stage: "portal discovery (discover / runDiscover)", emitsRunEvents: true, persists: "run + per-source stage events; jobs.jsonl" },
+  { stage: "pipeline: lane / extraction / decision / resume plan / application", emitsRunEvents: true, persists: "run + stage events; pipeline-checkpoint.json at run end; application-*.json" },
+  { stage: "LinkedIn and search discovery", emitsRunEvents: false, persists: "its own session files; no run events yet" },
+  { stage: "JD resolution", emitsRunEvents: false, persists: "jobs.jsonl (resolutionStatus, jdContentHash); no separate stage events" },
   { stage: "board verify", emitsRunEvents: false, persists: "nothing (stdout JSON only)" },
 ] as const;
 
@@ -27,6 +27,8 @@ export interface DashboardSources {
   dataDir: string;
   outputDir: string;
   boardsPath?: string;
+  /** Run-event JSONL. Defaults to private-runtime/run-events.jsonl under the working directory. */
+  eventsPath?: string;
   now?: string;
 }
 
@@ -50,10 +52,26 @@ export interface StageView {
   errorCode: string;
 }
 
+export interface EventView {
+  at: string;
+  runId: string;
+  runType: string;
+  kind: string;
+  stage: string;
+  company: string;
+  jobId: string;
+  outcome: string;
+  errorCode: string;
+  durationMs: number | null;
+}
+
 export interface ActivityView {
+  /** True only when the newest run has a run.start, no run.end, and an event less than ACTIVE_WINDOW_MS old. */
   active: boolean;
-  /** No run events are emitted, so no live feed exists. */
-  events: { status: "no data"; reason: string };
+  run: null | { runId: string; runType: string; startedAt: string; endedAt: string; outcome: string };
+  /** Innermost stage with a stage.start and no stage.end in the newest run. */
+  current: null | { stage: string; company: string; jobId: string; startedAt: string };
+  events: { status: "no data"; reason: string } | { status: "ok"; items: EventView[]; skippedLines: number };
   latestCheckpoint: null | {
     company: string;
     title: string;
@@ -61,7 +79,7 @@ export interface ActivityView {
     outcome: string;
     stages: StageView[];
   };
-  typedErrors: { company: string; title: string; stage: string; errorCode: string }[];
+  typedErrors: { source: "events" | "checkpoint"; company: string; title: string; stage: string; errorCode: string }[];
 }
 
 export interface DashboardSnapshot {
@@ -112,6 +130,41 @@ function stagesOf(data: Record<string, unknown>): StageView[] {
   });
 }
 
+const NO_EVENTS_REASON = "No run events file yet. Run boards:discover, discover or pipeline and it appears under private-runtime/.";
+
+function eventView(e: RunEvent): EventView {
+  return { at: e.at, runId: e.runId, runType: e.runType, kind: e.kind, stage: e.stage ?? "", company: e.company ?? "", jobId: e.jobId ?? "", outcome: e.outcome ?? "", errorCode: e.errorCode ?? "", durationMs: e.durationMs ?? null };
+}
+
+function eventsActivity(eventsPath: string, nowMs: number): Pick<ActivityView, "active" | "run" | "current" | "events"> & { errors: EventView[] } {
+  const { events, skippedLines } = readRunEvents(eventsPath);
+  if (events.length === 0) return { active: false, run: null, current: null, events: { status: "no data", reason: NO_EVENTS_REASON }, errors: [] };
+  // File order is write order; the newest run is the one whose last event is last in the file.
+  const lastRunId = events[events.length - 1]!.runId;
+  const runEvents = events.filter((e) => e.runId === lastRunId);
+  const start = runEvents.find((e) => e.kind === "run.start");
+  const end = runEvents.find((e) => e.kind === "run.end");
+  const lastMs = Date.parse(runEvents[runEvents.length - 1]!.at);
+  const open: RunEvent[] = [];
+  for (const e of runEvents) {
+    if (e.kind === "stage.start") open.push(e);
+    else if (e.kind === "stage.end") {
+      let i = open.length - 1;
+      while (i >= 0 && !(open[i]!.stage === e.stage && open[i]!.company === e.company && open[i]!.jobId === e.jobId)) i -= 1;
+      if (i >= 0) open.splice(i, 1);
+    }
+  }
+  const active = !!start && !end && nowMs - lastMs >= 0 && nowMs - lastMs < ACTIVE_WINDOW_MS;
+  const current = active ? open[open.length - 1] : undefined;
+  return {
+    active,
+    run: start ? { runId: lastRunId, runType: start.runType, startedAt: start.at, endedAt: end?.at ?? "", outcome: end?.outcome ?? "" } : null,
+    current: current ? { stage: current.stage ?? "", company: current.company ?? "", jobId: current.jobId ?? "", startedAt: current.at } : null,
+    events: { status: "ok", items: events.slice(-20).map(eventView), skippedLines },
+    errors: events.filter((e) => e.errorCode !== undefined).slice(-20).map(eventView),
+  };
+}
+
 export function buildDashboardSnapshot(sources: DashboardSources): DashboardSnapshot {
   const now = sources.now ?? new Date().toISOString();
   const jobsPath = path.join(sources.dataDir, "jobs.jsonl");
@@ -129,15 +182,18 @@ export function buildDashboardSnapshot(sources: DashboardSources): DashboardSnap
   const checkpoints = readCheckpoints(sources.outputDir, problems).sort((a, b) => a.mtime.localeCompare(b.mtime));
   const latest = checkpoints.at(-1);
   const latestJob = latest ? byId.get(latest.jobId) : undefined;
-  const typedErrors = checkpoints.flatMap((c) =>
-    stagesOf(c.data).filter((s) => s.errorCode).map((s) => ({ company: byId.get(c.jobId)?.company ?? "", title: byId.get(c.jobId)?.title ?? "", stage: s.stage, errorCode: s.errorCode })),
-  ).slice(-20);
-  const latestMs = latest ? Date.parse(latest.mtime) : NaN;
+  const checkpointErrors = checkpoints.flatMap((c) =>
+    stagesOf(c.data).filter((s) => s.errorCode).map((s) => ({ source: "checkpoint" as const, company: byId.get(c.jobId)?.company ?? "", title: byId.get(c.jobId)?.title ?? "", stage: s.stage, errorCode: s.errorCode })),
+  );
+  const live = eventsActivity(path.resolve(sources.eventsPath ?? DEFAULT_RUN_EVENTS_PATH), Date.parse(now));
+  const eventErrors = live.errors.map((e) => ({ source: "events" as const, company: e.company, title: "", stage: e.stage || e.kind, errorCode: e.errorCode }));
   const activity: ActivityView = {
-    active: Number.isFinite(latestMs) && Date.parse(now) - latestMs >= 0 && Date.parse(now) - latestMs < ACTIVE_WINDOW_MS,
-    events: { status: "no data", reason: "No stage emits run events yet; pipeline-checkpoint.json is written once at run end, so there is no live feed or event history." },
+    active: live.active,
+    run: live.run,
+    current: live.current,
+    events: live.events,
     latestCheckpoint: latest ? { company: latestJob?.company ?? "", title: latestJob?.title ?? "", updatedAt: latest.mtime, outcome: str(latest.data.outcome), stages: stagesOf(latest.data) } : null,
-    typedErrors,
+    typedErrors: [...checkpointErrors, ...eventErrors].slice(-20),
   };
 
   const byTrack: Record<string, number> = { SECURITY: 0, QA: 0 };

@@ -12,18 +12,24 @@ Read-only page on `http://127.0.0.1:<port>/`. GET/HEAD only (other methods get 4
 - Proof: `tests/dashboard/dashboard.test.ts` (loopback bind, 405/403/404, store digest unchanged, headless Chrome render of fixture data with zero external requests).
 - Reversal: delete `src/dashboard`, `tests/dashboard` and the `dashboard` script.
 
-## What emits data (verified in source)
+## Run events (`private-runtime/run-events.jsonl`)
 
-| Stage | Run events | What is stored |
+`src/events/run-events.ts` is an append-only JSONL writer. Override the path with `JOB_HUNTER_RUN_EVENTS` (or `--events` on the dashboard). One line per event: `run.start`, `run.end`, `stage.start`, `stage.end`, with `seq`, `at`, `runId`, `runType`, and optional `stage`, `company`, `jobId`, `outcome`, `errorCode`, `durationMs`.
+
+- **Redaction is structural.** There is no free-text field. Stage, outcome and error values must be plain codes (`[A-Za-z][A-Za-z0-9_.:-]{0,63}`); anything else becomes `UNTYPED_ERROR`. Error messages are never recorded. Company is stripped of control characters and capped at 120; job id must be a plain id. The reader re-sanitizes every line.
+- **Crash recovery.** Earlier bytes are never rewritten. If the file does not end in a newline (a torn write), the next process starts its first event on a fresh line; readers skip unparseable lines and report the count.
+- **Logging never breaks a run.** A failed write increments `failedWrites` and is otherwise ignored. Library callers get a no-op log unless they pass one; only the CLI entry points create the real file log, so tests do not write to `private-runtime/`.
+
+| Entry point | Events | Not covered |
 |---|---|---|
-| board discovery | no | `jobs.jsonl` only; run totals are printed |
-| JD resolution | no | `jobs.jsonl` (`resolutionStatus`, `jdContentHash`) |
-| extraction / decision / resume / form | no | `pipeline-checkpoint.json` (written once at run end), `resume-plan.json`, `application-*.json` |
-| board verify | no | nothing (stdout JSON) |
+| `npm run boards:discover` | run, one `board` stage per company (typed code on failure) | per-posting rejections (still in `job-failures.jsonl`) |
+| `npm run discover` (`runDiscover`) | run, `source:<id>` stage per source+keyword, `resolution`, `resolve_job` per listing, typed rejections | |
+| `npm run pipeline` (`runPipeline`) | run, `lane`, `extraction`, `decision`, `resume_plan`, `application` with company and job id | `application` is absent when a valid READY record is reused |
+| LinkedIn / search discovery, `boards:verify`, tracker | none | follow-up |
 
-No run-event log exists, so "last 20 events" and live stage show "no data". "Typed errors" are `errorCode` fields in the latest checkpoints. "Active run" only means a checkpoint was updated under 10 minutes ago. The daily queue (30/day: 24 SECURITY / 6 QA) has no stored counter, so progress shows "no data" and the targets are labelled targets. Board health shows ledger job counts per configured company, labelled as not verification, because `boards:verify` persists nothing.
+Known limits: one process writes one run; concurrent writers interleave whole lines (small appends) but are not otherwise coordinated. A run that crashes never writes `run.end`; the dashboard treats it as active for 10 minutes after its last event, then as stale. The daily queue (30/day: 24 SECURITY / 6 QA) still has no stored counter and shows "no data". Board health still shows ledger counts, not verification, because `boards:verify` stores nothing.
 
-Next gate if live panels are wanted: add an append-only run-event writer in the pipeline and discovery stages (separate task; not done here).
+The pipeline wiring lives in `src/pipeline/run.ts` and `src/pipeline/cli.ts`, which are not yet committed in this branch.
 
 ## Test prerequisite
 
