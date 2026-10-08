@@ -1,6 +1,8 @@
 import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { readFileSync } from "node:fs";
+import { boardListSchema, type ManualWatchEntry } from "../pipeline/discovery/board-discoverer.js";
 import { buildTrackerRows, rowToCells, TRACKER_COLUMNS } from "./rows.js";
 import { buildXlsx } from "./xlsx.js";
 
@@ -13,6 +15,8 @@ export interface TrackerArgs {
   dataDir: string;
   outputDir?: string;
   out?: string;
+  /** Board-list config whose manualWatch entries become MANUAL_WATCH rows. */
+  boards?: string;
 }
 
 export function parseTrackerArgs(argv: string[]): TrackerArgs {
@@ -21,14 +25,15 @@ export function parseTrackerArgs(argv: string[]): TrackerArgs {
     if (argv[i] === "--data-dir") args.dataDir = argv[++i] ?? args.dataDir;
     else if (argv[i] === "--output-dir") args.outputDir = argv[++i];
     else if (argv[i] === "--out") args.out = argv[++i];
+    else if (argv[i] === "--boards") args.boards = argv[++i];
   }
   return args;
 }
 
-export function writeTracker(args: { jobsPath: string; outputDir: string; out: string; now?: string }): { rows: number; problems: string[] } {
-  const { rows, problems } = buildTrackerRows({ jobsPath: args.jobsPath, outputDir: args.outputDir });
+export function writeTracker(args: { jobsPath: string; outputDir: string; out: string; now?: string; watch?: ManualWatchEntry[] }): { rows: number; problems: string[] } {
+  const { rows, problems } = buildTrackerRows({ jobsPath: args.jobsPath, outputDir: args.outputDir, watch: args.watch, now: args.now });
   const bytes = buildXlsx([
-    { name: "Tracker", header: [...TRACKER_COLUMNS], rows: rows.map(rowToCells), widths: [24, 36, 10, 11, 48, 20, 11, 14, 20, 24, 60] },
+    { name: "Tracker", header: [...TRACKER_COLUMNS], rows: rows.map(rowToCells), widths: [24, 36, 10, 28, 20, 11, 48, 20, 11, 14, 20, 24, 60] },
     {
       name: "About",
       header: ["Note"],
@@ -50,11 +55,11 @@ export function writeTracker(args: { jobsPath: string; outputDir: string; out: s
 
 export async function runTracker(args: TrackerArgs, log: (line: string) => void = console.log): Promise<number> {
   if (!args.out) {
-    log("usage: tracker --data-dir <dir> --output-dir <dir> --out <tracker.xlsx>");
+    log("usage: tracker --data-dir <dir> --output-dir <dir> --out <tracker.xlsx> [--boards <company-boards.json>]");
     return 2;
   }
   try {
-    const result = writeTracker({ jobsPath: path.resolve(args.dataDir, "jobs.jsonl"), outputDir: path.resolve(args.outputDir ?? path.join(args.dataDir, "output")), out: path.resolve(args.out) });
+    const result = writeTracker({ jobsPath: path.resolve(args.dataDir, "jobs.jsonl"), outputDir: path.resolve(args.outputDir ?? path.join(args.dataDir, "output")), out: path.resolve(args.out), watch: args.boards ? boardListSchema.parse(JSON.parse(readFileSync(path.resolve(args.boards), "utf8"))).manualWatch : undefined });
     log(`Tracker written: ${path.resolve(args.out)} (${result.rows} rows${result.problems.length ? `, ${result.problems.length} unreadable files noted in About` : ""})`);
     return 0;
   } catch (error) {

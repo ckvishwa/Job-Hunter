@@ -68,7 +68,7 @@ describe("tracker rows (projection of the ledger)", () => {
     expect(problems).toEqual([]);
     expect(rows).toEqual([
       {
-        company: "Acme", title: "QA Engineer", track: "QA", ats: "greenhouse", officialUrl: "https://boards.greenhouse.io/acme/jobs/1", jdHash: HASH_A,
+        company: "Acme", title: "QA Engineer", track: "QA", location: "", locationFlag: "LOCATION_UNKNOWN", ats: "greenhouse", officialUrl: "https://boards.greenhouse.io/acme/jobs/1", jdHash: HASH_A,
         decision: "REVIEW", resumeVariant: "sdet", state: "WAITING_FOR_USER", lastUpdate: "2026-10-08T10:00:00.000Z", blockingReason: "fact missing; coverage partial",
       },
     ]);

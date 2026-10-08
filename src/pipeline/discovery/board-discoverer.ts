@@ -15,6 +15,7 @@ import {
 } from "../../domain/canonical-job.js";
 import { stripHtml, unescapeEscapedHtml } from "../../extraction/jd-cleaner.js";
 import { appendJobFailures, updateJobs } from "../../storage/jsonl-store.js";
+import { classifyLocation } from "./location.js";
 
 // Discovery source: the public Greenhouse and Lever board APIs, for a company list the candidate
 // provides. No browser, no LinkedIn, no scraping: one JSON GET per company board. Every posting
@@ -41,6 +42,19 @@ const keywordList = z.array(z.string().trim().min(1).max(60)).min(1).max(100);
 // earliest track wins (so SECURITY listed before QA claims a title that matches both).
 const trackSchema = z.object({ name: z.string().regex(/^[A-Z][A-Z0-9_]{1,19}$/, "track name must be upper-case, e.g. SECURITY"), keywords: keywordList }).strict();
 
+// Employers whose careers site is on an ATS this tool has no adapter for. They are listed in the
+// tracker as MANUAL_WATCH rows for the candidate to check by hand; nothing is fetched or scraped.
+const watchSchema = z
+  .object({
+    company: z.string().trim().min(1).max(120),
+    ats: z.string().trim().min(1).max(40),
+    careersUrl: z.string().url().refine((u) => /^https?:/i.test(u), { message: "careersUrl must be http(s)" }),
+    track: z.string().regex(/^[A-Z][A-Z0-9_]{1,19}$/).optional(),
+    note: z.string().trim().max(200).optional(),
+  })
+  .strict();
+export type ManualWatchEntry = z.infer<typeof watchSchema>;
+
 export const boardListSchema = z
   .object({
     version: z.literal(1),
@@ -49,6 +63,10 @@ export const boardListSchema = z
     tracks: z.array(trackSchema).min(1).max(5).optional(),
     // Applied before any track: a title containing one of these phrases is dropped.
     excludeTitleKeywords: z.array(z.string().trim().min(1).max(60)).max(100).optional(),
+    // Drop postings whose location is clearly outside the US (default true). Unknown or ambiguous
+    // locations are never dropped; the tracker flags them instead.
+    dropNonUsLocations: z.boolean().optional(),
+    manualWatch: z.array(watchSchema).max(100).optional(),
     companies: z.array(companySchema).min(1).max(300),
   })
   .strict()
@@ -243,6 +261,8 @@ export interface BoardCompanyResult {
   matched: number;
   /** Titles dropped by excludeTitleKeywords before any track was tried. */
   excluded: number;
+  /** Title-matched postings dropped because their location is clearly outside the US. */
+  droppedLocation: number;
   /** Matched postings per track (key "" for a flat keyword list). */
   byTrack: Record<string, number>;
   /** New canonical records plus changed JD revisions written this run. */
@@ -255,7 +275,7 @@ export interface BoardCompanyResult {
 export interface BoardDiscoveryResult {
   runId: string;
   companies: BoardCompanyResult[];
-  totals: { fetched: number; matched: number; excluded: number; saved: number; unchanged: number; rejected: number; failedCompanies: number };
+  totals: { fetched: number; matched: number; excluded: number; droppedLocation: number; saved: number; unchanged: number; rejected: number; failedCompanies: number };
 }
 
 export interface BoardDiscoveryOptions {
@@ -340,7 +360,7 @@ export async function runBoardDiscovery(options: BoardDiscoveryOptions): Promise
   for (const [index, company] of list.companies.entries()) {
     if (options.signal?.aborted) break;
     if (index > 0) await wait(options.delayMs ?? 750, options.signal);
-    const result: BoardCompanyResult = { company: company.company, ats: company.ats, board: company.board, status: "OK", fetched: 0, matched: 0, excluded: 0, byTrack: {}, saved: 0, unchanged: 0, rejected: 0 };
+    const result: BoardCompanyResult = { company: company.company, ats: company.ats, board: company.board, status: "OK", fetched: 0, matched: 0, excluded: 0, droppedLocation: 0, byTrack: {}, saved: 0, unchanged: 0, rejected: 0 };
     const failures: JobFailure[] = [];
     const fail = (code: JobFailureCode, detail: string, target: string, title: string, sourceJobId: string | null) =>
       failures.push(buildJobFailure({ code, stage: "search", runId, targetUrl: target, company: company.company, title, sourceJobId, detail, at: now() }));
@@ -351,7 +371,10 @@ export async function runBoardDiscovery(options: BoardDiscoveryOptions): Promise
       const accepted: JobPosting[] = [];
       const classified = postings.map((p) => ({ p, ...classifyTitle(p.title, list) }));
       result.excluded = classified.filter((c) => c.excludedBy.length > 0).length;
-      const matched = classified.filter((c) => c.track !== null);
+      const titleMatched = classified.filter((c) => c.track !== null);
+      const dropNonUs = list.dropNonUsLocations !== false;
+      const matched = titleMatched.filter((c) => !(dropNonUs && classifyLocation(c.p.location) === "NON_US"));
+      result.droppedLocation = titleMatched.length - matched.length;
       result.matched = matched.length;
       for (const m of matched) result.byTrack[m.track!] = (result.byTrack[m.track!] ?? 0) + 1;
       for (const { p, keywords, track } of matched.slice(0, options.maxPerCompany ?? matched.length)) {
@@ -398,13 +421,13 @@ export async function runBoardDiscovery(options: BoardDiscoveryOptions): Promise
     }
     if (failures.length > 0) appendJobFailures(failuresPath, failures);
     results.push(result);
-    log(`[boards] ${company.company} (${company.ats}:${company.board}) ${result.status} fetched=${result.fetched} matched=${result.matched} excluded=${result.excluded} saved=${result.saved} unchanged=${result.unchanged} rejected=${result.rejected}${result.failure ? ` ${result.failure.code}` : ""}`);
+    log(`[boards] ${company.company} (${company.ats}:${company.board}) ${result.status} fetched=${result.fetched} matched=${result.matched} excluded=${result.excluded} droppedLocation=${result.droppedLocation} saved=${result.saved} unchanged=${result.unchanged} rejected=${result.rejected}${result.failure ? ` ${result.failure.code}` : ""}`);
   }
 
   const sum = (pick: (r: BoardCompanyResult) => number) => results.reduce((n, r) => n + pick(r), 0);
   return {
     runId,
     companies: results,
-    totals: { fetched: sum((r) => r.fetched), matched: sum((r) => r.matched), excluded: sum((r) => r.excluded), saved: sum((r) => r.saved), unchanged: sum((r) => r.unchanged), rejected: sum((r) => r.rejected), failedCompanies: results.filter((r) => r.status === "FAILED").length },
+    totals: { fetched: sum((r) => r.fetched), matched: sum((r) => r.matched), excluded: sum((r) => r.excluded), droppedLocation: sum((r) => r.droppedLocation), saved: sum((r) => r.saved), unchanged: sum((r) => r.unchanged), rejected: sum((r) => r.rejected), failedCompanies: results.filter((r) => r.status === "FAILED").length },
   };
 }

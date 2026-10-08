@@ -1,19 +1,24 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import type { JobPosting } from "../adapters/types.js";
+import type { ManualWatchEntry } from "../pipeline/discovery/board-discoverer.js";
+import { locationFlag } from "../pipeline/discovery/location.js";
 import { loadJobs } from "../storage/job-store.js";
 
 // The tracker is a read-only projection of the authoritative stores (jobs.jsonl and the per-run
 // application records under the output directory). Nothing here writes to those stores, and no code
 // reads the generated workbook back: a deleted or edited tracker is simply rebuilt.
 
-export const TRACKER_COLUMNS = ["Company", "Title", "Track", "ATS", "Official URL", "JD hash", "Decision", "Resume variant", "State", "Last update", "Blocking reason"] as const;
+export const TRACKER_COLUMNS = ["Company", "Title", "Track", "Location", "Location flag", "ATS", "Official URL", "JD hash", "Decision", "Resume variant", "State", "Last update", "Blocking reason"] as const;
 
 export interface TrackerRow {
   company: string;
   title: string;
   /** SECURITY, QA, or empty when the job did not come through a tracked title search. */
   track: string;
+  location: string;
+  /** LOCATION_UNKNOWN or LOCATION_OTHER_US when the posting is not clearly in a target location. */
+  locationFlag: string;
   ats: string;
   officialUrl: string;
   jdHash: string;
@@ -27,6 +32,9 @@ export interface TrackerRow {
 export interface TrackerSources {
   jobsPath: string;
   outputDir: string;
+  /** Employers to check by hand (no adapter); emitted as MANUAL_WATCH rows. */
+  watch?: ManualWatchEntry[];
+  now?: string;
 }
 
 export interface TrackerBuild {
@@ -99,6 +107,8 @@ function rowFromRun(job: JobPosting | undefined, run: RunDir, problems: string[]
     company: job?.company ?? "",
     title: job?.title ?? "",
     track: trackOf(job),
+    location: job?.location ?? "",
+    locationFlag: job ? locationFlag(job.location) : "",
     ats: atsIdentity.split(":")[0] ?? "",
     officialUrl: job?.canonicalUrl ?? "",
     jdHash: run.jdHash,
@@ -124,6 +134,8 @@ export function buildTrackerRows(sources: TrackerSources): TrackerBuild {
       company: job.company,
       title: job.title,
       track: trackOf(job),
+      location: job.location ?? "",
+      locationFlag: locationFlag(job.location),
       ats: (job.atsIdentity ?? "").split(":")[0] ?? "",
       officialUrl: job.canonicalUrl,
       jdHash: job.jdContentHash ?? "",
@@ -134,8 +146,25 @@ export function buildTrackerRows(sources: TrackerSources): TrackerBuild {
       blockingReason: "",
     });
   }
+  for (const w of sources.watch ?? []) {
+    rows.push({
+      company: w.company,
+      title: "(no adapter: check the careers site manually)",
+      track: w.track ?? "",
+      location: "",
+      locationFlag: "",
+      ats: w.ats,
+      officialUrl: w.careersUrl,
+      jdHash: "",
+      decision: "",
+      resumeVariant: "",
+      state: "MANUAL_WATCH",
+      lastUpdate: sources.now ?? new Date().toISOString(),
+      blockingReason: w.note ?? "No adapter for this ATS; open the URL and review roles by hand.",
+    });
+  }
   rows.sort((a, b) => trackRank(a.track) - trackRank(b.track) || a.company.localeCompare(b.company) || a.title.localeCompare(b.title) || a.jdHash.localeCompare(b.jdHash));
   return { rows, problems };
 }
 
-export const rowToCells = (r: TrackerRow): string[] => [r.company, r.title, r.track, r.ats, r.officialUrl, r.jdHash, r.decision, r.resumeVariant, r.state, r.lastUpdate, r.blockingReason].map((v) => v.trim());
+export const rowToCells = (r: TrackerRow): string[] => [r.company, r.title, r.track, r.location, r.locationFlag, r.ats, r.officialUrl, r.jdHash, r.decision, r.resumeVariant, r.state, r.lastUpdate, r.blockingReason].map((v) => v.trim());
