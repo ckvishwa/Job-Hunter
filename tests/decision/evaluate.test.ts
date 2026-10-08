@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decisionKey, decisionStaleness, evaluateJob, normalizeTerm, POLICY_V1, type Decision, type ExtractionReview } from "../../src/decision/evaluate.js";
+import { decisionKey, decisionStaleness, evaluateJob, normalizeTerm, POLICY_V1, structuredExtractionDigest, type Decision, type ExtractionReview } from "../../src/decision/evaluate.js";
 import { profileDigest } from "../../src/domain/candidate-profile.js";
 import { AS_OF, ATTESTED, JD_HASH, fact, job, profile, review, stated } from "../helpers/decision-fixtures.js";
 
@@ -8,7 +8,7 @@ import { AS_OF, ATTESTED, JD_HASH, fact, job, profile, review, stated } from "..
 // FAIL -> REJECT, else any mandatory UNKNOWN or unattested coverage -> REVIEW, else ELIGIBLE). Months are
 // counted end minus start. Boundary: pure functions over synthetic data.
 
-const run = (j: ReturnType<typeof job>, p: ReturnType<typeof profile>, r: ExtractionReview | null = review()): Decision => evaluateJob({ structured: j, profile: p, review: r, asOf: AS_OF, evaluatedAt: "2026-10-07T12:00:00.000Z" });
+const run = (j: ReturnType<typeof job>, p: ReturnType<typeof profile>, r: ExtractionReview | null = review()): Decision => evaluateJob({ structured: j, profile: p, review: r === null ? null : { ...r, extractionDigest: r.extractionDigest ?? structuredExtractionDigest(j) }, asOf: AS_OF, evaluatedAt: "2026-10-07T12:00:00.000Z" });
 const rule = (d: Decision, id: string) => d.rules.find((r) => r.ruleId === id)!;
 
 const python = fact({ factId: "f-python", kind: "skill", value: "Python" });
@@ -281,6 +281,28 @@ describe("extraction coverage and the outcome", () => {
     expect(rule(d, "coverage:extraction").status).toBe("PASS");
     expect(d.extraction).toMatchObject({ coverage: "complete", reviewedBy: "reviewer-a", provenance: "MANUAL_ANNOTATION" });
     expect(d.unresolvedQuestions).toEqual([]);
+  });
+  it("rejects a legacy review that has the JD hash but no job, extraction or digest binding", () => {
+    const { jobId: _j, structuredId: _s, ...legacy } = review();
+    const j = passing();
+    const d = evaluateJob({ structured: j, profile: profile([python]), review: legacy as ExtractionReview, asOf: AS_OF, evaluatedAt: "2026-10-07T12:00:00.000Z" });
+    expect(d.outcome).toBe("REVIEW");
+    expect(rule(d, "coverage:extraction").status).toBe("UNKNOWN");
+    expect(rule(d, "coverage:extraction").explanation).toContain("not bound to a job and extraction");
+    expect(d.extraction.coverage).toBe("unreviewed");
+  });
+  it("rejects a named review bound to an older structured extraction", () => {
+    const d = run(passing(), profile([python]), review({ structuredId: "job-1::old-extraction" }));
+    expect(d.outcome).toBe("REVIEW");
+    expect(rule(d, "coverage:extraction").status).toBe("UNKNOWN");
+    expect(rule(d, "coverage:extraction").explanation).toContain("different extraction revision");
+  });
+  it("rejects a review when validated extraction content changes under the same ID", () => {
+    const original = passing();
+    const changed = { ...original, requirements: [...original.requirements, { ...original.requirements[0]!, id: 'r-new', value: 'SQL' }] };
+    const d = run(changed, profile([python]), review({ extractionDigest: structuredExtractionDigest(original) }));
+    expect(d.outcome).toBe('REVIEW');
+    expect(rule(d, 'coverage:extraction').explanation).toContain('different extraction revision');
   });
 
   it.each([

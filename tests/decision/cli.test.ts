@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { JobPosting } from "../../src/adapters/types.js";
 import { runDecide } from "../../src/decision/cli.js";
+import { structuredExtractionDigest } from "../../src/decision/evaluate.js";
 import { computeJdContentHash } from "../../src/domain/canonical-job.js";
 import { parseCanonicalJob } from "../../src/semantic/parse-job.js";
 import { FixtureJobSemanticProvider } from "../../src/semantic/provider.js";
@@ -79,7 +80,7 @@ async function setup(jd = JD) {
     return file;
   };
   const python = fact({ factId: "f-python", kind: "skill", value: "Python" });
-  return { dir, job, write, profileFile: write("profile.json", profile([python])), reviewFile: write("review.json", review({ jdHash: job.jdContentHash! })), python };
+  return { dir, job, write, profileFile: write("profile.json", profile([python])), reviewFile: write("review.json", review({ jobId: job.id, structuredId: parsed.ok ? parsed.structured.id : "", extractionDigest: parsed.ok ? structuredExtractionDigest(parsed.structured) : "", jdHash: job.jdContentHash! })), python };
 }
 
 const args = (s: Awaited<ReturnType<typeof setup>>, over: Record<string, unknown> = {}) => ({ dataDir: s.dir, job: "greenhouse:acme:1", profile: s.profileFile, review: s.reviewFile, asOf: "2026-10-07", json: false, ...over });

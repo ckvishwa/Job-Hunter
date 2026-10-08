@@ -80,7 +80,7 @@ export function job(parts: {
 }
 
 export function review(over: Partial<ExtractionReview> = {}): ExtractionReview {
-  return { schemaVersion: 1, jdHash: JD_HASH, provenance: "MANUAL_ANNOTATION", coverage: "complete", reviewedBy: "reviewer-a", reviewedAt: "2026-10-07", omissions: [], ...over };
+  return { schemaVersion: 1, jobId: "job-1", structuredId: "job-1::s", jdHash: JD_HASH, provenance: "MANUAL_ANNOTATION", coverage: "complete", reviewedBy: "reviewer-a", reviewedAt: "2026-10-07", omissions: [], ...over };
 }
 
 export const stated = (quote: string, start: number): { quote: string; start: number; end: number } => ({ quote, start, end: start + quote.length });

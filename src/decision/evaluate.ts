@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import {
   factUsability,
@@ -44,6 +45,9 @@ export const POLICY_V1: DecisionPolicy = {
 export const extractionReviewSchema = z
   .object({
     schemaVersion: z.literal(1),
+    jobId: z.string().min(1).optional(),
+    structuredId: z.string().min(1).optional(),
+    extractionDigest: z.string().regex(/^[0-9a-f]{64}$/).optional(),
     jdHash: z.string().regex(/^[0-9a-f]{64}$/),
     provenance: z.enum(["MANUAL_ANNOTATION", "MODEL_OUTPUT"]),
     coverage: z.enum(["complete", "partial"]),
@@ -54,6 +58,13 @@ export const extractionReviewSchema = z
   })
   .strict();
 export type ExtractionReview = z.infer<typeof extractionReviewSchema>;
+
+/** Binds human coverage review to the actual validated interpretation, even if a
+ * provider erroneously reuses its revision string for changed output. */
+export function structuredExtractionDigest(structured: StructuredJob): string {
+  const material = { jobId: structured.jobId, jdHash: structured.jdHash, parserVersion: structured.parserVersion, providerRevision: structured.providerRevision, requirements: structured.requirements, responsibilities: structured.responsibilities, constraints: structured.constraints, alternativeGroups: structured.alternativeGroups, warnings: structured.warnings };
+  return createHash("sha256").update(JSON.stringify(material)).digest("hex");
+}
 
 export type RuleStatus = "PASS" | "FAIL" | "UNKNOWN";
 
@@ -378,7 +389,7 @@ export function evaluateJob(input: EvaluateInput): Decision {
   }
 
   // Coverage: omitted requirements must never be read as passed.
-  const reviewMatches = review !== null && review.jdHash === structured.jdHash;
+  const reviewMatches = review !== null && review.jdHash === structured.jdHash && review.jobId === structured.jobId && review.structuredId === structured.id && review.extractionDigest === structuredExtractionDigest(structured);
   const attestedComplete = reviewMatches && review!.coverage === "complete" && !!review!.reviewedBy && !!review!.reviewedAt;
   const coverage: Decision["extraction"]["coverage"] = !reviewMatches ? "unreviewed" : review!.coverage;
   rules.push({
@@ -393,7 +404,7 @@ export function evaluateJob(input: EvaluateInput): Decision {
       : review === null
         ? "No extraction review record: nothing attests that the extracted requirements cover the JD."
         : !reviewMatches
-          ? "The extraction review record is for a different JD revision."
+          ? review.jdHash !== structured.jdHash ? "The extraction review record is for a different JD revision." : review.jobId === undefined || review.structuredId === undefined || review.extractionDigest === undefined ? "The extraction review record is not bound to a job and extraction (legacy format); re-review it against this extraction." : review.jobId !== structured.jobId ? "The extraction review record is for a different job." : "The extraction review record is for a different extraction revision."
           : review.coverage === "partial"
             ? `The reviewer marked coverage partial${review.omissions.length ? `; known omissions: ${review.omissions.map((o) => o.replace(/\.$/, "")).join("; ")}` : ""}.`
             : "Coverage is marked complete but no reviewer name and date are recorded.",
