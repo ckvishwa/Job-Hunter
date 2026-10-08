@@ -162,6 +162,7 @@ export type SemanticFailureCode =
   | "CONSTRAINT_INVALID"
   | "YEARS_UNSUPPORTED"
   | "SCOPE_MISMATCH"
+  | "NO_REQUIREMENTS"
   | "PROVIDER_FAILED";
 
 export interface SemanticIssue {

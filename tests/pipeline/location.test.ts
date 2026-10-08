@@ -12,19 +12,19 @@ import { buildTrackerRows } from "../../src/tracker/rows.js";
 
 // Expected verdicts are hand-assigned from real board location strings, not produced by the classifier.
 const CASES: Array<[string | null, string]> = [
-  ["Remote - US", "TARGET"],
-  ["Remote, United States", "TARGET"],
-  ["US Remote", "TARGET"],
-  ["Remote (USA)", "TARGET"],
-  ["New York, NY", "TARGET"],
-  ["New York City", "TARGET"],
-  ["Boston, MA", "TARGET"],
-  ["Cambridge, MA", "TARGET"],
-  ["Hartford, CT", "TARGET"],
-  ["Connecticut", "TARGET"],
-  ["Remote - Massachusetts", "TARGET"],
-  ["San Francisco, CA; New York, NY", "TARGET"], // any acceptable place keeps it
-  ["Remote - US/Canada", "TARGET"],
+  ["Remote - US", "US"],
+  ["Remote, United States", "US"],
+  ["US Remote", "US"],
+  ["Remote (USA)", "US"],
+  ["New York, NY", "US"],
+  ["New York City", "US"],
+  ["Boston, MA", "US"],
+  ["Cambridge, MA", "US"],
+  ["Hartford, CT", "US"],
+  ["Connecticut", "US"],
+  ["Remote - Massachusetts", "US"],
+  ["San Francisco, CA; New York, NY", "US"], // any acceptable place keeps it
+  ["Remote - US/Canada", "US"],
   ["Dublin, Ireland", "NON_US"],
   ["London, UK", "NON_US"],
   ["Toronto, ON, Canada", "NON_US"],
@@ -33,18 +33,18 @@ const CASES: Array<[string | null, string]> = [
   ["Bengaluru, India", "NON_US"],
   ["Cambridge, UK", "NON_US"],
   ["Tel Aviv; London", "NON_US"],
-  ["Austin, TX", "OTHER_US"],
-  ["San Francisco, CA", "OTHER_US"],
-  ["Washington, DC", "OTHER_US"],
-  ["Seattle, Washington", "OTHER_US"],
+  ["Austin, TX", "US"],
+  ["San Francisco, CA", "US"],
+  ["Washington, DC", "US"],
+  ["Seattle, Washington", "US"],
   ["Remote", "UNKNOWN"],
-  ["United States", "UNKNOWN"],
+  ["United States", "US"],
   ["San Francisco", "UNKNOWN"],
   ["Hybrid", "UNKNOWN"],
   ["", "UNKNOWN"],
   [null, "UNKNOWN"],
   ["Remote - North America", "UNKNOWN"],
-  ["Social, MA Remote", "TARGET"], // a state code after a comma is a state; "Social" is only a word
+  ["Social, MA Remote", "US"], // a state code after a comma is a state; "Social" is only a word
 ];
 
 describe("location classification", () => {
@@ -52,11 +52,11 @@ describe("location classification", () => {
     expect(classifyLocation(input)).toBe(expected);
   });
 
-  it("flags only the kept-but-not-clearly-wanted cases", () => {
+  it("flags only unknown or ambiguous locations", () => {
     expect(locationFlag("Remote - US")).toBe("");
     expect(locationFlag("Remote")).toBe("LOCATION_UNKNOWN");
     expect(locationFlag(null)).toBe("LOCATION_UNKNOWN");
-    expect(locationFlag("Austin, TX")).toBe("LOCATION_OTHER_US");
+    expect(locationFlag("Austin, TX")).toBe("");
   });
 });
 
@@ -96,7 +96,7 @@ describe("discovery location policy", () => {
     const out = path.join(dir, "output");
     mkdirSync(out);
     const { rows } = buildTrackerRows({ jobsPath: path.join(dir, "jobs.jsonl"), outputDir: out });
-    expect(rows.map((r) => [r.location, r.locationFlag]).sort()).toEqual([["", "LOCATION_UNKNOWN"], ["Austin, TX", "LOCATION_OTHER_US"], ["Remote - US", ""], ["Remote", "LOCATION_UNKNOWN"]]);
+    expect(rows.map((r) => [r.location, r.locationFlag]).sort()).toEqual([["", "LOCATION_UNKNOWN"], ["Austin, TX", ""], ["Remote - US", ""], ["Remote", "LOCATION_UNKNOWN"]]);
   });
 });
 

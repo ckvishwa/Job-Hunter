@@ -68,7 +68,7 @@ describe("tracker rows (projection of the ledger)", () => {
     expect(problems).toEqual([]);
     expect(rows).toEqual([
       {
-        company: "Acme", title: "QA Engineer", track: "QA", location: "", locationFlag: "LOCATION_UNKNOWN", ats: "greenhouse", officialUrl: "https://boards.greenhouse.io/acme/jobs/1", jdHash: HASH_A,
+        company: "Acme", title: "QA Engineer", track: "QA", location: "", locationFlag: "LOCATION_UNKNOWN", noSponsorship: "", noSponsorshipQuote: "", clearanceRequired: "", clearanceQuote: "", yearsRequired: "", yearsQuote: "", remoteExcludesCt: "", excludesCtQuote: "", ats: "greenhouse", officialUrl: "https://boards.greenhouse.io/acme/jobs/1", jdHash: HASH_A,
         decision: "REVIEW", resumeVariant: "sdet", state: "WAITING_FOR_USER", lastUpdate: "2026-10-08T10:00:00.000Z", blockingReason: "fact missing; coverage partial",
       },
     ]);
@@ -111,6 +111,26 @@ describe("tracker track column", () => {
     ]);
     const { rows } = buildTrackerRows({ jobsPath: w.jobsPath, outputDir: w.out });
     expect(rows.map((r) => [r.track, r.company])).toEqual([["SECURITY", "Alpha"], ["SECURITY", "Yank"], ["QA", "Legacy"], ["QA", "Zeta"], ["", "Beta"]]);
+  });
+});
+
+describe("tracker JD flag columns", () => {
+  it("carries each flag with its verbatim quote, and never removes the row", () => {
+    const w = workspace();
+    const NL = String.fromCharCode(10);
+    const text =
+      "Requirements:" + NL + "- 4+ years of experience in security operations" + NL + "- Must hold an active Public Trust clearance." + NL + "Location: This role is remote but not eligible to be hired in CT, NY. We do not sponsor visas. " +
+      "We are a growing team of engineers who value careful work, clear writing and steady improvement across everything we ship to our customers every month of the year.";
+    saveJobs(w.jobsPath, [job({ descriptionText: text, location: "Remote - US", matchedProfiles: ["security"] })]);
+    const { rows } = buildTrackerRows({ jobsPath: w.jobsPath, outputDir: w.out });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      noSponsorship: "NO_SPONSORSHIP", noSponsorshipQuote: "We do not sponsor visas.",
+      clearanceRequired: "CLEARANCE_REQUIRED", clearanceQuote: "- Must hold an active Public Trust clearance.",
+      yearsRequired: "4", yearsQuote: "4+ years of experience in security operations",
+      remoteExcludesCt: "REMOTE_EXCLUDES_CT",
+    });
+    expect(rows[0]!.excludesCtQuote).toContain("not eligible to be hired in CT, NY.");
   });
 });
 

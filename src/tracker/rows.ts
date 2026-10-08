@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import type { JobPosting } from "../adapters/types.js";
 import type { ManualWatchEntry } from "../pipeline/discovery/board-discoverer.js";
+import { analyzeJd } from "../pipeline/discovery/jd-flags.js";
 import { locationFlag } from "../pipeline/discovery/location.js";
 import { loadJobs } from "../storage/job-store.js";
 
@@ -9,7 +10,7 @@ import { loadJobs } from "../storage/job-store.js";
 // application records under the output directory). Nothing here writes to those stores, and no code
 // reads the generated workbook back: a deleted or edited tracker is simply rebuilt.
 
-export const TRACKER_COLUMNS = ["Company", "Title", "Track", "Location", "Location flag", "ATS", "Official URL", "JD hash", "Decision", "Resume variant", "State", "Last update", "Blocking reason"] as const;
+export const TRACKER_COLUMNS = ["Company", "Title", "Track", "Location", "Location flag", "No sponsorship", "No sponsorship quote", "Clearance required", "Clearance quote", "Years required", "Years quote", "Remote excludes CT", "Excludes CT quote", "ATS", "Official URL", "JD hash", "Decision", "Resume variant", "State", "Last update", "Blocking reason"] as const;
 
 export interface TrackerRow {
   company: string;
@@ -17,8 +18,17 @@ export interface TrackerRow {
   /** SECURITY, QA, or empty when the job did not come through a tracked title search. */
   track: string;
   location: string;
-  /** LOCATION_UNKNOWN or LOCATION_OTHER_US when the posting is not clearly in a target location. */
+  /** LOCATION_UNKNOWN when the location is empty or ambiguous (a non-US location is dropped before it gets here). */
   locationFlag: string;
+  /** Flags read from the saved JD text, each with its verbatim quote. They inform; no row is removed for them. */
+  noSponsorship: string;
+  noSponsorshipQuote: string;
+  clearanceRequired: string;
+  clearanceQuote: string;
+  yearsRequired: string;
+  yearsQuote: string;
+  remoteExcludesCt: string;
+  excludesCtQuote: string;
   ats: string;
   officialUrl: string;
   jdHash: string;
@@ -61,8 +71,8 @@ function reasonText(value: unknown): string {
 }
 
 // Discovery records the matched track in matchedProfiles (lower-case); older profile ids map to the same two tracks.
-const TRACK_BY_PROFILE: Record<string, string> = { security: "SECURITY", cybersecurity: "SECURITY", qa: "QA", sdet: "QA" };
-const TRACK_ORDER = ["SECURITY", "QA"];
+const TRACK_BY_PROFILE: Record<string, string> = { security: "SECURITY", cybersecurity: "SECURITY", qa: "QA", sdet: "QA", entry_level: "ENTRY_LEVEL" };
+const TRACK_ORDER = ["SECURITY", "QA", "ENTRY_LEVEL"];
 
 export function trackOf(job: JobPosting | undefined): string {
   const tracks = (job?.matchedProfiles ?? []).map((p) => TRACK_BY_PROFILE[p.toLowerCase()]).filter((t): t is string => t !== undefined);
@@ -70,6 +80,23 @@ export function trackOf(job: JobPosting | undefined): string {
 }
 
 const trackRank = (track: string) => (TRACK_ORDER.includes(track) ? TRACK_ORDER.indexOf(track) : TRACK_ORDER.length);
+
+const NO_FLAGS = { noSponsorship: "", noSponsorshipQuote: "", clearanceRequired: "", clearanceQuote: "", yearsRequired: "", yearsQuote: "", remoteExcludesCt: "", excludesCtQuote: "" };
+
+function jdFlagFields(job: JobPosting | undefined) {
+  if (!job) return NO_FLAGS;
+  const f = analyzeJd(job.descriptionText, { location: job.location });
+  return {
+    noSponsorship: f.noSponsorship ? "NO_SPONSORSHIP" : "",
+    noSponsorshipQuote: f.noSponsorship?.quote ?? "",
+    clearanceRequired: f.clearanceRequired ? "CLEARANCE_REQUIRED" : "",
+    clearanceQuote: f.clearanceRequired?.quote ?? "",
+    yearsRequired: f.yearsRequired ? String(f.yearsRequired.years) : "",
+    yearsQuote: f.yearsRequired?.quote ?? "",
+    remoteExcludesCt: f.remoteExcludesCt ? "REMOTE_EXCLUDES_CT" : "",
+    excludesCtQuote: f.remoteExcludesCt?.quote ?? "",
+  };
+}
 
 interface RunDir {
   jobId: string;
@@ -109,6 +136,7 @@ function rowFromRun(job: JobPosting | undefined, run: RunDir, problems: string[]
     track: trackOf(job),
     location: job?.location ?? "",
     locationFlag: job ? locationFlag(job.location) : "",
+    ...jdFlagFields(job),
     ats: atsIdentity.split(":")[0] ?? "",
     officialUrl: job?.canonicalUrl ?? "",
     jdHash: run.jdHash,
@@ -136,6 +164,7 @@ export function buildTrackerRows(sources: TrackerSources): TrackerBuild {
       track: trackOf(job),
       location: job.location ?? "",
       locationFlag: locationFlag(job.location),
+      ...jdFlagFields(job),
       ats: (job.atsIdentity ?? "").split(":")[0] ?? "",
       officialUrl: job.canonicalUrl,
       jdHash: job.jdContentHash ?? "",
@@ -153,6 +182,7 @@ export function buildTrackerRows(sources: TrackerSources): TrackerBuild {
       track: w.track ?? "",
       location: "",
       locationFlag: "",
+      ...NO_FLAGS,
       ats: w.ats,
       officialUrl: w.careersUrl,
       jdHash: "",
@@ -167,4 +197,4 @@ export function buildTrackerRows(sources: TrackerSources): TrackerBuild {
   return { rows, problems };
 }
 
-export const rowToCells = (r: TrackerRow): string[] => [r.company, r.title, r.track, r.location, r.locationFlag, r.ats, r.officialUrl, r.jdHash, r.decision, r.resumeVariant, r.state, r.lastUpdate, r.blockingReason].map((v) => v.trim());
+export const rowToCells = (r: TrackerRow): string[] => [r.company, r.title, r.track, r.location, r.locationFlag, r.noSponsorship, r.noSponsorshipQuote, r.clearanceRequired, r.clearanceQuote, r.yearsRequired, r.yearsQuote, r.remoteExcludesCt, r.excludesCtQuote, r.ats, r.officialUrl, r.jdHash, r.decision, r.resumeVariant, r.state, r.lastUpdate, r.blockingReason].map((v) => v.trim());

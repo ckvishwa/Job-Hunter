@@ -1,14 +1,14 @@
 // Deterministic location classification for discovered postings. The policy is deliberately
 // asymmetric: only a location that is clearly outside the US is dropped. Anything unknown or
 // ambiguous stays visible and is flagged, so a missing or odd location string never hides a job.
+// Every US posting is kept, whether on-site, hybrid or remote and in any state.
 
 export type LocationVerdict =
-  | "TARGET" // US-remote, Connecticut, New York or Massachusetts
+  | "US" // a US location: any state, on-site, hybrid or remote
   | "NON_US" // clearly outside the US: dropped by discovery
-  | "OTHER_US" // a US location outside the target states: kept, flagged
-  | "UNKNOWN"; // empty, bare "Remote", city-only, or otherwise ambiguous: kept, flagged
+  | "UNKNOWN"; // empty, bare "Remote"/"Hybrid", city-only, or otherwise ambiguous: kept, flagged
 
-export type LocationFlag = "" | "LOCATION_UNKNOWN" | "LOCATION_OTHER_US";
+export type LocationFlag = "" | "LOCATION_UNKNOWN";
 
 const STATES: Record<string, string> = {
   al: "alabama", ak: "alaska", az: "arizona", ar: "arkansas", ca: "california", co: "colorado", ct: "connecticut", de: "delaware", dc: "district of columbia",
@@ -18,7 +18,6 @@ const STATES: Record<string, string> = {
   or: "oregon", pa: "pennsylvania", ri: "rhode island", sc: "south carolina", sd: "south dakota", tn: "tennessee", tx: "texas", ut: "utah", vt: "vermont",
   va: "virginia", wa: "washington", wv: "west virginia", wi: "wisconsin", wy: "wyoming",
 };
-const TARGET_ABBR = new Set(["ct", "ny", "ma"]);
 const TARGET_NAMES = ["connecticut", "new york", "massachusetts", "nyc", "new haven", "hartford", "stamford", "boston", "brooklyn", "manhattan", "cambridge, ma"];
 
 // Clear non-US markers: countries, regions and major non-US cities. Matched on whole words.
@@ -47,13 +46,12 @@ function segmentVerdict(raw: string): LocationVerdict {
   const us = US_RE.test(text);
   // "Boston, MA" / "Hartford, CT": a two-letter state code only counts after a comma.
   const abbr = [...text.matchAll(/,\s*([a-z]{2})(?![a-z0-9])/g)].map((m) => m[1]!);
-  const targetState = abbr.some((a) => TARGET_ABBR.has(a)) || TARGET_NAME_RE.test(text);
-  if (targetState) return "TARGET";
-  if (remote && us) return "TARGET"; // Remote - US, Remote (United States), US Remote
-  if (NON_US_RE.test(text) && !us) return "NON_US"; // "Remote - EMEA", "Toronto, Canada", "London"
-  const otherState = abbr.some((a) => a in STATES) || STATE_NAMES_RE.test(text);
-  if (otherState) return "OTHER_US";
-  return "UNKNOWN"; // bare "Remote", "United States", a city with no region, ...
+  const usPlace = abbr.some((a) => a in STATES) || TARGET_NAME_RE.test(text) || STATE_NAMES_RE.test(text);
+  if (usPlace) return "US"; // "Boston, MA", "Austin, TX", "Washington, D.C.", "Remote - New York"
+  if (us) return "US"; // "Remote - US", "United States", "US Remote", "Remote (USA)"
+  if (NON_US_RE.test(text)) return "NON_US"; // "Remote - EMEA", "Toronto, Canada", "London"
+  void remote;
+  return "UNKNOWN"; // bare "Remote"/"Hybrid", a city with no region, ...
 }
 
 /** Verdict for a whole location field; several places separated by ; | / or " or " are judged together. */
@@ -61,13 +59,11 @@ export function classifyLocation(location: string | null | undefined): LocationV
   if (!location || !location.trim()) return "UNKNOWN";
   const segments = location.split(/\s*(?:;|\||\/|\bor\b)\s*/i).filter((s) => s.trim());
   const verdicts = segments.map(segmentVerdict);
-  if (verdicts.includes("TARGET")) return "TARGET";
+  if (verdicts.includes("US")) return "US";
   if (verdicts.length > 0 && verdicts.every((v) => v === "NON_US")) return "NON_US";
-  if (verdicts.includes("OTHER_US")) return "OTHER_US";
   return "UNKNOWN";
 }
 
 export function locationFlag(location: string | null | undefined): LocationFlag {
-  const verdict = classifyLocation(location);
-  return verdict === "UNKNOWN" ? "LOCATION_UNKNOWN" : verdict === "OTHER_US" ? "LOCATION_OTHER_US" : "";
+  return classifyLocation(location) === "UNKNOWN" ? "LOCATION_UNKNOWN" : "";
 }

@@ -103,6 +103,12 @@ export async function parseCanonicalJob(job: JobPosting, provider: JobSemanticPr
   }
   if (!outcome.ok) return fail(outcome.code, outcome.issues);
 
+  // A posting always asks something of the candidate. A structurally valid result with no requirements means
+  // the source sections were not recognized (or the model returned nothing); it must never read as "no requirements".
+  if (outcome.job.requirements.length === 0) {
+    return fail("NO_REQUIREMENTS", [{ code: "NO_REQUIREMENTS", path: "requirements", message: "extraction produced no requirements; the posting's qualification sections were not recognized or nothing was extracted" }], false);
+  }
+
   // Persist before reporting success. A storage failure throws (JobStoreError) and is NOT a parse failure.
   if (options.structuredPath) {
     await upsertStructuredJob(options.structuredPath, outcome.job);

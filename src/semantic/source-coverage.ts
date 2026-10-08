@@ -23,10 +23,10 @@ export type CoverageItem = SourceSegment & {
     status: "EXTRACTED" | "EXCLUDED" | "UNRESOLVED";
     exclusionReason: string | null;
 };
-const HEADINGS = /\b(?:Minimum (?:requirements|qualifications)|Basic qualifications|Required qualifications|Required (?:experience|expereince)|Essential skills|Requirements|Qualifications|Preferred qualifications|Preferred skills|Preferred experience|Nice to have|Bonus points|Education & Certifications|Responsibilities|What you(?:’|'| wi)ll (?:do|be doing)|What you will (?:do|be doing)|What you should have|Who you are|Who we are|Why [A-Z][\w&-]+|About (?:the team|the company|[A-Z][\w&-]*)|Hybrid work(?: at [A-Z][\w&-]*)?|In-office expectations|Working remotely(?: at [A-Z][\w&-]*)?|Work arrangements?|Work location|Location|The US base salary range|Compensation|Pay and benefits|Benefits|What we offer|Equal opportunity)\b/gi;
-const QUAL_START = /(?<!\S)(?:Approximately\s+\d+|\d+(?:\s*[-–]\s*\d+)?(?:\.\d+)?\+?\s+years?\b|(?:(?:Deep|Strong|General|Additional|Demonstrated|Proven|Practical|Hands-on|Working|Prior) (?:experience|expertise|proficiency|knowledge|understanding|exposure|ability)|Experience|Expertise|Proficiency|Knowledge|Understanding|Exposure|Ability|Familiarity)\b|(?:An|The) ability\b|Hands-on\b|Some hands-on\b|Basic (?:scripting capability|to intermediate)\b|Academic\b|Jira for\b|Candidates must\b|Applicants must\b|High standards\b|Empathy\b|[A-Z][\w+./-]* system administration (?:knowledge|experience)\b)/g;
+const HEADINGS = /\b(?:Minimum (?:requirements|qualifications)|Basic qualifications|Required qualifications|Required (?:experience|expereince)|Essential skills|Requirements|Qualifications|Preferred qualifications|Preferred skills|Preferred experience|Nice to have|Bonus points|Desired qualifications|Desirable (?:skills(?:, knowledge,? and experience)?|qualifications|experience)|Additional notes|What you(?:’|')?ll bring|What you should bring(?: with you)?|What you bring(?: with you)?|Education & Certifications|Responsibilities|What you(?:’|'| wi)ll (?:do|be doing)|What you will (?:do|be doing)|What you should have|Who you are|Who we are|Why [A-Z][\w&-]+|About (?:the team|the company|[A-Z][\w&-]*)|Hybrid work(?: at [A-Z][\w&-]*)?|In-office expectations|Working remotely(?: at [A-Z][\w&-]*)?|Work arrangements?|Work location|Location|The US base salary range|Compensation|Pay and benefits|Benefits|What we offer|Equal opportunity)\b|(?<![\w])\*?(?:Required|Desired|Preferred):/gi;
+const QUAL_START = /(?<!\S)(?<!Language )(?:Approximately\s+\d+|\d+(?:\s*[-–]\s*\d+)?(?:\.\d+)?\+?\s+years?\b|(?:(?:Deep|Strong|General|Additional|Demonstrated|Proven|Practical|Hands-on|Working|Prior) (?:experience|expertise|proficiency|knowledge|understanding|exposure|ability)|Experience|Expertise|Proficiency|Knowledge|Understanding|Exposure|Ability|Familiarity)\b|(?:An|The) ability\b|Hands-on\b|Some hands-on\b|Basic (?:scripting capability|to intermediate)\b|Academic\b|Jira for\b|Candidates must\b|Applicants must\b|Strong\b|Awareness\b|Comfortable\b|Eager\b|A (?:fundamental|strong|solid|working|basic) (?:understanding|knowledge)\b|A curiosity\b|High standards\b|Empathy\b|[A-Z][\w+./-]* system administration (?:knowledge|experience)\b)/g;
 const RESP_START = /(?<!\S)(?:Contribute|Act as|Design|Collaborate|Operate|Drive|Manage|Identify|Build|Develop|Maintain|Implement|Support|Lead)\b/g;
-const WORK = /\b(?:remote(?:ly)?|office|work from home|onsite|on-site|hybrid work|relocat\w*|resid\w*|lived in the United States|travel|sponsor\w*|visa|citizen\w*|clearance|work authorization)\b/i;
+const WORK = /\b(?:remote(?:ly)?|office|work from home|onsite|on-site|hybrid work|relocat\w*|resid\w*|lived in the United States|travel|sponsor\w*|visa|citizen\w*|clearance|work authorization|authorized to work|authorization to work|eligible to work|right to work)\b/i;
 function segment(raw: string, start: number, end: number): SourceSegment | null {
     while (start < end && /\s/.test(raw[start]!))
         start++;
@@ -35,9 +35,9 @@ function segment(raw: string, start: number, end: number): SourceSegment | null 
     return end > start ? { start, end, text: raw.slice(start, end) } : null;
 }
 function sectionOf(label: string): SourceSection {
-    if (/^(?:minimum|basic|required|essential|requirements|what you should have)/i.test(label))
+    if (/^\*?(?:minimum|basic|required|essential|requirements|what you should have|what you(?:’|')?ll bring|what you should bring|what you bring)/i.test(label))
         return 'required';
-    if (/^(?:preferred|nice to have|bonus)/i.test(label))
+    if (/^\*?(?:preferred|desired|desirable|nice to have|bonus)/i.test(label))
         return 'preferred';
     if (/^(?:responsibilities|what you)/i.test(label))
         return 'responsibility';
@@ -65,7 +65,8 @@ export function inventorySource(raw: string): SourceInventory {
         // A title-like word inside prose (for example, "Product Requirements Documents") is
         // not a section boundary. Flattened DOM headings are accepted at sentence/line starts,
         // or adjacent to another already-recognized bare heading ("Who we are About Stripe").
-        if (afterBoundary.trim() !== '' && !followsBareHeading && !inlineQualificationHeading && !inlineWorkHeading) continue;
+        const explicitColonHeading = /^\*?(?:Required|Desired|Preferred):$/i.test(m[0]);
+        if (afterBoundary.trim() !== '' && !followsBareHeading && !inlineQualificationHeading && !inlineWorkHeading && !explicitColonHeading) continue;
         headings.push({ start, end: start + m[0].length, label: m[0] });
     }
     for (const m of raw.matchAll(/^[ \t]*(?:minimum (?:requirements|qualifications)|required qualifications|requirements|qualifications|preferred qualifications|nice to have|responsibilities|work arrangements?)[ \t]*:?[ \t]*$/gim))
@@ -122,7 +123,9 @@ export function inventorySource(raw: string): SourceInventory {
             const s = segment(raw, starts[i]!, itemEnd);
             if (!s || !s.text.replace(/[:\s]/g, ''))
                 continue;
-            const section = WORK.test(s.text) && (!['required', 'preferred', 'responsibility'].includes(sec) || /^(?:Candidates must|Applicants must|This role|Employees|You must|Must be|Remote|Hybrid|On-site|Onsite)\b/i.test(s.text)) ? 'work' : sec;
+            let section: SourceSection = WORK.test(s.text) && (!['required', 'preferred', 'responsibility'].includes(sec) || /^(?:Candidates must|Applicants must|This role|Employees|You must|Must be|Remote|Hybrid|On-site|Onsite)\b/i.test(s.text)) ? 'work' : sec;
+            // An item that says of itself that it is preferred is preferred, whatever list it sits in.
+            if (section === 'required' && /\b(?:is|are)\s+(?:preferred|desired|a plus|a bonus|nice to have)\b/i.test(s.text)) section = 'preferred';
             const id = 's' + s.start.toString(36);
             items.push({ ...s, id, section, heading: h.label, boundary: explicit ? 'explicit' : 'inferred', annotate: ['required', 'preferred'].includes(section) });
         }
