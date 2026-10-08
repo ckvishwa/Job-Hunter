@@ -97,8 +97,9 @@ export interface DashboardSnapshot {
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 const isHttps = (u: string) => /^https:\/\//i.test(u);
 
+// entrySignal is read defensively: it exists on TrackerRow only once the tracker's entry-signal column is committed.
 function flagsOf(r: TrackerRow): string[] {
-  return [r.noSponsorship, r.clearanceRequired, r.yearsRequired ? "YEARS_REQUIRED" : "", r.remoteExcludesCt, r.locationFlag === "LOCATION_UNKNOWN" ? "LOCATION_UNKNOWN" : "", r.entrySignal ? "ENTRY_SIGNAL" : ""].filter(Boolean);
+  return [r.noSponsorship, r.clearanceRequired, r.yearsRequired ? "YEARS_REQUIRED" : "", r.remoteExcludesCt, r.locationFlag === "LOCATION_UNKNOWN" ? "LOCATION_UNKNOWN" : "", (r as { entrySignal?: string }).entrySignal ? "ENTRY_SIGNAL" : ""].filter(Boolean);
 }
 
 function readCheckpoints(outputDir: string, problems: string[]): { jobId: string; data: Record<string, unknown>; mtime: string }[] {
