@@ -170,15 +170,20 @@ async function openOwnedForm(url: string, profileDir: string): Promise<{ page: i
   }
 }
 
-async function saveApplicationRecord(filePath: string, record: unknown): Promise<void> {
+export async function saveApplicationRecord(filePath: string, record: unknown): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   try {
     const handle = await open(filePath, "wx");
     try { await handle.writeFile(`${JSON.stringify(record, null, 2)}\n`, "utf8"); await handle.sync(); } finally { await handle.close(); }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-    const previous = JSON.parse(await readFile(filePath, "utf8")) as { outcome?: string };
-    if (previous.outcome === "READY_TO_SUBMIT") return;
+    const previous = JSON.parse(await readFile(filePath, "utf8")) as Record<string, unknown>;
+    if (previous.outcome === "READY_TO_SUBMIT") {
+      const next = record as Record<string, unknown>;
+      const binding = ["applicationKey", "jobId", "atsIdentity", "jdHash", "profileDigest", "decisionId", "artifactSha256"];
+      if (next.outcome === "READY_TO_SUBMIT" && binding.every(key => previous[key] === next[key])) return;
+      throw new Error("STALE_READY_RECORD: existing readiness is bound to a different JD, profile, decision or resume; human review is required.");
+    }
     await writeJsonAtomic(filePath, record);
   }
 }

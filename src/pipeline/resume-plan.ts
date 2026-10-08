@@ -5,7 +5,7 @@ import { chromium } from "playwright";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { JobPosting } from "../adapters/types.js";
 import { z } from "zod";
-import type { CandidateFact } from "../domain/candidate-profile.js";
+import { factUsability, type CandidateFact, type CandidateProfile } from "../domain/candidate-profile.js";
 import type { Decision } from "../decision/evaluate.js";
 import type { CanonicalLane, VerifiedInputs } from "./trust.js";
 
@@ -47,6 +47,17 @@ function factWording(fact: CandidateFact): string {
   return fact.attributes.detail ?? fact.value;
 }
 
+/** Resume claims are a strict subset of approved facts for these four technical tracks. */
+export function resumeFactAllowed(fact: CandidateFact): boolean {
+  if (fact.sensitivity !== "normal" || !["skill", "employment", "project", "education", "certification"].includes(fact.kind)) return false;
+  const claim = [fact.value, fact.attributes.detail, fact.attributes.employer, fact.attributes.title].filter(Boolean).join(" ");
+  return !/\b(?:QCL|special inspector|construction|civil engineering|environmental inspection|environmental inspector)\b/i.test(claim);
+}
+
+export function resumeSourceFacts(profile: CandidateProfile, asOf: string): Map<string, CandidateFact> {
+  return new Map(profile.facts.filter(fact => factUsability(fact, asOf).usable && resumeFactAllowed(fact)).map(fact => [fact.factId, fact]));
+}
+
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
@@ -71,7 +82,7 @@ export async function buildAndRenderResumePlan(input: {
 }): Promise<RenderedResumeArtifact> {
   if (!input.job.jdContentHash) throw new Error("Cannot create a job-specific plan without a canonical JD content hash.");
   const laneFiles = input.verifiedInputs.laneFiles[input.lane];
-  const byId = new Map(input.verifiedInputs.approvedFacts.map((fact) => [fact.factId, fact]));
+  const byId = resumeSourceFacts(input.verifiedInputs.profile, input.decision.asOf);
   const ids = input.factCandidates.map((candidate) => candidate.factId);
   const protectedJobs = input.verifiedInputs.protectedEmployment;
   for (const job of [...protectedJobs].reverse()) if (!ids.includes(job.factId)) ids.unshift(job.factId);

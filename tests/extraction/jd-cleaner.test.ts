@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { stripHtml, unescapeEscapedHtml } from "../../src/extraction/jd-cleaner.js";
+import { stripHtml, stripHtmlWithStructure, unescapeEscapedHtml } from "../../src/extraction/jd-cleaner.js";
+
+it("preserves headings and list items from an official ATS JD", () => {
+  const html = "<h2>Required Skills and Experience:</h2><ul><li>2+ years in production security pipelines</li><li>Python or Go</li></ul><h2>Preferred:</h2><ul><li>Cloud security</li></ul>";
+  expect(stripHtmlWithStructure(html)).toBe("Required Skills and Experience:\n- 2+ years in production security pipelines\n- Python or Go\nPreferred:\n- Cloud security");
+});
 
 describe("stripHtml", () => {
   it("removes tags and collapses whitespace", () => {

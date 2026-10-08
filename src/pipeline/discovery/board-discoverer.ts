@@ -13,7 +13,7 @@ import {
   type JobFailure,
   type JobFailureCode,
 } from "../../domain/canonical-job.js";
-import { stripHtml, unescapeEscapedHtml } from "../../extraction/jd-cleaner.js";
+import { stripHtml, stripHtmlWithStructure, unescapeEscapedHtml } from "../../extraction/jd-cleaner.js";
 import { appendJobFailures, updateJobs } from "../../storage/jsonl-store.js";
 import { classifyLocation } from "./location.js";
 import { noopRunEventLog, type RunEventLog } from "../../events/run-events.js";
@@ -230,7 +230,7 @@ export async function fetchBoardPostings(company: BoardCompany, fetchImpl: typeo
         department: job.departments?.[0]?.name ?? null,
         employmentType: null,
         postingDate: job.updated_at ?? null,
-        descriptionText: stripHtml(unescapeEscapedHtml(html)),
+        descriptionText: stripHtmlWithStructure(html),
         descriptionHtml: html || null,
       };
     });

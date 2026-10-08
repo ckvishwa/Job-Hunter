@@ -74,6 +74,7 @@ export const candidateFactSchema = z
         verifiedBy: z.string().min(1).nullable(),
         verifiedAt: isoDate.nullable(),
         validUntil: isoDate.nullable().default(null),
+        contentDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
       })
       .strict(),
     approvalStatus: z.enum(["pending", "approved", "rejected"]),
@@ -164,7 +165,13 @@ export function profileDigest(profile: CandidateProfile): string {
   return createHash("sha256").update(JSON.stringify(canonical(material))).digest("hex");
 }
 
-export type FactUsability = { usable: true } | { usable: false; reason: "PENDING" | "REJECTED" | "UNVERIFIED" | "EXPIRED"; detail: string };
+/** Binds a new human approval to the exact claim and provenance reviewed. */
+export function factContentDigest(fact: CandidateFact): string {
+  const material = { kind: fact.kind, value: fact.value, polarity: fact.polarity, attributes: fact.attributes, source: fact.source, sensitivity: fact.sensitivity };
+  return createHash("sha256").update(JSON.stringify(material)).digest("hex");
+}
+
+export type FactUsability = { usable: true } | { usable: false; reason: "PENDING" | "REJECTED" | "UNVERIFIED" | "EXPIRED" | "STALE_APPROVAL"; detail: string };
 
 /** Only an approved, verified, unexpired fact can satisfy anything. `asOf` is an ISO date (YYYY-MM-DD). */
 export function factUsability(fact: CandidateFact, asOf: string): FactUsability {
@@ -172,6 +179,9 @@ export function factUsability(fact: CandidateFact, asOf: string): FactUsability 
   if (fact.approvalStatus === "rejected") return { usable: false, reason: "REJECTED", detail: `fact ${fact.factId} was rejected` };
   if (!fact.verification.verifiedBy || !fact.verification.verifiedAt) {
     return { usable: false, reason: "UNVERIFIED", detail: `fact ${fact.factId} has no verifier or verification date` };
+  }
+  if (fact.verification.contentDigest && fact.verification.contentDigest !== factContentDigest(fact)) {
+    return { usable: false, reason: "STALE_APPROVAL", detail: `fact ${fact.factId} changed after approval` };
   }
   const until = fact.verification.validUntil;
   if (until && until.slice(0, 10) < asOf.slice(0, 10)) {

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { candidateProfileSchema, factUsability, parseCandidateProfile, profileDigest, unionMonths } from "../../src/domain/candidate-profile.js";
+import { candidateProfileSchema, factUsability, parseCandidateProfile, profileDigest, unionMonths, factContentDigest } from "../../src/domain/candidate-profile.js";
 import { fact, profile } from "../helpers/decision-fixtures.js";
 
 const raw = (over: Record<string, unknown> = {}) => ({
@@ -99,6 +99,12 @@ describe("candidate profile contract", () => {
 });
 
 describe("factUsability", () => {
+  it("invalidates a reviewed approval when factual content changes", () => {
+    const original = fact({ factId: "a", kind: "skill", value: "Python" });
+    const approved = { ...original, verification: { ...original.verification, contentDigest: factContentDigest(original) } };
+    expect(factUsability(approved, "2026-10-07")).toEqual({ usable: true });
+    expect(factUsability({ ...approved, value: "Go" }, "2026-10-07")).toMatchObject({ usable: false, reason: "STALE_APPROVAL" });
+  });
   it("only approved, verified, unexpired facts are usable", () => {
     expect(factUsability(fact({ factId: "a", kind: "skill", value: "x" }), "2026-10-07")).toEqual({ usable: true });
     expect(factUsability(fact({ factId: "a", kind: "skill", value: "x", pending: true }), "2026-10-07")).toMatchObject({ usable: false, reason: "PENDING" });

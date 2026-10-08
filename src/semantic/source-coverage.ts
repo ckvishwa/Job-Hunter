@@ -76,6 +76,9 @@ export function inventorySource(raw: string): SourceInventory {
     for (const m of raw.matchAll(/^[^\r\n]{1,70}:\s*$/gm))
         if (!/\b(?:should|must|can|will)\b/i.test(m[0]) && !headings.some(h => h.start >= m.index! && h.start < m.index! + m[0].length))
             headings.push({ start: m.index!, end: m.index! + m[0].trimEnd().length, label: m[0].trim() });
+    // ATS metadata and pay notices end a qualification list even when no new heading tag survives.
+    for (const m of raw.matchAll(/^(?:Position ID:\s*\S[^\r\n]*|Pay Transparency Notice:\s*[^\r\n]*|#LI-[^\r\n]*)$/gim))
+        if (!headings.some(h => h.start === m.index!)) headings.push({ start: m.index!, end: m.index! + m[0].length, label: m[0] });
     headings.sort((a, b) => a.start - b.start);
     const items: SourceItem[] = [];
     const warnings: string[] = [];

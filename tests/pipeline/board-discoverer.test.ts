@@ -88,6 +88,14 @@ describe("board list configuration", () => {
 });
 
 describe("board discovery (Greenhouse and Lever public APIs)", () => {
+  it("preserves Greenhouse requirement bullets and changes the JD hash when structure is restored", async () => {
+    const w = setup([GH], ["Security"]);
+    const content = `<h2>Required Skills and Experience:</h2><ul><li>2+ years building production security pipelines.</li><li>Python or Go development experience.</li></ul><p>${JD_BODY}</p>`;
+    const fetchImpl = stubFetch({ [boardApiUrl(GH)]: { body: { jobs: [ghJob(10, "Security Engineer", "acme", content)] } } });
+    await runBoardDiscovery(opts(w, fetchImpl));
+    const job = loadJobs(w.jobsPath)[0]!;
+    expect(job.descriptionText).toContain("Required Skills and Experience:\n- 2+ years building production security pipelines.\n- Python or Go development experience.");
+  });
   it("saves title-matching official postings with full JD, distinct requisitions, and makes no other request", async () => {
     const w = setup([GH, LV]);
     const fetchImpl = stubFetch({

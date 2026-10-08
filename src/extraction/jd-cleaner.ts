@@ -34,6 +34,17 @@ export function stripHtml(html: string): string {
   return decodeEntities(withoutTags).replace(/\s+/g, " ").trim();
 }
 
+/** Preserve ATS qualification boundaries so reviews can address each source clause. */
+export function stripHtmlWithStructure(html: string): string {
+  const markup = unescapeEscapedHtml(html)
+    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<li(?:\s[^>]*)?>/gi, "\n- ")
+    .replace(/<\/(?:li|p|div|h[1-6]|ul|ol|section)>/gi, "\n")
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<[^>]+>/g, " ");
+  return decodeEntities(markup).split(/\r?\n/).map(line => line.replace(/[ \t]+/g, " ").trim()).filter(Boolean).join("\n");
+}
+
 /**
  * Some ATS APIs (Greenhouse's job endpoints) return the description as entity-escaped HTML
  * ("&lt;p&gt;..."). That is markup in disguise: stripHtml alone would keep it as literal text.
