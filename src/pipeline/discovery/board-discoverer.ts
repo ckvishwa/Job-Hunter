@@ -301,7 +301,7 @@ export interface BoardDiscoveryOptions {
   events?: RunEventLog;
 }
 
-function registryEntryFor(company: BoardCompany): CompanyRegistryEntry {
+export function registryEntryFor(company: BoardCompany): CompanyRegistryEntry {
   return companyRegistryEntrySchema.parse({
     company: company.company,
     fortuneRank: null,
@@ -319,7 +319,7 @@ function registryEntryFor(company: BoardCompany): CompanyRegistryEntry {
   });
 }
 
-function toPosting(company: BoardCompany, raw: BoardPosting, matchedKeywords: string[], entrySignal: string[], track: string, now: string): JobPosting {
+export function toPosting(company: BoardCompany, raw: BoardPosting, matchedKeywords: string[], entrySignal: string[], track: string, now: string): JobPosting {
   return {
     id: computeJobId(raw.url),
     source: `board-api::${company.ats}::${company.board}`,

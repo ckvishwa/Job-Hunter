@@ -37,3 +37,16 @@ canonical-resume-registry*.json
 
 # Local agent working notes (compact handoff); never tracked
 .agent-runtime/
+
+# S1 (candidate workflow): local secrets, virtualenv, Astro build output
+infra/.env
+services/ai/.venv/
+services/ai/**/__pycache__/
+services/ai/.pytest_cache/
+web/node_modules/
+web/dist/
+web/.astro/
+web/.build-lock/
+
+# S3: the owner's own list of official employer boards (see config/company-boards.example.json)
+config/company-boards.json

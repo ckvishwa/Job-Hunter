@@ -276,7 +276,7 @@ const uniqueSpans = (spans: EvidenceSpan[]): EvidenceSpan[] => {
 
 type Constraint = StructuredJob["constraints"][number];
 
-function evaluateExplicitFactConstraint(c: Constraint, profile: CandidateProfile, kind: "clearance" | "work_authorization", asOf: string): Outcome {
+function evaluateExplicitFactConstraint(c: Constraint, profile: CandidateProfile, kind: "clearance" | "work_authorization" | "citizenship", asOf: string): Outcome {
   const term = c.value ?? c.type;
   const m = matchFacts(profile, [kind], term, asOf);
   const kindFacts = profile.facts.filter((f) => f.kind === kind);
@@ -353,7 +353,8 @@ export function evaluateJob(input: EvaluateInput): Decision {
     }
     if (c.status === "unknown") continue; // the JD says nothing: no rule, no restriction invented
     if ((c.type === "clearance" || c.type === "work_authorization" || c.type === "citizenship") && c.status === "required") {
-      const kind = c.type === "clearance" ? "clearance" : "work_authorization";
+      // Citizenship, clearance and work authorization are separate facts; none is ever derived from another.
+      const kind = c.type;
       const outcome = evaluateExplicitFactConstraint(c, profile, kind, asOf);
       rules.push({ ruleId: `constraint:${c.id}`, subject: { kind: "constraint", id: c.id }, label: `${c.type} required${c.value ? `: ${c.value}` : ""}`, mandatory: true, level: "required", ...outcome, evidence: c.evidence });
       continue;

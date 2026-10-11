@@ -1,0 +1,29 @@
+# Dedicated PostgreSQL for Job Hunter S1 (candidate workflow). Do not point other projects at it.
+# Usage (from repo root):  docker compose -f infra/docker-compose.yml --env-file infra/.env up -d
+name: jobhunter-s1
+
+services:
+  db:
+    # Pinned minor version and digest (PostgreSQL 17 is a supported major). Upgrade deliberately, never via "latest".
+    image: postgres:17.6-bookworm@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3
+    container_name: jobhunter-s1-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${JH_PG_USER:?set JH_PG_USER in infra/.env}
+      POSTGRES_PASSWORD: ${JH_PG_PASSWORD:?set JH_PG_PASSWORD in infra/.env}
+      POSTGRES_DB: ${JH_PG_DB:?set JH_PG_DB in infra/.env}
+    ports:
+      # Loopback only. Never 0.0.0.0.
+      - "127.0.0.1:${JH_PG_PORT:-55440}:5432"
+    volumes:
+      - jobhunter_s1_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  jobhunter_s1_pgdata:
+    name: jobhunter_s1_pgdata

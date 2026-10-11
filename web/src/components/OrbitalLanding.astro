@@ -1,0 +1,95 @@
+---
+import OrbitalLogo from "./OrbitalLogo.astro";
+---
+  <header class="site-header">
+    <div class="nav wrap">
+      <a href="#top" class="brand" aria-label="Orbital home">
+        <OrbitalLogo />
+        <span>orbital<span class="dot-blue">.</span></span>
+      </a>
+      <nav class="nav-links" aria-label="Main navigation">
+        <a href="#top">Home</a><a href="#how">How it works</a><a href="#paths">Career paths</a><a href="/roles">My roles</a>
+      </nav>
+      <div class="nav-actions"><a class="btn btn--light" href="/dashboard">Log in</a><a class="btn btn--dark" href="/resumes">Get started <span aria-hidden="true">↗</span></a></div>
+      <button type="button" class="menu-button" id="menu-button" aria-controls="mobile-menu" aria-expanded="false">Menu ☰</button>
+    </div>
+    <nav class="mobile-links" id="mobile-menu" aria-label="Mobile navigation">
+      <a href="#top">Home</a><a href="#how">How it works</a><a href="#paths">Career paths</a><a href="/roles">My roles</a><a href="/dashboard">Log in ↗</a><a href="/resumes">Get started ↗</a>
+    </nav>
+  </header>
+  <main id="top">
+    <section class="hero" aria-labelledby="hero-title"><div class="hero-inner wrap">
+      <div class="hero-copy">
+        <div class="eyebrow">Your skills. A wider horizon.</div>
+        <h1 class="display" id="hero-title">Discover<br/>where your<br/>skills <span class="blue">belong.</span></h1>
+        <p class="body-copy">Upload your résumé, review what the system understands, and explore cybersecurity career paths grounded in your actual experience.</p>
+        <div class="hero-actions"><a href="/resumes" class="btn btn--dark">Explore my paths <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12h16m-7-7 7 7-7 7"/></svg></a><a href="#how" class="btn btn--light">See how it works <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4z"/></svg></a></div>
+        <div class="micro-line"><span><i class="dot"></i> Evidence-backed</span><span><i class="dot"></i> Human-reviewed</span><span><i class="dot"></i> No hiring promises</span></div>
+      </div>
+      <div class="hero-visual" aria-label="Abstract royal-blue Orbital square with skill nodes exploring connected career paths" role="img">
+        <div class="graphic-panel"></div><div class="graphic-grid"></div>
+        <span class="visual-caption">ORBITAL / 001</span>
+        <svg class="graphic-art" viewBox="0 0 680 600" aria-hidden="true">
+          <defs><filter id="softShadow" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="20" stdDeviation="21" flood-color="#19378b" flood-opacity=".22"/></filter><clipPath id="orbSquare"><rect x="175" y="159" width="330" height="310" rx="70" transform="rotate(-13 340 310)"/></clipPath></defs>
+          <path d="M80 502 580 54" stroke="#2855e8" stroke-width="1" opacity=".22"/><path d="M125 65H565M100 536H650" stroke="#2855e8" opacity=".15"/>
+          <ellipse class="orbit-ring" cx="351" cy="310" rx="276" ry="141" transform="rotate(-26 351 310)"/>
+          <ellipse cx="355" cy="302" rx="225" ry="235" fill="#e7efff" opacity=".9"/>
+          <rect x="175" y="159" width="330" height="310" rx="70" transform="rotate(-13 340 310)" fill="#2855e8" filter="url(#softShadow)"/>
+          <g clip-path="url(#orbSquare)"><path d="m132 168 420-55-136 235-242 52z" fill="#101116"/><path d="M165 395 411 338 529 517 202 555z" fill="#1643d6"/><path d="m414 341 144-230 29 413-81-8z" fill="#fff"/><path d="m147 380 270-38 89 28-236 192z" fill="#fff"/><path d="m301 213 189-39-75 159-247 61z" fill="#101116"/><path d="m209 402 214-56 60 19-188 104z" fill="#e9f1ff"/></g>
+          <path d="M179 399c78-45 165-46 254-81 45-19 89-42 123-87" fill="none" stroke="#2855e8" stroke-width="6" stroke-linecap="round"/>
+          <g class="orbit-spin"><circle cx="585" cy="177" r="13" fill="#2855e8"/><circle cx="122" cy="462" r="7" fill="#101116"/></g>
+          <circle cx="584" cy="177" r="13" fill="#2855e8"/><circle cx="126" cy="455" r="7" fill="#101116"/>
+          <path d="M556 467l15-15m-7 17 7-17-17 5" fill="none" stroke="#141820" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+        <div class="floating-pill pill-one"><svg viewBox="0 0 24 24" fill="none" stroke="#2855e8" stroke-width="2.6"><path d="M4 18V12m5 6V5m5 13V9m5 9V3"/></svg> SIEM</div>
+        <div class="floating-pill pill-two"><svg viewBox="0 0 24 24" fill="none" stroke="#2855e8" stroke-width="2.1"><path d="m8 5-6 7 6 7M16 5l6 7-6 7M14 3 10 21"/></svg> Python</div>
+        <div class="floating-pill pill-three"><svg viewBox="0 0 24 24" fill="none" stroke="#2855e8" stroke-width="2.1"><rect x="4" y="3" width="16" height="18" rx="3"/><circle cx="12" cy="9" r="2.3"/><path d="M8 17c0-4 8-4 8 0"/></svg> Identity & access</div>
+        <div class="visual-note">SAME SKILLS.<br/>MORE WAYS<br/>FORWARD.<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10Q7 31 33 29M24 21l9 8-10 4"/></svg></div>
+      </div>
+    </div></section>
+
+    <section id="upload" class="resume-section" aria-labelledby="upload-title"><div class="resume-wrap wrap">
+      <div class="section-heading-row"><span class="section-number">01</span><span class="eyebrow">Your journey starts here</span></div>
+      <div class="resume-grid">
+        <div class="resume-intro"><h2 class="section-title" id="upload-title">Turn your résumé into possibilities.</h2><p class="body-copy">Your experience is more than a job title. Start with the facts, then discover the directions they support.</p></div>
+        <div class="white-card upload-card"><div class="card-head"><span class="section-number">1</span> Upload your résumé</div><div class="upload-target"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M11 4h19l9 9v31H11zM30 4v9h9M17 24h16M17 31h16M17 38h11"/></svg><strong>Your next chapter starts with what you've done.</strong><p>Upload and review your résumé in your private workspace.</p><a class="btn btn--dark" href="/resumes">Go to résumé upload ↗</a><p>PDF or DOCX • Processed through the existing S1 flow</p></div></div>
+        <div class="white-card verification-card"><div class="card-head"><span class="section-number">2</span> You verify the facts</div><div class="verification-graphic"><span>YOUR<br/>CALL.</span></div><ul class="checklist"><li><span class="tick">✓</span> Review the source evidence</li><li><span class="tick">✓</span> Correct employment dates</li><li><span class="tick">✓</span> Approve or reject facts</li><li><span class="tick">✓</span> Explore supported paths</li></ul></div>
+      </div>
+    </div></section>
+
+    <section id="paths" class="careers" aria-labelledby="paths-title"><div class="career-wrap wrap">
+      <div class="section-heading-row"><span class="section-number">02</span><span class="eyebrow">Explore cybersecurity career paths</span></div>
+      <div class="career-grid">
+        <div class="career-intro"><h2 class="section-title" id="paths-title">Real roles.<br/>Real growth.</h2><p>Explore different security careers and the skills behind them. Your actual recommendations depend on your approved profile.</p><a href="/roles" class="btn btn--dark">Explore my roles <span aria-hidden="true">↗</span></a></div>
+        <article class="career-card"><div class="career-art"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 8 82 22v24c0 22-14 35-32 45-18-10-32-23-32-45V22Z" fill="#fff"/><path d="m34 50 12 12 23-26" stroke="#2855e8" stroke-width="5"/></svg></div><div class="career-body"><h3>SOC Analyst</h3><p>Monitor, investigate, and respond to security alerts and threats.</p><div class="tags"><span>SIEM</span><span>Threat analysis</span></div><div class="card-bottom"><span>SECURITY OPERATIONS</span><a href="/roles" aria-label="Explore SOC Analyst">Explore →</a></div></div></article>
+        <article class="career-card"><div class="career-art"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="43" cy="43" r="25" fill="#fff"/><path d="m62 63 22 22M29 43h28M43 29v28"/><path d="m40 43 6 5 9-10" stroke="#2855e8"/></svg></div><div class="career-body"><h3>DFIR Analyst</h3><p>Investigate incidents, preserve evidence, and support response.</p><div class="tags"><span>Forensics</span><span>Incident response</span></div><div class="card-bottom"><span>INVESTIGATION</span><a href="/roles" aria-label="Explore DFIR Analyst">Explore →</a></div></div></article>
+        <article class="career-card"><div class="career-art"><svg viewBox="0 0 100 100" aria-hidden="true"><rect x="21" y="42" width="58" height="45" rx="7" fill="#fff"/><path d="M34 42V29a16 16 0 0 1 32 0v13M50 59v15"/><circle cx="50" cy="58" r="5" stroke="#2855e8"/></svg></div><div class="career-body"><h3>IAM Analyst</h3><p>Manage access, identity controls, and authorization processes.</p><div class="tags"><span>IAM</span><span>Access controls</span></div><div class="card-bottom"><span>IDENTITY</span><a href="/roles" aria-label="Explore IAM Analyst">Explore →</a></div></div></article>
+        <article class="career-card"><div class="career-art"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M22 65a20 20 0 0 1 8-36 26 26 0 0 1 47 14 17 17 0 0 1 3 34H27a15 15 0 0 1-5-12Z" fill="#fff"/><path d="m37 61 11 10 17-21" stroke="#2855e8" stroke-width="5"/></svg></div><div class="career-body"><h3>Cloud Security</h3><p>Build and protect secure cloud environments and services.</p><div class="tags"><span>Cloud</span><span>Risk management</span></div><div class="card-bottom"><span>CLOUD PLATFORM</span><a href="/roles" aria-label="Explore Cloud Security">Explore →</a></div></div></article>
+      </div>
+    </div></section>
+
+    <section id="how" aria-labelledby="how-title"><div class="how-wrap wrap"><div class="section-heading-row"><span class="section-number">03</span><span class="eyebrow">How Orbital works</span></div><div class="how-grid">
+      <div class="how-intro"><h2 class="section-title" id="how-title">A clearer path<br/>to what's next.</h2><p class="body-copy">Orbital helps you understand your experience, explore relevant careers, and choose the opportunities worth investigating.</p></div>
+      <div class="step-card"><div class="step-top"><span class="section-number">1</span><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3h14l6 6v20H7zM21 3v6h6M12 16h11m-11 5h11"/></svg></div><h3>Upload résumé</h3><p>Start with your skills, work history and certifications.</p></div>
+      <div class="step-card"><div class="step-top"><span class="section-number">2</span><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2"><circle cx="16" cy="16" r="12"/><path d="m9 16 5 5 9-11"/></svg></div><h3>Approve facts</h3><p>Check source evidence. Only approved facts support recommendations.</p></div>
+      <div class="step-card"><div class="step-top"><span class="section-number">3</span><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="11" height="11" rx="2"/><rect x="18" y="3" width="11" height="11" rx="2"/><rect x="3" y="18" width="11" height="11" rx="2"/><rect x="18" y="18" width="11" height="11" rx="2"/></svg></div><h3>Explore paths</h3><p>Review role families, their evidence and missing skills.</p></div>
+      <div class="step-card"><div class="step-top"><span class="section-number">4</span><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2"><circle cx="15" cy="15" r="11"/><path d="m11 22 4-9 9-4-4 9Z"/></svg></div><h3>Discover openings</h3><p>Search verified official job sources for selected roles.</p><div class="coming">S3 • In development</div></div>
+    </div></div></section>
+
+    <section class="closing wrap"><div class="closing-inner"><div><div class="eyebrow">A whole world of possibilities</div><h2>Your experience. More directions.</h2><p>Explore what's possible without pretending there's a guaranteed path to getting hired.</p></div><a class="btn btn--blue" href="/resumes">Start exploring <span aria-hidden="true">↗</span></a></div></section>
+  </main>
+  <footer class="footer"><div class="footer-inner wrap"><a href="#top" class="brand"><OrbitalLogo /><span>orbital<span class="dot-blue">.</span></span></a><small>Explore career options. No placement guarantees. © 2026 Orbital concept.</small><div class="footer-links"><a href="/dashboard">Log in</a><a href="/resumes">Résumés</a><a href="/roles">Career paths</a><a href="#how">How it works</a></div></div></footer>
+  <script>
+    const menu = document.getElementById('menu-button');
+    const mobile = document.getElementById('mobile-menu');
+    if (menu && mobile) {
+      menu.addEventListener('click', () => {
+        const isOpen = mobile.classList.toggle('open');
+        menu.setAttribute('aria-expanded', String(isOpen));
+      });
+      mobile.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => {
+        mobile.classList.remove('open');
+        menu.setAttribute('aria-expanded', 'false');
+      }));
+    }
+  </script>

@@ -1,8 +1,45 @@
 # Status
 
-Last updated: 2026-10-09. Branch `careerops-integration`. Nothing here is merged to `master`.
+Last updated: 2026-10-10. Branch `careerops-integration`. Nothing here is merged to `master`.
 
 > Public-repository note: this file records redacted summaries only. Candidate facts, answers, resume content, immigration or eligibility details, target-employer selections, application identifiers and the hashes of private files live under the gitignored `private-runtime/` and are deliberately not described here.
+
+## Resume correction, diagnostics and AI shadow evaluation (2026-10-10)
+
+**Implemented and verified offline; nothing committed.** Rules parser is now `resume-rules@2`: split words are repaired in a parsing view while spans and
+quotes stay on the original text; `Intern` in a job title no longer assigns a category; unseparated `Title Employer` lines are split only when clear;
+projects, inline certification lists, `B.Tech.` degrees and wrapped skill items are captured. `npm run facts:correct` edits one fact through the
+existing review lifecycle (per-field confirmation, optional verified quotation widening, approved facts need a flag, S2 recomputed). Employment records
+that disagree for the same employer are flagged `EMPLOYMENT_CONFLICT` and approving one needs an explicit flag; neither version is ever chosen.
+`npm run resumes:diagnose` reports coverage, evidence quality, review status and career relevance separately (no overall score; precision/recall/F1
+are `NOT_EVALUATED` without an independent reference). `npm run ai:eval` compares the rules baseline with a local Qwen2.5-3B challenger in shadow mode:
+on 18 author-labelled synthetic résumés the challenger is far behind (F1 0.41 vs 0.94) and 39 of its 61 raw facts were unsupported, so it stays in shadow.
+Existing résumés keep their `resume-rules@1` facts until re-extracted; the new parser applies to new uploads and to `--rerun-parser` previews.
+Docs: `docs/RESUME-DIAGNOSTICS.md`, `docs/FACT-REVIEW.md`, `services/ai/README.md`. Full suite, serialized (`--maxWorkers=1 --minWorkers=1 --no-file-parallelism`):
+124 files / 1,407 tests passed. An earlier serialized run of this work failed 3 tests for deterministic reasons of my own making (an extra eager
+S2 refresh in the browser review route changed row counts that `s2-api` and `s2-ui` assert; a test file name matched the private-isolation guard);
+both were fixed, not retried.
+
+## S2 status (Master ARD, 2026-10-09): roles, grounded experience, recommendations, selection
+
+**Implemented and verified offline; nothing committed (S1 and S2 are both uncommitted); S3 not started.** Versioned editable role
+catalog (cybersecurity primary; QA/SDET, cloud, network secondary), month-precision experience summary from approved and classified
+facts only, deterministic evidence-linked role recommendations bound to an evidence digest (changed evidence supersedes and never
+carries an old approval), human approve/dismiss, and an explicit role/location/level selection that governs S3. API under
+`/api/v1/roles/*`; UI at `/roles`. Evidence, rules, decision notes, limitations, flake diagnosis and the S3 entry criteria:
+`docs/evidence/s2-role-recommendations.md`. Full suite: green serialized (2 of 2) and in 1 of the last 2 default runs, otherwise
+loopback-flaky on this machine (`docs/KNOWN_FLAKES.md`, seventh entry).
+
+## S1 status (Master ARD, 2026-10-09): resume upload to human-approved facts
+
+**Implemented and verified offline; nothing committed; S2 not started.** Astro upload/review UI -> Fastify API -> Python FastAPI
+extraction (PDF/DOCX, rules first, optional Qwen fallback) -> PostgreSQL pending facts -> human review with immutable revisions.
+PostgreSQL (Docker, `infra/`) is authoritative for this S1 workflow only; the legacy JSONL stores and the existing pipeline are
+unchanged. Citizenship, clearance, work authorization and sponsorship are never read from a resume; they exist only as explicit,
+confirmed user statements, and a citizenship requirement is now checked against citizenship facts only (unknown => REVIEW).
+Evidence, commands, decision notes, limitations and the changed-file inventory: `docs/evidence/s1-resume-upload-review.md`.
+The full suite passed in 4 of 7 runs after S1 was added; the other runs failed on loopback/timeouts that pass alone
+(`docs/KNOWN_FLAKES.md`, sixth entry). Parser quality on real resumes is unmeasured.
 
 ## V1 status summary (2026-10-09)
 

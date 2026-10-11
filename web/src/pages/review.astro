@@ -1,0 +1,203 @@
+---
+import Base from "../layouts/Base.astro";
+import PageHead from "../components/PageHead.astro";
+---
+
+<Base title="Orbital — Review facts" crumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Résumés", href: "/resumes" }, { label: "Fact review" }]}>
+  <PageHead eyebrow="Step 2 · Fact review" number="02" title="Check what the system understood." lead="Every fact below was proposed from your résumé and is pending. Only facts you approve can ever be used. Select a row to see where it came from.">
+    <a class="button secondary" href="/resumes">&larr; Résumés</a>
+    <a id="to-roles" class="button blue" href="/roles">Next: career paths &rarr;</a>
+  </PageHead>
+  <section aria-label="Extraction status">
+    <p>State: <strong id="state">loading</strong> <span id="parser" class="muted"></span></p>
+    <ul id="warnings"></ul>
+    <p id="msg" role="status"></p>
+  </section>
+
+  <div class="grid">
+    <section>
+      <h2>Facts</h2>
+      <table class="stack">
+        <thead><tr><th>Kind</th><th>Value</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="facts"></tbody>
+      </table>
+    </section>
+    <section>
+      <h2>Source text</h2>
+      <pre id="source-text"></pre>
+    </section>
+  </div>
+</Base>
+
+<script>
+  import { api, ApiError, type FactView } from "../lib/api";
+  import { startPage } from "../lib/gate";
+  import { $, clear, h, say } from "../lib/dom";
+
+  const id = new URLSearchParams(window.location.search).get("id") ?? "";
+  let text = "";
+  let facts: FactView[] = [];
+  let selected: string | null = null;
+  const msg = $("#msg");
+
+  const describe = (e: unknown): string =>
+    e instanceof ApiError
+      ? e.kind === "unauthenticated" ? "Your session expired. Reload the page to sign in again."
+        : e.kind === "unavailable" || e.kind === "offline" ? "Lost contact with the API. Nothing was changed; reload to retry."
+        : `${e.message} (${e.code})`
+      : "Something went wrong.";
+
+  function showSource(fact: FactView | undefined): void {
+    const pre = $("#source-text");
+    clear(pre);
+    if (!fact?.span) {
+      pre.append(text);
+      return;
+    }
+    const { start, end } = fact.span;
+    const mark = h("mark", {}, text.slice(start, end));
+    pre.append(text.slice(0, start), mark, text.slice(end));
+    mark.scrollIntoView({ block: "center" });
+  }
+
+  function attributeSummary(f: FactView): string {
+    const a = f.attributes;
+    const parts: string[] = [];
+    if (a.employer) parts.push(`employer: ${a.employer}`);
+    if (a.title) parts.push(`title: ${a.title}`);
+    if (a.startDate) parts.push(`from ${a.startDate} to ${a.endDate ?? "present"}`);
+    if (a.employmentType) parts.push(`type: ${a.employmentType}`);
+    if (Array.isArray(a.technologies)) parts.push(`technologies: ${(a.technologies as string[]).join(", ")}`);
+    return parts.join(" | ");
+  }
+
+  async function review(fact: FactView, action: "approve" | "reject", confirmSensitive = false): Promise<void> {
+    try {
+      const r = await api.post<{ changed: boolean }>(`/api/v1/resumes/${id}/facts/review`, {
+        factId: fact.factId, action, expectedDigest: fact.contentDigest, ...(confirmSensitive ? { confirmSensitive: true } : {}),
+      });
+      say(msg, r.changed ? `Fact ${action === "approve" ? "approved" : "rejected"}.` : "Nothing changed.", "ok");
+    } catch (e) {
+      say(msg, describe(e), "error");
+    }
+    await load(false);
+  }
+
+  function editForm(fact: FactView): HTMLElement {
+    const a = fact.attributes as Record<string, string | null | undefined>;
+    const employment = fact.kind === "employment";
+    const education = fact.kind === "education";
+    const described = ["employment", "education", "project", "certification"].includes(fact.kind);
+    const value = h("input", { name: "value", value: fact.value, "aria-label": "Value" });
+    const employer = h("input", { name: "employer", value: String(a.employer ?? ""), placeholder: "Employer", "aria-label": "Employer" });
+    const title = h("input", { name: "title", value: String(a.title ?? ""), placeholder: "Title", "aria-label": "Title" });
+    const start = h("input", { name: "startDate", value: String(a.startDate ?? ""), placeholder: "YYYY-MM", "aria-label": "Start date" });
+    const end = h("input", { name: "endDate", value: a.endDate ? String(a.endDate) : "", placeholder: employment ? "YYYY-MM (blank = current)" : "YYYY-MM (blank = unknown)", "aria-label": "End date" });
+    const type = h("select", { name: "employmentType", "aria-label": "Employment type" },
+      ...["", "professional", "internship", "academic", "volunteer"].map((v) => h("option", { value: v, ...(a.employmentType === v ? { selected: true } : {}) }, v || "(not set)")));
+    const detail = h("input", { name: "detail", value: String(a.detail ?? ""), placeholder: "Approved detail (optional, max 300)", maxlength: "300", "aria-label": "Detail" });
+    const form = h("form", { class: "edit" }, value,
+      ...(employment ? [employer, title, start, end, type] : []),
+      ...(education ? [start, end] : []),
+      ...(described ? [detail] : []),
+      h("button", { type: "submit" }, "Save edit"), h("button", { type: "button", class: "secondary", onclick: () => void load(false) }, "Cancel"));
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const attributes: Record<string, unknown> = { ...fact.attributes };
+      const set = (k: string, v: string) => (v.trim() ? (attributes[k] = v.trim()) : delete attributes[k]);
+      if (employment) {
+        set("employer", employer.value); set("title", title.value); set("startDate", start.value); set("employmentType", type.value);
+        if (end.value.trim()) attributes.endDate = end.value.trim(); else attributes.endDate = null;
+      }
+      if (education) {
+        set("startDate", start.value); set("endDate", end.value);
+      }
+      if (described) set("detail", detail.value);
+      try {
+        await api.post(`/api/v1/resumes/${id}/facts/review`, { factId: fact.factId, action: "edit", expectedDigest: fact.contentDigest, edit: { value: value.value, ...(described ? { attributes } : {}) } });
+        say(msg, "Edit saved as a new revision. The fact is pending again and needs re-approval.", "ok");
+      } catch (e) {
+        say(msg, describe(e), "error");
+      }
+      await load(false);
+    });
+    return form;
+  }
+
+  async function showHistory(fact: FactView, cell: HTMLElement): Promise<void> {
+    const { revisions } = await api.get<{ revisions: Array<{ revision: number; action: string; actor: string; explicitConfirmation: boolean; createdAt: string }> }>(`/api/v1/facts/${encodeURIComponent(fact.factId)}/revisions`);
+    cell.querySelector(".history")?.remove();
+    cell.append(h("ul", { class: "history" }, ...revisions.map((r) => h("li", {}, `#${r.revision} ${r.action} by ${r.actor}${r.explicitConfirmation ? " (explicitly confirmed)" : ""} - ${new Date(r.createdAt).toLocaleString()}`))));
+  }
+
+  function row(fact: FactView): HTMLElement {
+    const sensitive = fact.sensitivity === "sensitive";
+    const confirm = h("input", { type: "checkbox", class: "confirm-sensitive", "aria-label": "I confirm this is correct and may be used" });
+    const approve = h("button", { "data-action": "approve", ...(sensitive ? { disabled: true } : {}) }, "Approve");
+    confirm.addEventListener("change", () => ((approve as HTMLButtonElement).disabled = !(confirm as HTMLInputElement).checked));
+    approve.addEventListener("click", () => void review(fact, "approve", sensitive && (confirm as HTMLInputElement).checked));
+    const actionsCell = h("td", {}, h("div", { class: "actions" },
+      approve,
+      h("button", { "data-action": "reject", class: "danger", onclick: () => void review(fact, "reject") }, "Reject"),
+      h("button", { "data-action": "edit", class: "secondary", onclick: () => { cell.replaceChildren(h("div", {}, fact.value), editForm(fact)); } }, "Edit"),
+      h("button", { "data-action": "history", class: "secondary", onclick: () => void showHistory(fact, actionsCell) }, "History"),
+      ...(sensitive && fact.approvalStatus !== "approved" ? [h("label", {}, confirm, " I confirm this is correct and may be used")] : []),
+    ));
+    const detail = attributeSummary(fact);
+    const cell = h("td", { class: "value" }, h("div", {}, fact.value), detail ? h("div", { class: "muted" }, detail) : null,
+      fact.notes ? h("div", { class: "muted" }, fact.notes) : null,
+      fact.proposedBy === "qwen" ? h("div", { class: "muted" }, "Proposed by a local model - verify against the source.") : null);
+    const tr = h("tr", { "data-fact-id": fact.factId, "data-kind": fact.kind, "data-status": fact.approvalStatus, ...(selected === fact.factId ? { class: "selected" } : {}) },
+      h("td", {}, fact.kind, " ", sensitive ? h("span", { class: "badge sensitive" }, "sensitive") : null),
+      cell,
+      h("td", {}, h("span", { class: `badge ${fact.approvalStatus}` }, fact.approvalStatus)),
+      actionsCell);
+    tr.addEventListener("click", (event) => {
+      if ((event.target as HTMLElement).closest("button,input,select,label,form")) return;
+      selected = fact.factId;
+      showSource(fact);
+      document.querySelectorAll("#facts tr").forEach((r) => r.classList.toggle("selected", r === tr));
+    });
+    return tr;
+  }
+
+  async function load(first: boolean): Promise<void> {
+    const body = await api.get<{ state: string; errorCode: string | null; errorDetail: string | null; parserRevision: string | null; warnings: Array<{ code: string; message: string }>; facts: FactView[] }>(`/api/v1/resumes/${encodeURIComponent(id)}/facts`);
+    $("#state").textContent = body.errorCode ? `${body.state} (${body.errorCode})` : body.state;
+    $("#parser").textContent = body.parserRevision ? `parser ${body.parserRevision}` : "";
+    const warnings = $("#warnings");
+    clear(warnings);
+    for (const w of body.warnings) warnings.append(h("li", { "data-code": w.code }, `${w.code}: ${w.message}`));
+    if (body.errorDetail) say(msg, body.errorDetail, "error");
+    // Load the source text BEFORE rendering rows, so a row can never be selected while its source is still empty.
+    if (first && body.state === "PROPOSED") {
+      text = (await api.get<{ text: string }>(`/api/v1/resumes/${encodeURIComponent(id)}/text`)).text;
+      showSource(undefined);
+    }
+    facts = body.facts;
+    const tbody = $("#facts");
+    clear(tbody);
+    for (const f of facts) tbody.append(row(f));
+    if (first && !selected) {
+      const wanted = new URLSearchParams(window.location.search).get("fact");
+      if (wanted && facts.some((f) => f.factId === wanted)) selected = wanted;
+    }
+    if (selected) {
+      showSource(facts.find((f) => f.factId === selected));
+      document.querySelectorAll("#facts tr").forEach((r) => r.classList.toggle("selected", r.getAttribute("data-fact-id") === selected));
+    }
+    if (body.state === "UPLOADED" || body.state === "EXTRACTING") window.setTimeout(() => void load(first).catch((e) => say(msg, describe(e), "error")), 1200);
+  }
+
+  // Expected rejections (a bad id, for example) are shown on the page; transport, auth and server failures go to the session gate.
+  startPage({
+    load: async () => {
+      try {
+        await load(true);
+      } catch (e) {
+        if (e instanceof ApiError && e.kind === "client") say(msg, describe(e), "error");
+        else throw e;
+      }
+    },
+  });
+</script>

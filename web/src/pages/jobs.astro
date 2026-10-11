@@ -1,0 +1,321 @@
+---
+import Base from "../layouts/Base.astro";
+import PageHead from "../components/PageHead.astro";
+import OrbitalTile from "../components/OrbitalTile.astro";
+---
+
+<Base title="Orbital — Official openings" crumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Career paths", href: "/roles" }, { label: "Official openings" }]}>
+  <PageHead eyebrow="Step 4 · Official openings" number="04" title="Verified openings for the roles you chose." lead="Orbital reads official employer job boards for the roles in your saved selection. Whether you qualify is not evaluated here.">
+    <a class="button secondary" href="/roles">&larr; Career paths</a>
+  </PageHead>
+  <template id="tile-template"><OrbitalTile /></template>
+
+  <div id="jobs-alert" class="alert error" role="alert" hidden></div>
+
+  <section id="plan-card" aria-labelledby="plan-title">
+    <h2 id="plan-title">Your selection</h2>
+    <div id="plan-body"><span class="skeleton w60"></span><span class="skeleton w40"></span></div>
+    <div class="row" id="start-row">
+      <button id="start-run" type="button" class="blue" disabled>Start discovery</button>
+      <button id="cancel-run" type="button" class="secondary" hidden>Cancel run</button>
+      <span id="start-msg" role="status" class="small"></span>
+    </div>
+    <p class="muted small" id="start-note">Only official Greenhouse and Lever employer boards are read, with plain GET requests. Nothing is applied for, filled in or submitted.</p>
+  </section>
+
+  <section id="run-card" aria-labelledby="run-title" hidden>
+    <h2 id="run-title">Latest discovery run <span id="run-status" class="chip"></span></h2>
+    <div class="progress" aria-hidden="true"><i id="run-bar"></i></div>
+    <p class="small muted" id="run-line"></p>
+    <div class="counts" id="run-counts"></div>
+    <details id="boards-details">
+      <summary>Sources and failures</summary>
+      <div class="scroll-x"><table id="boards-table">
+        <thead><tr><th>Employer board</th><th>Status</th><th>Read</th><th>Title match</th><th>Stored</th><th>Why it failed</th></tr></thead>
+        <tbody id="boards-body"></tbody>
+      </table></div>
+    </details>
+  </section>
+
+  <section id="results-card" aria-labelledby="results-title">
+    <h2 id="results-title">Official listings <span class="muted small" id="results-total"></span></h2>
+    <p class="muted small" id="disclaimer"></p>
+    <form id="filters" class="filters" aria-label="Filter listings">
+      <label>Role <select id="f-role"><option value="">All selected roles</option></select></label>
+      <label>Employer <input id="f-company" type="search" maxlength="80" placeholder="Any" /></label>
+      <label>Location contains <input id="f-location" type="search" maxlength="80" placeholder="Any" /></label>
+      <label>Title contains <input id="f-q" type="search" maxlength="80" placeholder="Any" /></label>
+      <label>Location <select id="f-loc"><option value="">Any</option><option value="MATCH">Matches my places</option><option value="UNKNOWN">Unclear</option></select></label>
+      <label>Stated years <select id="f-band"><option value="">Any</option><option value="WITHIN">Within my window</option><option value="OUTSIDE">Outside my window</option><option value="UNSTATED">Not stated</option></select></label>
+      <button type="submit" class="secondary">Apply filters</button>
+    </form>
+    <div id="results" aria-live="polite"><span class="skeleton w80"></span><span class="skeleton w60"></span></div>
+    <div class="row"><button id="more" type="button" class="secondary" hidden>Show more</button></div>
+  </section>
+
+  <section id="detail-card" aria-labelledby="detail-title" hidden>
+    <h2 id="detail-title">Job description</h2>
+    <div id="detail-body"></div>
+    <div class="row"><button id="detail-close" type="button" class="secondary">Close</button></div>
+  </section>
+</Base>
+
+<style is:global>
+  .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; margin: 8px 0 16px; }
+  .filters label { display: grid; gap: 4px; font-size: 12px; font-weight: 850; text-transform: uppercase; letter-spacing: .1em; color: #3f4550; }
+  .filters input, .filters select { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 15px; }
+  .progress { height: 10px; border-radius: 6px; background: var(--blue-wash); overflow: hidden; margin: 10px 0; border: 1px solid var(--blue-line); }
+  .progress i { display: block; height: 100%; width: 0; background: var(--royal); transition: width .3s ease; }
+  .counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 12px 0; }
+  .count { border: 1px solid var(--hair); border-radius: 12px; padding: 10px 12px; background: var(--tint); }
+  .count .n { display: block; font-size: 30px; font-weight: 950; letter-spacing: -.05em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .count .l { font-size: 11px; font-weight: 850; text-transform: uppercase; letter-spacing: .1em; color: #3f4550; }
+  .count.hl .n { color: var(--royal); }
+  .job-list { display: grid; gap: 12px; }
+  .job { border: 1px solid var(--hair); border-radius: 14px; padding: 16px 18px; background: #fff; display: grid; gap: 8px; }
+  .job h3 { margin: 0; font-size: 21px; font-weight: 900; letter-spacing: -.045em; }
+  .job .meta { color: #4b505b; font-size: 14px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .job .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .job .quote { margin: 0; padding: 6px 10px; border-left: 4px solid var(--royal); background: var(--blue-wash); border-radius: 6px; font-size: 14px; }
+  .jd-text { white-space: pre-wrap; word-break: break-word; font: 14.5px/1.65 "Segoe UI", system-ui, sans-serif; max-height: 60vh; overflow: auto; background: var(--tint); border: 1px solid var(--hair); border-radius: 12px; padding: 16px; margin: 10px 0; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 14px; margin: 8px 0; }
+  .kv dt { font-weight: 850; color: #3f4550; } .kv dd { margin: 0; word-break: break-all; }
+  .plan-roles { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .upcoming-note { border-style: dashed; }
+</style>
+
+<script>
+  import { api, ApiError } from "../lib/api";
+  import { startPage, reloadPage } from "../lib/gate";
+  import { $, clear, h, say } from "../lib/dom";
+
+  interface Plan { selectionRevisionNo: number; roles: Array<{ roleSlug: string; title: string }>; locations: Array<{ kind: string; value: string }>; workModes: string[]; seniorityLevels: string[]; searchBand: { minYears: number; maxYears: number } }
+  interface Progress { boardsTotal: number; boardsDone: number; fetched: number; titleMatched: number; locationExcluded: number; seniorityExcluded: number; verified: number; newJobs: number; changedJd: number; unchanged: number; duplicates: number; rejected: number }
+  interface Run { runId: string; status: string; limitReached: string | null; errorCode: string | null; errorDetail: string | null; createdAt: string | null; finishedAt: string | null; progress: Progress; selectionRevisionNo: number }
+  interface Overview { disclaimer: string; boardsConfigured: boolean; boards: Array<{ boardKey: string; company: string }>; limits: { maxBoards: number; maxCandidates: number }; plan: Plan | null; planError: { code: string; message: string } | null; latestRun: Run | null }
+  interface BoardRow { boardKey: string; company: string; status: string; fetched: number; titleMatched: number; stored: number; failureCode: string | null; failureDetail: string | null; blocked: boolean; retryable: boolean }
+  interface RunDetail extends Run { boards: BoardRow[]; failures: Array<{ code: string; stage: string; company: string | null; title: string | null; detail: string }> }
+  interface JobRow { jobId: string; company: string; title: string; location: string | null; officialUrl: string; observedAt: string; matchedRoles: string[]; locationStatus: string; bandStatus: string; statedYears: number | null; yearsQuote: string | null; revisionCount: number; sourceKind: string; atsIdentity: string }
+  interface JobList { disclaimer: string; total: number; limit: number; offset: number; jobs: JobRow[] }
+
+  const ACTIVE = new Set(["QUEUED", "RUNNING"]);
+  const PAGE = 25;
+  let overview: Overview;
+  let offset = 0;
+  let loaded: JobRow[] = [];
+  let timer: number | undefined;
+  let pollFailures = 0;
+  const tile = (): Node | null => (document.getElementById("tile-template") as HTMLTemplateElement | null)?.content.firstElementChild?.cloneNode(true) ?? null;
+  const alertBox = $("#jobs-alert");
+  const describe = (e: unknown): string =>
+    e instanceof ApiError
+      ? e.kind === "unauthenticated" ? "Your session expired. Reload the page to sign in again."
+        : e.kind === "unavailable" || e.kind === "offline" ? "Lost contact with the API. Nothing was changed; reload to retry."
+        : `${e.message} (${e.code})`
+      : "Something went wrong.";
+  const showAlert = (text: string | null) => { alertBox.hidden = !text; alertBox.textContent = text ?? ""; };
+  const safeHref = (url: string): string | null => { try { const u = new URL(url); return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : null; } catch { return null; } };
+  const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : "");
+
+  const STATUS_CHIP: Record<string, [string, string]> = {
+    QUEUED: ["Queued", "in-progress"], RUNNING: ["Running", "in-progress"], COMPLETED: ["Completed", "done"], PARTIAL: ["Partial", "in-progress"],
+    FAILED: ["Failed", "failed"], CANCELLED: ["Cancelled", "upcoming"], INTERRUPTED: ["Interrupted", "failed"],
+  };
+
+  // --- selection snapshot and Start --------------------------------------------------------------------------------------------------------
+  function renderPlan(): void {
+    const body = $("#plan-body");
+    clear(body);
+    const start = $("#start-run") as HTMLButtonElement;
+    const p = overview.plan;
+    const active = !!overview.latestRun && ACTIVE.has(overview.latestRun.status);
+    if (!p) {
+      body.append(h("div", { class: "empty", id: "plan-empty" }, tile(), overview.planError?.message ?? "Save a role selection first.", " ", h("a", { href: "/roles" }, "Choose roles on Career paths")));
+    } else {
+      body.append(
+        h("p", { class: "muted small" }, `Saved selection revision ${p.selectionRevisionNo}. Discovery searches only these roles, using their titles and aliases:`),
+        h("div", { class: "plan-roles", id: "plan-roles" }, ...p.roles.map((r) => h("span", { class: "tag", "data-role": r.roleSlug }, r.title))),
+        h("p", { class: "small" }, `Places: ${p.locations.length ? p.locations.map((l) => (l.kind === "remote" ? "Remote" : l.value)).join(", ") : "any"}. Level: ${p.seniorityLevels.length ? p.seniorityLevels.join(", ") : "any"}. Years window: ${p.searchBand.minYears}–${p.searchBand.maxYears}.`),
+        h("p", { class: "muted small" }, "The years window decides which postings to look at. It is not a claim about your experience."));
+    }
+    if (!overview.boardsConfigured) body.append(h("div", { class: "alert", id: "no-boards" }, "No official employer boards are configured. Copy config/company-boards.example.json to config/company-boards.json and list the employers to read."));
+    else body.append(h("p", { class: "muted small" }, `${overview.boards.length} configured employer board${overview.boards.length === 1 ? "" : "s"}. A run reads up to ${overview.limits.maxBoards} boards and stores up to ${overview.limits.maxCandidates} listings.`));
+    start.disabled = !p || !overview.boardsConfigured || active;
+    ($("#cancel-run") as HTMLButtonElement).hidden = !active;
+    $("#start-run").title = start.disabled ? (active ? "A run is already in progress." : "Needs a saved selection and a configured board list.") : "";
+  }
+
+  // --- run status ---------------------------------------------------------------------------------------------------------------------------------
+  function count(label: string, n: number, hl = false): HTMLElement {
+    return h("div", { class: `count${hl ? " hl" : ""}` }, h("span", { class: "n" }, String(n)), h("span", { class: "l" }, label));
+  }
+
+  function renderRun(run: RunDetail | null): void {
+    $("#run-card").hidden = !run;
+    if (!run) return;
+    const [label, cls] = STATUS_CHIP[run.status] ?? [run.status, ""];
+    const chip = $("#run-status");
+    chip.textContent = label;
+    chip.className = `chip ${cls}`;
+    chip.dataset.status = run.status;
+    const p = run.progress;
+    ($("#run-bar") as HTMLElement).style.width = `${p.boardsTotal ? Math.round((100 * p.boardsDone) / p.boardsTotal) : 0}%`;
+    const notes = [`${p.boardsDone} of ${p.boardsTotal} boards finished.`];
+    if (run.limitReached === "MAX_CANDIDATES") notes.push("Stopped at the listing limit; remaining boards were skipped.");
+    if (run.status === "CANCELLED") notes.push("You cancelled this run; boards not yet read were skipped.");
+    if (run.errorDetail) notes.push(run.errorDetail);
+    notes.push(`Started ${when(run.createdAt)}${run.finishedAt ? `, finished ${when(run.finishedAt)}` : ""}. Planned from selection revision ${run.selectionRevisionNo}.`);
+    $("#run-line").textContent = notes.join(" ");
+    const counts = $("#run-counts");
+    clear(counts);
+    counts.append(
+      count("Postings read", p.fetched), count("Title matched", p.titleMatched), count("Verified official", p.verified, true), count("New", p.newJobs), count("Unchanged", p.unchanged),
+      count("JD changed", p.changedJd), count("Wrong place (not stored)", p.locationExcluded), count("Senior title (not stored)", p.seniorityExcluded), count("Rejected", p.rejected), count("Duplicates", p.duplicates));
+    const body = $("#boards-body");
+    clear(body);
+    for (const b of run.boards) {
+      const why = b.failureCode ? `${b.failureCode}${b.blocked ? " (blocked by the source)" : ""}${b.retryable ? ", can retry" : ""}: ${b.failureDetail ?? ""}` : "";
+      body.append(h("tr", { "data-board": b.boardKey },
+        h("td", {}, h("strong", {}, b.company), h("div", { class: "muted small" }, b.boardKey)),
+        h("td", {}, h("span", { class: `chip ${b.status === "OK" ? "done" : b.status === "FAILED" ? "failed" : b.status === "SKIPPED" ? "upcoming" : "in-progress"}` }, b.status.toLowerCase())),
+        h("td", {}, String(b.fetched)), h("td", {}, String(b.titleMatched)), h("td", {}, String(b.stored)), h("td", { class: "small" }, why)));
+    }
+    const failed = run.boards.filter((b) => b.status === "FAILED").length;
+    ($("#boards-details") as HTMLDetailsElement).open = failed > 0 || run.failures.length > 0;
+  }
+
+  async function refreshRun(): Promise<RunDetail | null> {
+    overview = await api.get<Overview>("/api/v1/discovery/overview");
+    renderPlan();
+    const latest = overview.latestRun;
+    const detail = latest ? await api.get<RunDetail>(`/api/v1/discovery-runs/${latest.runId}`) : null;
+    renderRun(detail);
+    window.clearTimeout(timer);
+    if (detail && ACTIVE.has(detail.status)) timer = window.setTimeout(() => void poll(), 1500);
+    return detail;
+  }
+
+  async function poll(): Promise<void> {
+    try {
+      const run = await refreshRun();
+      pollFailures = 0;
+      if (!run || !ACTIVE.has(run.status)) await loadResults(true);
+    } catch (e) {
+      pollFailures += 1;
+      showAlert(`${describe(e)} Progress updates stopped. ${pollFailures > 2 ? "Reload the page." : ""}`);
+      if (pollFailures < 3) timer = window.setTimeout(() => void poll(), 3000);
+    }
+  }
+
+  // --- results ------------------------------------------------------------------------------------------------------------------------------------------
+  const qs = (): string => {
+    const v = (id: string) => ($(id) as HTMLInputElement | HTMLSelectElement).value.trim();
+    const p = new URLSearchParams({ limit: String(PAGE), offset: String(offset) });
+    for (const [key, id] of [["role", "#f-role"], ["company", "#f-company"], ["location", "#f-location"], ["q", "#f-q"], ["locationStatus", "#f-loc"], ["bandStatus", "#f-band"]] as const) if (v(id)) p.set(key, v(id));
+    return p.toString();
+  };
+
+  function card(j: JobRow): HTMLElement {
+    const href = safeHref(j.officialUrl);
+    const band = j.bandStatus === "WITHIN" ? ["done", `Asks for ${j.statedYears}+ years: inside your window`] : j.bandStatus === "OUTSIDE" ? ["failed", `Asks for ${j.statedYears}+ years: outside your window`] : ["upcoming", "Years of experience not stated"];
+    const loc = j.locationStatus === "MATCH" ? ["done", "Location matches your places"] : j.locationStatus === "UNKNOWN" ? ["in-progress", "Location unclear: check the posting"] : ["upcoming", "No place filter set"];
+    return h("article", { class: "job", "data-job": j.jobId, "data-req": j.atsIdentity.split(":")[2] ?? "" },
+      h("h3", {}, j.title),
+      h("div", { class: "meta" }, h("strong", {}, j.company), j.location ? h("span", {}, j.location) : h("span", { class: "muted" }, "Location not listed"), h("span", {}, `Observed ${when(j.observedAt)}`), h("span", { class: "muted" }, `Source: official ${j.atsIdentity.split(":")[0]} board`)),
+      h("div", { class: "chips" }, h("span", { class: "chip done" }, "Official source verified"), h("span", { class: `chip ${loc[0]}` }, loc[1]!), h("span", { class: `chip ${band[0]}`, "data-band": j.bandStatus }, band[1]!), h("span", { class: "chip upcoming" }, "Eligibility not evaluated yet"), j.revisionCount > 1 ? h("span", { class: "chip in-progress" }, `Description changed (${j.revisionCount} versions)`) : null),
+      j.yearsQuote ? h("p", { class: "quote" }, `“${j.yearsQuote}”`) : null,
+      h("div", { class: "row" },
+        h("button", { type: "button", class: "secondary", "data-action": "detail", onclick: () => void openDetail(j.jobId) }, "Read job description"),
+        href ? h("a", { class: "button secondary", href, target: "_blank", rel: "noopener noreferrer", "data-action": "official" }, "Open official posting ↗") : null));
+  }
+
+  async function loadResults(reset: boolean): Promise<void> {
+    if (reset) { offset = 0; loaded = []; }
+    const list = await api.get<JobList>(`/api/v1/jobs?${qs()}`);
+    $("#disclaimer").textContent = list.disclaimer;
+    loaded = reset ? list.jobs : [...loaded, ...list.jobs];
+    const box = $("#results");
+    clear(box);
+    $("#results-total").textContent = `${list.total} listing${list.total === 1 ? "" : "s"}`;
+    if (list.total === 0) {
+      const filtered = qs().split("&").some((x) => /^(role|company|location|q|locationStatus|bandStatus)=/.test(x));
+      box.append(h("div", { class: "empty", id: "results-empty" }, tile(), filtered ? "No listing matches these filters." : overview.latestRun ? "This run stored no listing. See the sources above for why." : "No listings yet. Start discovery to read the official boards for your selected roles."));
+    } else box.append(h("div", { class: "job-list" }, ...loaded.map(card)));
+    ($("#more") as HTMLButtonElement).hidden = loaded.length >= list.total;
+    offset = loaded.length;
+    const roleSel = $("#f-role") as HTMLSelectElement;
+    if (roleSel.options.length <= 1 && overview.plan) for (const r of overview.plan.roles) roleSel.append(h("option", { value: r.roleSlug }, r.title));
+  }
+
+  // --- detail -----------------------------------------------------------------------------------------------------------------------------------------------
+  async function openDetail(jobId: string): Promise<void> {
+    try {
+      const { job } = await api.get<{ job: { title: string; company: string; officialUrl: string; atsIdentity: string; location: string | null; currentRevision: { jdSha256: string; descriptionText: string; firstSeenAt: string } | null; revisions: Array<{ jdSha256: string; firstSeenAt: string }>; observations: Array<{ observedAt: string; finalUrl: string; extractionMethod: string; verification: Record<string, unknown>; yearsQuote: string | null }> } }>(`/api/v1/jobs/${jobId}`);
+      $("#detail-title").textContent = `${job.title} — ${job.company}`;
+      const body = $("#detail-body");
+      clear(body);
+      const href = safeHref(job.officialUrl);
+      body.append(
+        h("dl", { class: "kv" },
+          h("dt", {}, "Official identity"), h("dd", { id: "d-identity" }, job.atsIdentity),
+          h("dt", {}, "Official posting"), h("dd", {}, href ? h("a", { href, target: "_blank", rel: "noopener noreferrer" }, href) : "unavailable"),
+          h("dt", {}, "Location"), h("dd", {}, job.location ?? "not listed"),
+          h("dt", {}, "Description version"), h("dd", {}, job.currentRevision ? `${job.currentRevision.jdSha256.slice(0, 12)} (first seen ${when(job.currentRevision.firstSeenAt)}); ${job.revisions.length} version${job.revisions.length === 1 ? "" : "s"} kept` : "none"),
+          h("dt", {}, "Observed"), h("dd", {}, job.observations.map((o) => `${when(o.observedAt)} via ${o.extractionMethod}`).join("; "))),
+        h("p", { class: "muted small" }, "The description is shown exactly as the employer published it. It has not been read for eligibility."),
+        h("div", { class: "jd-text", id: "jd-text", tabindex: "0", role: "region", "aria-label": "Job description text" }, job.currentRevision?.descriptionText ?? ""));
+      const card2 = $("#detail-card");
+      card2.hidden = false;
+      card2.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+      ($("#detail-close") as HTMLButtonElement).focus();
+    } catch (e) {
+      showAlert(describe(e));
+    }
+  }
+
+  // --- actions ---------------------------------------------------------------------------------------------------------------------------------------------------
+  $("#start-run").addEventListener("click", async () => {
+    const button = $("#start-run") as HTMLButtonElement;
+    if (!overview.plan) return;
+    button.disabled = true;
+    showAlert(null);
+    say($("#start-msg"), "Starting...", "info");
+    try {
+      await api.post("/api/v1/discovery-runs", { expectedSelectionRevision: overview.plan.selectionRevisionNo });
+      say($("#start-msg"), "Run started.", "ok");
+      await refreshRun();
+    } catch (e) {
+      say($("#start-msg"), "", "info");
+      showAlert(e instanceof ApiError && e.code === "STALE_SELECTION" ? "Your selection changed in another window. Reload to see the current one before starting." : describe(e));
+      await refreshRun().catch(() => undefined);
+    }
+  });
+
+  $("#cancel-run").addEventListener("click", async () => {
+    const run = overview.latestRun;
+    if (!run) return;
+    try {
+      await api.post(`/api/v1/discovery-runs/${run.runId}/cancel`, {});
+      say($("#start-msg"), "Run cancelled.", "ok");
+      await refreshRun();
+    } catch (e) {
+      showAlert(describe(e));
+    }
+  });
+
+  $("#filters").addEventListener("submit", (event) => {
+    event.preventDefault();
+    void loadResults(true).catch((e) => showAlert(describe(e)));
+  });
+  $("#more").addEventListener("click", () => void loadResults(false).catch((e) => showAlert(describe(e))));
+  $("#detail-close").addEventListener("click", () => { $("#detail-card").hidden = true; });
+
+  startPage({
+    load: async () => {
+      showAlert(null);
+      await refreshRun();
+      await loadResults(true);
+    },
+  });
+  void reloadPage;
+</script>

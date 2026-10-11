@@ -255,6 +255,26 @@ describe("constraints: sensitive facts are explicit, sponsorship is record-only,
     expect(rule(run(job({ requirements: [reqPython], constraints: [c] }), profile([python, auth])), "constraint:c1").status).toBe("PASS");
   });
 
+  it("citizenship is its own fact: unknown -> REVIEW, explicit approved lack -> REJECT, work authorization never satisfies it", () => {
+    const c = { type: "citizenship" as const, status: "required" as const, value: "U.S. citizen", evidence: [stated("Must be a U.S. citizen.", 300)] };
+    const j = job({ requirements: [reqPython], constraints: [c] });
+    const unknown = run(j, profile([python]));
+    expect(rule(unknown, "constraint:c1").status).toBe("UNKNOWN");
+    expect(unknown.outcome).toBe("REVIEW");
+    // A work-authorization fact with identical wording must not answer a citizenship requirement.
+    const authSameWords = fact({ factId: "f-auth", kind: "work_authorization", value: "U.S. citizen" });
+    expect(rule(run(j, profile([python, authSameWords])), "constraint:c1").status).toBe("UNKNOWN");
+    const held = fact({ factId: "f-cit", kind: "citizenship", value: "U.S. citizen" });
+    expect(rule(run(j, profile([python, held])), "constraint:c1")).toMatchObject({ status: "PASS", factIds: ["f-cit"] });
+    const lacks = fact({ factId: "f-cit-no", kind: "citizenship", value: "U.S. citizen", polarity: "lacks" });
+    const rejected = run(j, profile([python, lacks]));
+    expect(rule(rejected, "constraint:c1").status).toBe("FAIL");
+    expect(rejected.outcome).toBe("REJECT");
+    // A pending (unapproved) citizenship fact is not usable.
+    const pending = fact({ factId: "f-cit-p", kind: "citizenship", value: "U.S. citizen", polarity: "lacks", approvalStatus: "pending" } as never);
+    expect(run(j, profile([python, pending])).outcome).toBe("REVIEW");
+  });
+
   it("location: with no configured preference the JD statement is recorded only; a configured mandatory preference decides", () => {
     const loc = { type: "location" as const, status: "required" as const, value: "US hubs or remotely in the United States", evidence: [stated("remotely in the United States", 400)] };
     const j = job({ requirements: [reqPython], constraints: [loc] });

@@ -17,6 +17,7 @@ export const FACT_KINDS = [
   "certification",
   "clearance",
   "work_authorization",
+  "citizenship",
   "sponsorship_need",
   "legal_name",
   "email",
@@ -24,7 +25,7 @@ export const FACT_KINDS = [
 ] as const;
 export type FactKind = (typeof FACT_KINDS)[number];
 
-export const SENSITIVE_FACT_KINDS: readonly FactKind[] = ["clearance", "work_authorization", "sponsorship_need", "legal_name", "email", "phone"];
+export const SENSITIVE_FACT_KINDS: readonly FactKind[] = ["clearance", "work_authorization", "citizenship", "sponsorship_need", "legal_name", "email", "phone"];
 
 const idString = z.string().regex(/^[A-Za-z0-9._-]{1,64}$/, "id must be 1-64 chars of [A-Za-z0-9._-]");
 const textValue = z.string().trim().min(1).max(300);
@@ -47,6 +48,8 @@ export const factAttributesSchema = z
     title: textValue.optional(),
     startDate: yearMonth.optional(),
     endDate: yearMonth.nullable().optional(), // null = current
+    // Set only from an explicit keyword (internship/co-op) or by the reviewer. Never inferred from a title or a section.
+    employmentType: z.enum(["professional", "internship", "academic", "volunteer"]).optional(),
     // Approved wording naming what this role counts as for years-of-role requirements (e.g. "QA automation").
     // Role-years are never inferred from a job title.
     roleTags: z.array(textValue).max(20).optional(),

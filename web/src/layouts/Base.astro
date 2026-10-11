@@ -1,0 +1,80 @@
+---
+// Orbital app layout: branded header + route nav + workflow breadcrumb, and the session gate every private page relies on
+// (see lib/gate.ts for the required element ids). Private content lives in #app and stays hidden until a session is confirmed.
+import "../styles/orbital.css";
+import "../styles/app.css";
+import OrbitalLogo from "../components/OrbitalLogo.astro";
+
+interface Crumb { label: string; href?: string }
+interface Props { title: string; crumbs?: Crumb[] }
+const { title, crumbs = [] } = Astro.props;
+
+const path = Astro.url.pathname.replace(/\/+$/, "") || "/";
+const NAV = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/resumes", label: "Résumés", also: ["/review"] },
+  { href: "/roles", label: "Career paths" },
+  { href: "/jobs", label: "Jobs" },
+  { href: "/profile", label: "Statements" },
+];
+const isActive = (n: { href: string; also?: string[] }) => path === n.href || (n.also ?? []).includes(path);
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; form-action 'none'; base-uri 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <title>{title}</title>
+  </head>
+  <body class="app">
+    <header class="app-header">
+      <div class="app-bar">
+        <a href="/" class="brand" aria-label="Orbital home"><OrbitalLogo /><span>orbital<span class="dot-blue">.</span></span></a>
+        <nav class="app-nav" aria-label="Workspace">
+          {NAV.map((n) => <a href={n.href} aria-current={isActive(n) ? "page" : undefined}>{n.label}</a>)}
+        </nav>
+        <button id="signout" class="secondary" hidden>Sign out</button>
+      </div>
+      {crumbs.length > 0 && (
+        <nav class="crumbs" aria-label="Breadcrumb">
+          <ol>{crumbs.map((c, i) => <li>{c.href && i < crumbs.length - 1 ? <a href={c.href}>{c.label}</a> : <span aria-current={i === crumbs.length - 1 ? "page" : undefined}>{c.label}</span>}</li>)}</ol>
+        </nav>
+      )}
+    </header>
+    <main>
+      <div id="gate">
+        <section id="gate-status" data-state="loading" role="status" aria-live="polite">
+          <h1 id="gate-title">Checking your session...</h1>
+          <p id="gate-text" class="muted"></p>
+          <div id="gate-skeleton" aria-hidden="true"><span class="skeleton w80"></span><span class="skeleton w60"></span><span class="skeleton w40"></span></div>
+          <div class="row"><button id="gate-retry" type="button" hidden>Try again</button></div>
+        </section>
+        <section id="signin-panel" hidden>
+          <div class="eyebrow">Your private workspace</div>
+          <h1>Sign in</h1>
+          <p id="signin-note" class="notice" role="status" hidden></p>
+          <p class="muted">Enter the local access token from <code>infra/.env</code> (JH_API_ACCESS_TOKEN). Nothing about your résumé or profile is shown until you do.</p>
+          <form id="signin-form" class="row">
+            <label class="sr-only" for="token">Access token</label>
+            <input id="token" type="password" autocomplete="off" placeholder="Access token" required />
+            <button id="signin" type="submit">Sign in</button>
+            <span id="signin-msg" role="alert"></span>
+          </form>
+          <p class="muted small"><a href="/">&larr; Back to Orbital</a></p>
+        </section>
+      </div>
+      <noscript><section><h1>JavaScript is required</h1><p class="muted">This local app talks to its API from the browser. Enable JavaScript and reload.</p></section></noscript>
+      <div id="app" hidden><slot /></div>
+    </main>
+  </body>
+</html>
+<style is:global>
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  #gate-status:not([data-state="loading"]) #gate-skeleton { display: none; }
+</style>
