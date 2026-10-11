@@ -1,8 +1,32 @@
 # Status
 
-Last updated: 2026-10-11. Branch `careerops-integration`. Nothing here is merged to `master`.
+Last updated: 2026-10-11 (S4B). Branch `careerops-integration`. Nothing here is merged to `master`.
 
 > Public-repository note: this file records redacted summaries only. Candidate facts, answers, resume content, immigration or eligibility details, target-employer selections, application identifiers and the hashes of private files live under the gitignored `private-runtime/` and are deliberately not described here.
+
+## S4B persisted matches, saved-posting import and test runner (2026-10-11)
+
+**Implemented and verified offline; committed as a WIP checkpoint (`24ab84a`, `3647aeb`), not pushed, not merged.** S4A's report is now stored per (user, job, input digest) in
+PostgreSQL (migration `0005`). Identical inputs reuse the live row; a changed JD revision, authorized evidence, profile, extractor, policy or lexicon inserts a new row and
+supersedes the old one with a reason. Pieces: `src/match/store.ts` and `store-cli.ts` (`npm run match:store`), an embedding cache scoped to the active profile
+(`embedding-cache.ts`), saved-posting import into the S3 tables (`src/jobs/import*.ts`, `npm run jobs:import`; offline by default, `--live` is opt-in read-only GETs), API
+`GET /api/v1/matches`, `GET|POST /api/v1/jobs/:id/match`, `POST /api/v1/matches/:id/flags` (a flag is feedback only and never edits a report), and the `/matches` page.
+Also in this checkpoint: candidate-profile isolation (`0004`), the smart test runner (`npm run test:changed|failed|resume|status|full`, receipts under
+`private-runtime/test-cache/`) and managed browser session persistence (`npm run browser:login|status`).
+
+Verification (2026-10-11, this machine):
+- `npm run typecheck` clean.
+- Serialized full suite (`npx vitest run --maxWorkers=1 --minWorkers=1 --no-file-parallelism`): **134 files / 1,500 tests passed**, 0 failed.
+- `npm run db:migrate` on the dev database after a `pg_dump`: nothing to apply; `0001`-`0005` were already applied and no checksum differed.
+- Rollback `0005` -> `0004` -> `0003` -> forward again on a throwaway database: clean, and the resulting schema (tables, columns, constraints, migration list) is identical to a
+  first forward run. `0005`'s down script owns every `0005` object; the `0003` down script is unchanged. Roll back newest first: running `0003` down alone on a database that has
+  `0005` fails (`cannot drop table job_revisions because other objects depend on it`). `tests/api/s3-api.test.ts` now runs `0005` down before `0003` down.
+- `s1-ui.e2e` failed once in the interrupted run (browser problems list had 3 entries where 2 are allowed; the third was not recorded) and passed twice afterwards with every
+  console error and failed request captured: only the two intended ones (401 on `/api/v1/session`, 403 on `.../facts/review`). **Unreproduced; cause unknown; not classified as
+  environmental.** The test now records each console error's source URL and every failed or >= 400 response (`JH_UI_DIAG=1` prints it on a pass; a failure always prints it).
+
+Not done / limits: no independent human labels, so every S4A accuracy metric is still `NOT_EVALUATED`; `docs/evidence/orbital-screens/` (UI screenshots) are untracked on purpose;
+S4B has no separate evidence file; the live import path has not been run against a real board in this checkpoint. Nothing submits or applies.
 
 ## S4A evidence-grounded matching (2026-10-11)
 
