@@ -46,6 +46,7 @@ suite("S1 UI workflow (headed Chrome)", () => {
   let webPort: number;
   const external: string[] = [];
   const problems: string[] = [];
+  const netDiag: string[] = [];
   const previewLog: string[] = [];
 
   beforeAll(async () => {
@@ -85,7 +86,7 @@ suite("S1 UI workflow (headed Chrome)", () => {
   }, 60_000);
 
   afterEach((ctx) => {
-    if (ctx.task.result?.state === "fail") console.log("BROWSER DIAGNOSTICS", JSON.stringify({ problems, external, previewLog: previewLog.join("").slice(-3000) }, null, 1));
+    if (ctx.task.result?.state === "fail" || process.env.JH_UI_DIAG === "1") console.log("BROWSER DIAGNOSTICS", JSON.stringify({ problems, netDiag, external, previewLog: previewLog.join("").slice(-3000) }, null, 1));
   });
 
   const web = (p = "/") => `http://127.0.0.1:${webPort}${p}`;
@@ -95,7 +96,15 @@ suite("S1 UI workflow (headed Chrome)", () => {
   it("signs in, uploads, reviews, approves, edits, attests and signs out, with only safe state changes", async () => {
     const page = await context.newPage();
     page.on("pageerror", (e) => problems.push(`pageerror: ${e.message}`));
-    page.on("console", (m) => { if (m.type() === "error") problems.push(`console: ${m.text()}`); });
+    page.on("console", (m) => {
+      if (m.type() !== "error") return;
+      problems.push(`console: ${m.text()}`);
+      const loc = m.location();
+      netDiag.push(`console-error: ${m.text()} @ ${loc.url}:${loc.lineNumber}:${loc.columnNumber}`);
+    });
+    // Diagnostic-only side channel (never asserted): what URL each console error and failed request came from.
+    page.on("requestfailed", (r) => netDiag.push(`requestfailed: ${r.method()} ${r.url()} :: ${r.failure()?.errorText}`));
+    page.on("response", (r) => { if (r.status() >= 400) netDiag.push(`http-${r.status()}: ${r.request().method()} ${r.url()} (frame ${r.frame()?.url()})`); });
 
     // --- sign in -------------------------------------------------------------------------------------------------------
     await page.goto(web("/dashboard"));

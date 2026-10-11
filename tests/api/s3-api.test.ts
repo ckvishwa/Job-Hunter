@@ -361,8 +361,8 @@ suite("S3 migration 0003 and its rollback", { timeout: 60_000 }, () => {
       await pool.query("INSERT INTO users (handle) VALUES ('rollback-check')");
       const before = Number((await pool.query("SELECT count(*) AS n FROM users")).rows[0].n);
 
-      const down = readFileSync(path.resolve("db", "migrations", "down", "0003_s3_discovery.down.sql"), "utf8");
-      await pool.query(down);
+      // Rollback runs newest first: 0005 (match reports reference the job tables) goes before 0003.
+      for (const file of ["0005_s4b_matching.down.sql", "0003_s3_discovery.down.sql"]) await pool.query(readFileSync(path.resolve("db", "migrations", "down", file), "utf8"));
       const after = await tables();
       for (const t of s3Tables) expect(after).not.toContain(t);
       expect(after).toEqual(expect.arrayContaining(["users", "candidate_facts", "role_catalog", "search_preferences"])); // S1/S2 intact
