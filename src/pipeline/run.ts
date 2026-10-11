@@ -16,7 +16,8 @@ import { proposeLane, retrieveFactCandidates, type FactCandidate, type Lane, typ
 import { buildAndRenderResumePlan, type RenderedResumeArtifact } from "./resume-plan.js";
 import { loadVerifiedInputs, type CanonicalLane, type VerifiedInputs } from "./trust.js";
 import { inspectAndFillApplication, type FormResult } from "./application-form.js";
-import { closePersistentChrome, launchPersistentChrome, uniqueChromeProfileDir } from "../browser/launcher.js";
+import { closePersistentChrome } from "../browser/launcher.js";
+import { launchManagedChrome, resolveBrowserProfileDir } from "../browser/managed.js";
 import { errorCodeOf, noopRunEventLog, type RunEventLog } from "../events/run-events.js";
 
 export interface PipelineArgs {
@@ -158,7 +159,7 @@ function providerBlockReason(args: PipelineArgs): string {
 }
 
 async function openOwnedForm(url: string, profileDir: string): Promise<{ page: import("playwright").Page; close: () => Promise<void> }> {
-  const context = await launchPersistentChrome(profileDir, { headless: false, args: ["--disable-background-networking", "--disable-component-update", "--no-first-run"] });
+  const context = await launchManagedChrome(profileDir, { headless: false, args: ["--disable-background-networking", "--disable-component-update", "--no-first-run"] });
   let done = false;
   try {
     const page = context.pages()[0] ?? await context.newPage();
@@ -317,7 +318,7 @@ export async function processCanonicalJob(input: {
           finalOutcome = "READY_TO_SUBMIT";
           stageLog.application = { ...application, status: "REUSED_VALID_READY_RECORD", browserOpened: false };
         } else {
-          const profileDir = path.resolve(input.args.browserProfileDir ?? uniqueChromeProfileDir(".chrome-profile-pipeline"));
+          const profileDir = path.resolve(input.args.browserProfileDir ?? resolveBrowserProfileDir());
           const opened = await (deps.formPage ?? openOwnedForm)(job.applyUrl, profileDir);
           try {
             application = await events.stage("application", ctx, () => inspectAndFillApplication({ page: opened.page, profile: input.verifiedInputs.profile, artifactPath: artifact!.pdfPath, asOf: nowDate, admitted: true }));

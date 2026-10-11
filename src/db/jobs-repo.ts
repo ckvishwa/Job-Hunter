@@ -126,13 +126,13 @@ export class JobsRepo {
 
   // --- runs ---------------------------------------------------------------------------------------------------------------------
 
-  async createRun(userId: string, plan: DiscoveryPlan, boards: BoardRef[], limits: RunLimits): Promise<{ runId: string }> {
+  async createRun(userId: string, plan: DiscoveryPlan, boards: BoardRef[], limits: RunLimits, kind: "discovery" | "import" = "discovery"): Promise<{ runId: string }> {
     try {
       return await this.tx(async (c) => {
         const { rows } = await c.query<{ id: string }>(
-          `INSERT INTO discovery_runs (user_id, status, selection_revision_no, catalog_version, snapshot, limits, boards_total)
-           VALUES ($1, 'QUEUED', $2, $3, $4::jsonb, $5::jsonb, $6) RETURNING id`,
-          [userId, plan.selectionRevisionNo, plan.catalogVersion, JSON.stringify(plan), JSON.stringify(limits), boards.length],
+          `INSERT INTO discovery_runs (user_id, status, selection_revision_no, catalog_version, snapshot, limits, boards_total, run_kind)
+           VALUES ($1, 'QUEUED', $2, $3, $4::jsonb, $5::jsonb, $6, $7) RETURNING id`,
+          [userId, plan.selectionRevisionNo, plan.catalogVersion, JSON.stringify(plan), JSON.stringify(limits), boards.length, kind],
         );
         const runId = rows[0]!.id;
         let position = 0;
@@ -152,6 +152,14 @@ export class JobsRepo {
       }
       throw error;
     }
+  }
+
+  /** ats_identity -> sha256 of the job's CURRENT stored JD revision, for the identities that already exist. */
+  async existingRevisionHashes(atsIdentities: string[]): Promise<Map<string, string>> {
+    if (atsIdentities.length === 0) return new Map();
+    const { rows } = await this.pool.query<{ ats_identity: string; jd_sha256: string }>(
+      `SELECT j.ats_identity, r.jd_sha256 FROM jobs j JOIN job_revisions r ON r.id = j.current_revision_id WHERE j.ats_identity = ANY($1::text[])`, [atsIdentities]);
+    return new Map(rows.map((r) => [r.ats_identity, r.jd_sha256.trim()]));
   }
 
   async markRunning(runId: string): Promise<boolean> {

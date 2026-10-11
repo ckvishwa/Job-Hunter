@@ -3,6 +3,7 @@ import path from "node:path";
 import type { BrowserContext, Locator, Page } from "playwright";
 import type { JobPosting } from "../adapters/types.js";
 import { closePersistentChrome, launchPersistentChrome, registerShutdownOnSignal } from "../browser/launcher.js";
+import { launchManagedChrome } from "../browser/managed.js";
 import { pauseForVerification, type VerificationResult } from "../browser/verification.js";
 import { loadRolesConfig } from "../config/loader.js";
 import type { ResolvedSearchTarget } from "../config/search-input.js";
@@ -391,7 +392,7 @@ async function extractPostingFromDom(page: Page, container: string, removeSelect
 export async function runSearchDiscovery(resolved: ResolvedSearchTarget, options: SearchRunOptions, deps: SearchRunDeps = {}): Promise<SearchRunSummary> {
   const { target, entry } = resolved;
   const log = deps.log ?? ((line: string) => console.log(line));
-  const launchFn = deps.launchFn ?? launchPersistentChrome;
+  const launchFn = deps.launchFn ?? launchManagedChrome;
   const closeFn = deps.closeFn ?? closePersistentChrome;
   const registerShutdown = deps.registerShutdown ?? registerShutdownOnSignal;
   const verify = deps.verify ?? ((page: Page) => pauseForVerification(page));

@@ -2,7 +2,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseCandidateProfile } from "../domain/candidate-profile.js";
-import { closePersistentChrome, launchPersistentChrome } from "../browser/launcher.js";
+import { closePersistentChrome } from "../browser/launcher.js";
+import { launchManagedChrome, resolveBrowserProfileDir } from "../browser/managed.js";
 import { createRunEventLog } from "../events/run-events.js";
 import { parsePipelineArgs } from "../pipeline/cli.js";
 import { runPipeline } from "../pipeline/run.js";
@@ -134,8 +135,8 @@ async function withForm(a: Args, write: boolean): Promise<FormEvidenceFile> {
   const resume = resumeReady && pdfPath && before.hashes.resumeSha256 ? { sha256: before.hashes.resumeSha256, fileName: path.basename(pdfPath), path: pdfPath, approved: valid.has("resume") } : null;
   if (write && !gatesToWrite) console.log("Write gates are not satisfied (JD verified, eligibility ELIGIBLE or applicant-approved, no hard blocker); inspecting read-only.");
 
-  const profileDir = path.resolve(a.browserProfileDir ?? `private-runtime/browser-profiles/packet-${job.id}`);
-  const context = await launchPersistentChrome(profileDir, { headless: false, args: ["--disable-background-networking", "--disable-component-update", "--no-first-run"] });
+  const profileDir = path.resolve(a.browserProfileDir ?? resolveBrowserProfileDir());
+  const context = await launchManagedChrome(profileDir, { headless: false, args: ["--disable-background-networking", "--disable-component-update", "--no-first-run"] });
   try {
     const guard = await installNetworkGuard(context, a.allowWrite);
     const page = context.pages()[0] ?? (await context.newPage());

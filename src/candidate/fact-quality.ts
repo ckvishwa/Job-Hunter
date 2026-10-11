@@ -66,7 +66,7 @@ export function assessFactQuality(fact: QualityFact, all: readonly QualityFact[]
     if (!c.records.some((r) => r.ref === fact.factId)) continue;
     const other = c.records.find((r) => r.ref !== fact.factId);
     const diff = c.differences.map((d) => `${d.field}: ${d.values[0]} vs ${d.values[1]}`).join("; ");
-    add("EMPLOYMENT_CONFLICT", `Disagrees with ${other?.origin === "prior-record" ? "an earlier recorded entry" : "another extracted record"} (${other?.ref ?? "?"}) about ${c.employer}: ${diff}. Neither version is assumed correct; confirm from documents.`);
+    add("EMPLOYMENT_CONFLICT", `Disagrees with ${other?.origin === "confirmed-statement" ? "your confirmed employment statement" : other?.origin === "prior-record" ? "an earlier recorded entry" : "another extracted record"} (${other?.ref ?? "?"}) about ${c.employer}: ${diff}. Neither version is assumed correct; confirm from documents.`);
   }
 
   // INSUFFICIENT_CONTEXT: a lone generic noun says little by itself.

@@ -69,6 +69,7 @@ export function testEnv(overrides: Record<string, string> = {}): Record<string, 
     JH_SESSION_SECRET: "b".repeat(40),
     JH_AI_SERVICE_TOKEN: "c".repeat(40),
     JH_API_PORT: "8787",
+    JH_DEMO_PROFILE: "1", // synthetic uploads join an active DEMO profile; production defaults to UNVERIFIED
     ...overrides,
   };
 }

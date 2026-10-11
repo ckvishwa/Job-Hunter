@@ -1,7 +1,7 @@
 import type pg from "pg";
 import { z } from "zod";
 import type { CandidateFact } from "../domain/candidate-profile.js";
-import { rowToFact } from "./candidate-repo.js";
+import { loadScopedEvidence } from "./profile-repo.js";
 import {
   canonicalAliases, familySchema, normalizeAlias, roleDefinitionDigest, roleDefinitionSchema, roleEditSchema, sha256Json,
   type RoleDefinition, type RoleEdit, type RoleFamily,
@@ -92,6 +92,15 @@ export interface SeedResult {
   updated: number;
   unchanged: number;
   skippedUserEdited: number;
+}
+
+/** What the profile boundary let through and what it kept out, for display and audit. */
+export function evidenceScopeView(e: Awaited<ReturnType<typeof loadScopedEvidence>>) {
+  return {
+    profile: e.profile, sources: e.sources.map((s) => ({ resumeId: s.resumeId, provenance: s.provenance, authorized: s.authorized, basis: s.basis })),
+    confirmedEmploymentReferences: e.confirmed.length, factsUsed: e.facts.length, excludedApproved: e.excluded, duplicatesCountedOnce: e.duplicates,
+    unauthorizedFactCountsByResume: e.unauthorizedFactCounts,
+  };
 }
 
 export class RolesRepo {
@@ -235,11 +244,9 @@ export class RolesRepo {
 
   // --- recommendations ------------------------------------------------------------------------------------------------
 
-  private async loadFacts(c: pg.PoolClient, userId: string): Promise<CandidateFact[]> {
-    const { rows } = await c.query(
-      `SELECT fact_id, kind, value, polarity, attributes, source, approval_status, sensitivity, verification, notes
-         FROM candidate_facts WHERE user_id=$1 ORDER BY fact_id`, [userId]);
-    return rows.map((r) => rowToFact(r));
+  /** Facts S2 may use: only evidence the ACTIVE candidate profile authorizes (see roles/profile-evidence.ts). */
+  private loadEvidence(c: pg.Pool | pg.PoolClient, userId: string) {
+    return loadScopedEvidence(c, userId);
   }
 
   private async profileRevision(c: pg.PoolClient, userId: string): Promise<{ revisionNo: number; digest: string | null }> {
@@ -252,7 +259,8 @@ export class RolesRepo {
   private async refreshTx(c: pg.PoolClient, userId: string, asOf: string) {
     await c.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`roles:${userId}`]);
     const catalog = await this.loadCatalog(c);
-    const facts = await this.loadFacts(c, userId);
+    const evidence = await this.loadEvidence(c, userId);
+    const facts: CandidateFact[] = evidence.facts;
     const profile = await this.profileRevision(c, userId);
     const { assessments, pendingHints } = assessRoles({ roles: catalog.roles, facts, asOf });
     const experience = summarizeExperience(facts, asOf);
@@ -286,7 +294,7 @@ export class RolesRepo {
     for (const [slug, cur] of current) {
       if (!assessments.some((a) => a.roleSlug === slug)) { await supersede(cur.id, "ROLE_INACTIVE"); superseded += 1; }
     }
-    return { catalog, facts, profile, assessments, pendingHints, experience, inserted, superseded };
+    return { catalog, facts, evidence, profile, assessments, pendingHints, experience, inserted, superseded };
   }
 
   /**
@@ -295,14 +303,12 @@ export class RolesRepo {
    */
   async previewAssessment(userId: string, asOf: string) {
     const catalog = await this.loadCatalog(this.pool);
-    const { rows } = await this.pool.query(
-      `SELECT fact_id, kind, value, polarity, attributes, source, approval_status, sensitivity, verification, notes
-         FROM candidate_facts WHERE user_id=$1 ORDER BY fact_id`, [userId]);
-    const facts = rows.map((r) => rowToFact(r));
+    const evidence = await this.loadEvidence(this.pool, userId);
+    const facts = evidence.facts;
     const { assessments, pendingHints } = assessRoles({ roles: catalog.roles, facts, asOf });
     const persisted = (await this.pool.query<{ role_slug: string; status: string; input_digest: string; superseded_at: Date | null }>(
       "SELECT role_slug, status, input_digest, superseded_at FROM candidate_role_recommendations WHERE user_id=$1 AND superseded_at IS NULL", [userId])).rows;
-    return { catalogVersion: catalog.catalogVersion, assessments, pendingHints, experience: summarizeExperience(facts, asOf), persisted };
+    return { catalogVersion: catalog.catalogVersion, assessments, pendingHints, experience: summarizeExperience(facts, asOf), persisted, evidence };
   }
 
   /** Idempotent: identical inputs change nothing. */
@@ -330,6 +336,8 @@ export class RolesRepo {
             support: row.support, status: row.status, decidedBy: row.decided_by, decidedAt: row.decided_at, inputDigest: row.input_digest,
             roleRevision: row.role_revision, catalogVersion: row.catalog_version, profileRevisionNo: row.profile_revision_no,
             sourceFactIds: row.source_fact_ids, evidence: row.evidence, gaps: row.gaps,
+            // which uploaded résumé contributed each supporting fact (null = an attested statement)
+            sourceFacts: row.source_fact_ids.map((factId: string) => ({ factId, resumeId: r.evidence.factResume.get(factId) ?? null })),
             pendingHints: Object.entries(hints).map(([requirementId, factIds]) => ({ requirementId, factIds })),
             experienceNote: note, createdAt: row.created_at,
             _sort: [family.tier === "primary" ? 0 : 1, family.sortOrder, row.support === "SUPPORTED" ? 0 : 1, role.title] as const,
@@ -377,6 +385,7 @@ export class RolesRepo {
 
       return {
         asOf, catalogVersion: r.catalog.catalogVersion, profile: r.profile, experience: r.experience,
+        evidenceScope: evidenceScopeView(r.evidence),
         suggestedSearchBand: suggestSearchBand(r.experience), recommendations, noMatch, staleDecisions, factIndex,
         selection: await this.selectionTx(c, userId),
       };

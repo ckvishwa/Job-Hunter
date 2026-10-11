@@ -15,6 +15,7 @@ const NAV = [
   { href: "/resumes", label: "Résumés", also: ["/review"] },
   { href: "/roles", label: "Career paths" },
   { href: "/jobs", label: "Jobs" },
+  { href: "/matches", label: "Matches" },
   { href: "/profile", label: "Statements" },
 ];
 const isActive = (n: { href: string; also?: string[] }) => path === n.href || (n.also ?? []).includes(path);

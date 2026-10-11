@@ -1,6 +1,6 @@
 import path from "node:path";
 import { loadRolesConfig, loadSitesConfig } from "./config/loader.js";
-import { launchPersistentChrome } from "./browser/launcher.js";
+import { launchManagedChrome } from "./browser/managed.js";
 import { pauseForVerification } from "./browser/verification.js";
 
 const CONFIG_DIR = path.resolve("config");
@@ -17,7 +17,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const context = await launchPersistentChrome();
+  const context = await launchManagedChrome();
   const page = await context.newPage();
 
   console.log(`Navigating to ${enabledSite.name} (${enabledSite.url})...`);

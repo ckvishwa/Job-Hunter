@@ -352,8 +352,8 @@ suite("S3 migration 0003 and its rollback", { timeout: 60_000 }, () => {
     const pool = createPool(pgSettingsFromEnv(process.env, dbName), { max: 2, connectTimeoutMs: 30_000 });
     try {
       const first = await migrate(pool);
-      expect(first.applied).toEqual(["0001_s1_candidate", "0002_s2_roles", "0003_s3_discovery"]);
-      expect((await migrate(pool)).alreadyApplied).toHaveLength(3); // idempotent
+      expect(first.applied).toEqual(["0001_s1_candidate", "0002_s2_roles", "0003_s3_discovery", "0004_profile_boundary", "0005_s4b_matching"]);
+      expect((await migrate(pool)).alreadyApplied).toHaveLength(5); // idempotent
       const tables = async () => (await pool.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY 1")).rows.map((r) => r.table_name as string);
       const s3Tables = ["discovery_failures", "discovery_run_boards", "discovery_runs", "job_observations", "job_revisions", "jobs"];
       expect(await tables()).toEqual(expect.arrayContaining(s3Tables));
@@ -367,9 +367,9 @@ suite("S3 migration 0003 and its rollback", { timeout: 60_000 }, () => {
       for (const t of s3Tables) expect(after).not.toContain(t);
       expect(after).toEqual(expect.arrayContaining(["users", "candidate_facts", "role_catalog", "search_preferences"])); // S1/S2 intact
       expect(Number((await pool.query("SELECT count(*) AS n FROM users")).rows[0].n)).toBe(before);
-      expect((await pool.query("SELECT version FROM schema_migrations ORDER BY 1")).rows.map((r) => r.version)).toEqual(["0001_s1_candidate", "0002_s2_roles"]);
+      expect((await pool.query("SELECT version FROM schema_migrations ORDER BY 1")).rows.map((r) => r.version)).toEqual(["0001_s1_candidate", "0002_s2_roles", "0004_profile_boundary"]);
 
-      expect((await migrate(pool)).applied).toEqual(["0003_s3_discovery"]); // forward again
+      expect((await migrate(pool)).applied).toEqual(["0003_s3_discovery", "0005_s4b_matching"]); // forward again (0005 depends on the job tables)
       expect(await tables()).toEqual(expect.arrayContaining(s3Tables));
     } finally {
       await pool.end().catch(() => undefined);

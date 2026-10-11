@@ -1,0 +1,4 @@
+{
+  "purpose": "Regex patterns (matched against repo-relative test paths) for test files whose results must never be reused from a receipt, because they share mutable state or the dependency scan cannot prove what they observe. Empty on purpose: every current test uses throwaway databases/profiles and a statically scannable import graph.",
+  "neverCache": []
+}

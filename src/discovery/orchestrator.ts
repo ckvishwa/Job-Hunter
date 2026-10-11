@@ -5,6 +5,7 @@ import {
   registerShutdownOnSignal,
   uniqueChromeProfileDir,
 } from "../browser/launcher.js";
+import { launchManagedChrome } from "../browser/managed.js";
 import { loadCollectSettings, loadPortalsConfig, loadRolesConfig, loadSitesConfig } from "../config/loader.js";
 import { getOrCreateCheckpoint, loadCheckpoints, resetCheckpoints, saveCheckpoints } from "./checkpoints.js";
 import { resolveDiscoveryAdapter } from "./registry.js";
@@ -92,7 +93,7 @@ function emptyCounters(): RawDiscoveryCounters {
 export async function runDiscover(
   paths: DiscoverPaths,
   filters: DiscoverFilters = {},
-  launchFn: typeof launchPersistentChrome = launchPersistentChrome,
+  launchFn: typeof launchPersistentChrome = launchManagedChrome,
   closeFn: typeof closePersistentChrome = closePersistentChrome,
   events: RunEventLog = noopRunEventLog("discovery"),
 ): Promise<DiscoveryRunSummary> {

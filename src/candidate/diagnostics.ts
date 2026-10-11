@@ -144,6 +144,7 @@ export function buildDiagnostic(input: DiagnoseInput) {
       const f = valueOf.get(id);
       return {
         factId: id, kind: f?.kind ?? null, status: f?.approvalStatus ?? null, value: f && !options.hideValues ? f.value : null,
+        resumeId: input.preview.evidence.factResume.get(id) ?? null,
         onThisResume: resumeFactIds.has(id), inOpenConflict: conflictRefs.has(id),
         // weak evidence behind a recommendation is shown next to it, never hidden
         qualityWarningCodes: perFact.find((p) => p.factId === id)?.warnings.map((w) => w.code) ?? [],
@@ -250,6 +251,16 @@ export function buildDiagnostic(input: DiagnoseInput) {
       openConflictFactIdsOnThisResume: openConflictFactIds.sort(),
       thisResumeApprovedFactsOnly: slim(thisResume),
       allUploadedAndAttestedFacts_theViewS2Uses: slim(userWide),
+    },
+    evidenceScope: {
+      note: "Career scoring (S2, later S4) reads only evidence the ACTIVE candidate profile authorizes. Unclassified résumés are unverified and excluded.",
+      profile: input.preview.evidence.profile,
+      thisResume: input.preview.evidence.sources.find((s) => s.resumeId === resume.resumeId)
+        ? (({ provenance, authorized, basis }) => ({ provenance, authorized, basis }))(input.preview.evidence.sources.find((s) => s.resumeId === resume.resumeId)!)
+        : { provenance: "unverified", authorized: false, basis: "not classified for the active profile" },
+      factsUsedByS2: input.preview.evidence.facts.length,
+      approvedFactsKeptOut: input.preview.evidence.excluded,
+      employmentCountedOnce: input.preview.evidence.duplicates,
     },
     roleRecommendations: {
       catalogVersion: input.preview.catalogVersion,

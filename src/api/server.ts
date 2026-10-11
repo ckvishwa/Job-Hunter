@@ -7,8 +7,12 @@ import { FactRuleError, attestFact, type FactRuleCode } from "../candidate/fact-
 import { SENSITIVE_FACT_KINDS } from "../domain/candidate-profile.js";
 import type { CandidateRepo } from "../db/candidate-repo.js";
 import { RolesRepo } from "../db/roles-repo.js";
+import { ProfileRepo } from "../db/profile-repo.js";
 import { JobsRepo } from "../db/jobs-repo.js";
 import { DiscoveryRunner, loadBoardsConfig, type BoardsConfig, type RunnerDeps } from "../jobs/runner.js";
+import { registerMatchRoutes } from "./match-routes.js";
+import { MatchStore } from "../match/store.js";
+import { LocalTransformerEncoder } from "../nlu/local-transformer.js";
 import { JOBS_ERROR_STATUS, JobsRuleError, PLAN_ERROR_STATUS, PlanError, defaultLimits, registerJobsRoutes } from "./jobs-routes.js";
 import { RoleRuleError, type RoleRuleCode } from "../roles/errors.js";
 import { registerRoleRoutes } from "./roles-routes.js";
@@ -93,6 +97,9 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   const runner = deps.runner ?? new DiscoveryRunner({ repo: jobsRepo, boards, delayMs: discovery.delayMs, ...(deps.runnerOptions ?? {}) });
   const user = await repo.ensureUser(config.userHandle);
   await roles.seedCatalog(); // idempotent; never overwrites a role a person edited
+  const profiles = new ProfileRepo(repo.pool);
+  // Demo mode only: a DEMO profile that accepts fixture uploads. A real (personal) profile is never touched by it.
+  if (config.demoProfile) await profiles.ensureActive(user.id, "demo", "demo fixtures");
   const allowedHosts = new Set(["127.0.0.1", "localhost", "[::1]"]);
 
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024, trustProxy: false });
@@ -141,7 +148,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     }
   });
 
-  app.setErrorHandler((error: Error & { code?: string; statusCode?: number }, _req, reply) => {
+  app.setErrorHandler((error: Error & { code?: string; statusCode?: number }, req, reply) => {
     if (error instanceof ZodError) return send(reply, 400, "INVALID_REQUEST", "The request body is not valid.");
     if (error instanceof PlanError) return send(reply, PLAN_ERROR_STATUS[error.code] ?? 409, error.code, error.message);
     if (error instanceof JobsRuleError) {
@@ -153,6 +160,8 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     if (error.code === "FST_REQ_FILE_TOO_LARGE") return send(reply, 413, "FILE_TOO_LARGE", `The file exceeds ${config.maxUploadBytes} bytes.`);
     if (error.code === "FST_ERR_CTP_BODY_TOO_LARGE") return send(reply, 413, "BODY_TOO_LARGE", "The request body is too large.");
     if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500) return send(reply, error.statusCode, "BAD_REQUEST", "The request could not be processed.");
+    // An unexpected failure: record WHERE and WHAT KIND (route, error class, code) so it can be diagnosed. Never the request body, headers, cookies or the message text.
+    console.error(`[api] 500 ${req.method} ${req.routeOptions?.url ?? "(unrouted)"} ${error.name}${error.code ? ` ${error.code}` : ""}`);
     return send(reply, 500, "INTERNAL_ERROR", "Something went wrong.");
   });
 
@@ -196,6 +205,10 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     const storageRef = files.save(sha256, fileType, bytes);
     const result = await repo.registerResume({ userId: user.id, sha256, fileType, byteSize: bytes.length, storageRef, retryableErrorCodes: RETRYABLE_CODES });
     if (result.version.state === "UPLOADED" || result.version.state === "EXTRACTING") queue.enqueue(result.version.id);
+    // Without demo mode a new upload is UNVERIFIED (no classification) and is excluded from career scoring until the owner classifies it.
+    if (config.demoProfile && (await profiles.active(user.id))?.kind === "demo") {
+      await profiles.classify(user.id, { resumeId: result.resume.id, provenance: "fixture", authorized: true, basis: "demo mode (JH_DEMO_PROFILE=1): uploads are fixtures", actor: "demo-mode" });
+    }
     return reply.code(202).send({
       resumeId: result.resume.id, versionId: result.version.id, state: result.version.state,
       duplicate: !result.created, requeued: result.requeued,
@@ -272,6 +285,11 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     jobs: jobsRepo, roles, runner, boards, user, send,
     limits: deps.discoveryLimits ?? { maxBoards: discovery.maxBoards, maxCandidates: discovery.maxCandidates, maxMatchedPerBoard: discovery.maxMatchedPerBoard },
   });
+
+  // --- S4: evidence-grounded matches -----------------------------------------------------------------------------------------
+  // Deterministic baseline by default; JH_MATCH_ENCODER=minilm adds the local MiniLM ranker (no network at match time once the model is cached).
+  const matchStore = new MatchStore({ pool: repo.pool, candidates: repo, jobs: jobsRepo, encoder: process.env.JH_MATCH_ENCODER === "minilm" ? () => new LocalTransformerEncoder() : null });
+  registerMatchRoutes(app, { store: matchStore, user, send });
 
   return app;
 }

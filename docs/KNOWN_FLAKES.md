@@ -116,3 +116,18 @@ decide `SDLC-T06` (run browser/DB files serially) and have the owner look at the
 - **Default-parallel `npm test`, once:** 117/119 files, 1,357/1,359 tests; failures were `s2-api` (`ETIMEDOUT 127.0.0.1:55440`) and `tests/packet/build.test.ts` (5 s timeout). Not a green gate; not hidden.
 - **Cause (unconfirmed):** the machine-level loopback fault of the seventh entry. A live development stack (Astro, Fastify, Python, PostgreSQL) was running at the same time, which may raise the odds.
 - **What to do:** rerun the failing file alone. If it fails alone, treat it as real.
+
+## S2 UI workflow stall during S4A verification (tenth entry)
+
+- **Test:** `S1 -> S2 UI workflow (headed Chrome) > uploads a synthetic resume, approves facts, and gets persisted, evidence-linked role suggestions and a manual selection` (`tests/e2e/offline/s2-ui.e2e.test.ts`).
+- **Seen, 2026-10-11:** once in the first serialized full run of the S4A work (127 of 128 files, 1,458 of 1,459 tests). It ran 66.7 s and failed with `Error: Matcher did not succeed in 15000ms` at `toHaveAttribute` in `classify` (`AssertionError: expected 'pending' to be 'approved'`). The file passed alone twice (10.6 s each) and the repeated serialized full run passed 128 files / 1,459 tests. No code changed between those runs.
+- **Evidence for the classification:** the 6x slower duration and the pass on identical code match the loopback-stall pattern of the seventh entry (a UI request exceeding the page's poll window). Not proven; if it recurs, capture the request timings before calling it environmental.
+
+**Update, S4B (2026-10-11): root cause found and fixed.** The tenth entry was not environmental. `classify()` in the test clicked Approve as soon as the row's `data-status` read `pending`, but an unclassified employment fact is already `pending` before the edit, so the wait was satisfied by the OLD row and the click used the pre-edit digest (HTTP 409 `STALE_FACT`) whenever the fact-list refresh was slow. Reproduced on demand with the stress knob `JH_TEST_DELAY_FACTS_MS` (delays `GET /api/v1/resumes/*/facts`), fixed by waiting for the re-rendered row (`type: professional`) before approving. The server now also logs `[api] 500 <method> <route> <error>` so a future 500 is diagnosable.
+
+## `orbital-s3.e2e` suite failure with a lost message (eleventh entry)
+
+- **Seen, 2026-10-11:** once, in the first `npm run test:full` of S4B, `tests/e2e/offline/orbital-s3.e2e.test.ts` reported "(suite failed to run)" and the message was not captured. It passed when run alone and in later batches.
+- **What changed:** the smart-test runner (`src/testing/exec.ts`) now records the suite-level message and keeps the raw `*.failures.json`, so a recurrence is diagnosable.
+- **Cause: unknown.** Not classified as environmental without evidence. If it recurs, read the recorded message in `private-runtime/test-cache/logs/` first.
+- **What to do:** rerun the file alone. If it fails alone, treat it as real.

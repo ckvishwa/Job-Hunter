@@ -1,6 +1,7 @@
 import type { BrowserContext } from "playwright";
 import { loadCollectSettings, loadRolesConfig, loadSitesConfig } from "../config/loader.js";
 import { closePersistentChrome, launchPersistentChrome, registerShutdownOnSignal } from "../browser/launcher.js";
+import { launchManagedChrome } from "../browser/managed.js";
 import { resolveAdapter } from "../adapters/registry.js";
 import { loadJobs, updateJobs } from "../storage/jsonl-store.js";
 import { mergeJobs } from "../dedup/deduplicator.js";
@@ -55,7 +56,7 @@ function buildRoleSearches(
 export async function runCollect(
   paths: CollectPaths,
   filters: CollectFilters = {},
-  launchFn: typeof launchPersistentChrome = launchPersistentChrome,
+  launchFn: typeof launchPersistentChrome = launchManagedChrome,
   closeFn: typeof closePersistentChrome = closePersistentChrome,
 ): Promise<CollectSummary> {
   const sites = loadSitesConfig(paths.sitesConfigPath);

@@ -1,8 +1,23 @@
 # Status
 
-Last updated: 2026-10-10. Branch `careerops-integration`. Nothing here is merged to `master`.
+Last updated: 2026-10-11. Branch `careerops-integration`. Nothing here is merged to `master`.
 
 > Public-repository note: this file records redacted summaries only. Candidate facts, answers, resume content, immigration or eligibility details, target-employer selections, application identifiers and the hashes of private files live under the gitignored `private-runtime/` and are deliberately not described here.
+
+## S4A evidence-grounded matching (2026-10-11)
+
+**First vertical slice implemented and verified offline; nothing committed.** Stored official JD -> validated structured requirements (deterministic baseline; Qwen as a
+shadow challenger that fails closed) -> authorized candidate facts only -> lexical / BM25 / MiniLM / RRF retrieval -> SUPPORTED/PARTIAL/UNSUPPORTED/UNKNOWN per requirement
+with quotations and fact ids -> report with four separate eligibility checks. No score of any kind. Gold-set workflow with a frozen split exists, but no independent human
+labels yet, so every accuracy metric is NOT_EVALUATED. Details: `docs/S4A-MATCHING.md`.
+
+## P0 candidate-profile isolation (2026-10-11)
+
+**Implemented and verified offline; nothing committed.** S2 no longer pools approved facts from every upload. It reads only evidence authorized for the
+active candidate profile (migration `0004`): unclassified résumés are unverified and excluded, fixtures are classified separately, approved facts whose
+quotation does not back them are kept out until corrected, duplicate employment across résumé versions counts once, and résumé employment that contradicts
+the candidate's confirmed employment cannot count. Every recommendation now names the contributing résumé id and fact id. Details, commands and the S4
+gate: `docs/CANDIDATE-PROFILE-BOUNDARY.md`.
 
 ## Resume correction, diagnostics and AI shadow evaluation (2026-10-10)
 

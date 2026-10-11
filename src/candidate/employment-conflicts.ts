@@ -8,7 +8,7 @@ import { parseCandidateProfile } from "../domain/candidate-profile.js";
 export interface EmploymentRecord {
   /** Stable label shown to the reader: a fact id, or "prior:<file>#<factId>". */
   ref: string;
-  origin: "resume-fact" | "prior-record";
+  origin: "resume-fact" | "prior-record" | "confirmed-statement";
   factId: string | null;
   resumeId: string | null;
   status: string;
@@ -107,6 +107,14 @@ interface FactLike {
   value: string;
   approvalStatus: string;
   attributes: { employer?: string; title?: string; startDate?: string; endDate?: string | null; employmentType?: string };
+}
+
+/** The candidate's own confirmed-employment statements (profile reference rows). */
+export function confirmedStatementRecords(rows: ReadonlyArray<{ id: string; employer: string; title: string; start_date: string; end_date: string | null; employment_type: string }>): EmploymentRecord[] {
+  return rows.map((r) => ({
+    ref: `confirmed:${r.id.slice(0, 8)}`, origin: "confirmed-statement" as const, factId: null, resumeId: null, status: "confirmed-by-candidate",
+    employer: r.employer, title: r.title, text: `${r.employer} \u2014 ${r.title}`, startDate: r.start_date, endDate: r.end_date, employmentType: r.employment_type,
+  }));
 }
 
 export function employmentRecordsFromFacts(facts: readonly FactLike[], resumeId: string | null): EmploymentRecord[] {

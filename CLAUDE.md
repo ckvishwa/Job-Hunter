@@ -75,6 +75,14 @@ Given `data/jobs.jsonl`, `npm run hunt` runs each job through, in order:
 
 `docs/superpowers/plans/` and `docs/superpowers/specs/` hold the original phase-by-phase implementation plans and design specs for the discovery pipeline and phase-2 work — useful background for *why* something is shaped the way it is, not required reading to make a change.
 
+### Testing policy (smart incremental testing, `src/testing/`)
+
+- **During development run only what your change can affect.** `npm run test:changed` fingerprints every test unit (its own text, its static import closure, data files it reads, global lock/config/runtime, and the dependency classes db/python/browser/web) and runs only units whose fingerprint changed or whose last receipt is not a verified pass. A single file: `npx vitest run <file>`. After a crash or interruption: `npm run test:resume`. Re-run only the failures: `npm run test:failed`. Never loop the whole suite after every small edit.
+- **Reuse is reported, never disguised.** The output separates `executed NOW` from `REUSED ... NOT executed in this run`. Never write "N tests passed in this run" for reused units. Unknown, uncertain, skipped, failed and never-cache units are never reused; a failed receipt replaces an older green one. Receipts and logs are private (`private-runtime/test-cache/`, gitignored).
+- **One fresh full serialized run on the final tree before declaring a slice done:** `npm run test:full` (serial, no reuse). The full-gate record is tied to the whole-tree fingerprint, so any later edit marks it stale.
+- **Test isolation:** tests use throwaway PostgreSQL databases, dedicated temporary Chrome profiles (never the user's personal Chrome profile), fake board fetches and loopback-only networking. Ordinary CI never contacts an employer. A live read-only refresh is an explicit opt-in command (`npm run jobs:import -- --live ...`), never part of a test.
+- **A flaky test is a bug to root-cause, not to retry.** Record confirmed flakes in `docs/KNOWN_FLAKES.md` with the cause.
+
 ### Verifying a commit in a clean checkout
 
 - **Never** use `git worktree remove --force`, and never use directory junctions or symlinks to share `node_modules`, to verify a commit. On Windows, `git worktree remove --force` follows a junction and deletes the link's target: it emptied a working checkout's `node_modules` once.

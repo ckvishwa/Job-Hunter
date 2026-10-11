@@ -18,6 +18,8 @@ const configSchema = z.object({
   aiServiceToken: secret,
   aiTimeoutMs: z.number().int().min(1000).max(300_000),
   userHandle: z.string().regex(/^[a-z0-9._-]{1,64}$/),
+  /** Demo/fixture mode (JH_DEMO_PROFILE=1): uploads join an active DEMO profile as fixtures. Never set it on a database that holds a real candidate. */
+  demoProfile: z.boolean().optional(),
 });
 export type ApiConfig = z.infer<typeof configSchema>;
 
@@ -38,6 +40,7 @@ export function loadApiConfig(env: Env = process.env): ApiConfig {
     aiServiceToken: env.JH_AI_SERVICE_TOKEN,
     aiTimeoutMs: Number(env.JH_AI_TIMEOUT_MS ?? 90_000),
     userHandle: env.JH_USER_HANDLE ?? "local",
+    demoProfile: env.JH_DEMO_PROFILE === "1",
   });
   if (!parsed.success) {
     const problems = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");

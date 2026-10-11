@@ -2,6 +2,7 @@ import { chromium, type BrowserContext, type LaunchOptions } from "playwright";
 import { execFile } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import path from "node:path";
+import { runAfterClose, runBeforeClose } from "./session-state.js";
 
 export interface LaunchPersistentChromeOptions extends LaunchOptions {
   headless?: boolean;
@@ -19,6 +20,7 @@ const POST_KILL_WAIT_TIMEOUT_MS = 5_000;
 const LOCK_FILE_NAMES = ["lockfile", "SingletonLock", "SingletonSocket", "SingletonCookie"];
 
 export class ChromeProfileInUseError extends Error {
+  readonly code = "PROFILE_IN_USE" as const;
   constructor(userDataDir: string, pids: number[]) {
     super(
       `Chrome profile "${userDataDir}" is already in use by a live Chrome process (pid ${pids.join(", ")}). ` +
@@ -249,19 +251,26 @@ export async function closePersistentChrome(
 ): Promise<void> {
   const absoluteUserDataDir = path.resolve(userDataDir);
 
-  for (const page of context.pages()) {
-    await page.close().catch(() => undefined);
-  }
-  await context.close().catch(() => undefined);
+  // Managed contexts (browser/managed.ts) snapshot session cookies BEFORE the browser goes away and release their owner lock AFTER it has gone.
+  // The profile directory itself is never touched here: closing never clears cookies, storage or the profile.
+  await runBeforeClose(context);
+  try {
+    for (const page of context.pages()) {
+      await page.close().catch(() => undefined);
+    }
+    await context.close().catch(() => undefined);
 
-  const exitedCleanly = await waitUntilNoOwningProcess(absoluteUserDataDir, SHUTDOWN_WAIT_TIMEOUT_MS, deps);
-  if (exitedCleanly) return;
+    const exitedCleanly = await waitUntilNoOwningProcess(absoluteUserDataDir, SHUTDOWN_WAIT_TIMEOUT_MS, deps);
+    if (exitedCleanly) return;
 
-  const survivors = await deps.findOwningProcessIds(absoluteUserDataDir);
-  for (const pid of survivors) {
-    await deps.killProcessTree(pid);
+    const survivors = await deps.findOwningProcessIds(absoluteUserDataDir);
+    for (const pid of survivors) {
+      await deps.killProcessTree(pid);
+    }
+    await waitUntilNoOwningProcess(absoluteUserDataDir, POST_KILL_WAIT_TIMEOUT_MS, deps);
+  } finally {
+    await runAfterClose(context);
   }
-  await waitUntilNoOwningProcess(absoluteUserDataDir, POST_KILL_WAIT_TIMEOUT_MS, deps);
 }
 
 /**

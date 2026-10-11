@@ -72,6 +72,14 @@ suite("S1 -> S2 UI workflow (headed Chrome)", () => {
       external.push(route.request().url());
       return route.abort();
     });
+    // Stress knob: delay the fact-list refresh the way a loaded machine does. Used to PROVE the classify() synchronisation below; off by default.
+    const delay = Number(process.env.JH_TEST_DELAY_FACTS_MS ?? 0);
+    if (delay > 0) {
+      await context.route("**/api/v1/resumes/*/facts", async (route) => {
+        if (route.request().method() === "GET") await new Promise((r) => setTimeout(r, delay));
+        await route.fallback();
+      });
+    }
   }, 180_000);
 
   afterAll(async () => {
@@ -129,6 +137,9 @@ suite("S1 -> S2 UI workflow (headed Chrome)", () => {
       await page.selectOption('form.edit select[name="employmentType"]', "professional");
       await page.click('form.edit button[type="submit"]');
       await pw(page.locator("#msg")).toContainText("new revision");
+      // Synchronise on the RE-RENDERED row (it now shows the saved type), not on data-status: an unclassified employment fact is already "pending" before the edit,
+      // so that wait is satisfied by the OLD row and the approve click used the pre-edit digest (409 STALE_FACT) whenever the refresh was slow.
+      await pw(factRow(page, "employment", value)).toContainText("type: professional");
       await pw(factRow(page, "employment", value)).toHaveAttribute("data-status", "pending");
       await factRow(page, "employment", value).locator("[data-action=approve]").click();
       await pw(factRow(page, "employment", value)).toHaveAttribute("data-status", "approved");

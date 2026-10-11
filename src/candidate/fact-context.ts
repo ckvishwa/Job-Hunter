@@ -1,5 +1,6 @@
 import type { CandidateRepo } from "../db/candidate-repo.js";
-import { detectEmploymentConflicts, employmentRecordsFromFacts, findLatestPriorProfile, loadPriorEmploymentRecords, type EmploymentConflict, type EmploymentRecord } from "./employment-conflicts.js";
+import { ProfileRepo } from "../db/profile-repo.js";
+import { confirmedStatementRecords, detectEmploymentConflicts, employmentRecordsFromFacts, findLatestPriorProfile, loadPriorEmploymentRecords, type EmploymentConflict, type EmploymentRecord } from "./employment-conflicts.js";
 
 // Read-only: gathers every employment record the user has (all uploaded résumés, plus an earlier reviewed profile if one is available)
 // and reports the disagreements. Used by the reviewer export/apply gate, the correction CLI and the diagnostics.
@@ -15,6 +16,7 @@ export interface ConflictContext {
 export async function collectEmploymentConflicts(repo: CandidateRepo, userId: string, prior?: string | null): Promise<ConflictContext> {
   const records: EmploymentRecord[] = [];
   for (const r of await repo.listResumes(userId)) records.push(...employmentRecordsFromFacts(await repo.listFacts(userId, r.resumeId), r.resumeId));
+  records.push(...confirmedStatementRecords(await new ProfileRepo(repo.pool).listConfirmed(userId)));
   const file = prior === undefined ? findLatestPriorProfile() : prior;
   let priorProfileProblem: string | null = null;
   let used: string | null = null;
