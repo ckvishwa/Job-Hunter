@@ -27,7 +27,7 @@ Completion is judged by the demonstrations at the end of each module, with evide
 Runs the services; runs the agreed suites; explains the pipeline; reproduces a reported defect; writes or improves an automated test; opens a valid PR; reviews a Developer change; provides reproducible sign-off evidence.
 
 ## Growth plan (practical assignments; the Technical Lead mentors and reviews every PR)
-Reporting line: Hani reports to the Technical Lead. Progress is shown by merged, reviewed work and ledger evidence, not attendance.
+Reporting line: Hani (`Hani456`) reports to the Technical Lead (`ckvishwa`). Step zero: accept the collaborator invitation; GitHub Issues #8 (P0-07) and #10 (P0-09) are assigned to `Hani456` after acceptance. Progress is shown by merged, reviewed work and ledger evidence, not attendance.
 
 | Stage | Focus | Assignment (ledger task) | Done when |
 |---|---|---|---|

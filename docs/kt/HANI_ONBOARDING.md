@@ -1,6 +1,6 @@
 # Hani onboarding
 
-Welcome. You are the **Senior AI/ML & SDET Intern**, reporting to the Technical Lead (ckvishwa), who is also your mentor. You shadow AI/ML development and learn the technologies; you write automated tests and ML evaluation code; you report defects and independently verify the Technical Lead's work; you contribute supporting code through reviewed PRs. You do not own architecture or production model promotion unless explicitly delegated in `docs/DECISIONS.md`. Read in this order:
+Welcome. You are the **Senior AI/ML & SDET Intern**, (GitHub `Hani456`) reporting to the Technical Lead (`ckvishwa`), who is also your mentor. Accept the repository collaborator invitation at https://github.com/ckvishwa/Job-Hunter/invitations first; it gives you write access to branches and PRs (not to protected `main`). You shadow AI/ML development and learn the technologies; you write automated tests and ML evaluation code; you report defects and independently verify the Technical Lead's work; you contribute supporting code through reviewed PRs. You do not own architecture or production model promotion unless explicitly delegated in `docs/DECISIONS.md`. Read in this order:
 
 1. `docs/PRD.md` (what we build) and `docs/AGENT_PROTOCOL.md` (how work is claimed and verified).
 2. `docs/PROGRESS_LEDGER.json` via `python scripts/sync_progress.py --next` (what is next). Tasks where `owner_role` = `HANI` are yours to build; tasks where `reviewer_role` = `HANI` are ones you independently verify.

@@ -94,3 +94,48 @@ Review/merge conditions for PR #1 (draft): CI green, two clean serialized Gate A
 
 ### Next Session
 Record Gate A run 3 and write `GATE_A_REPORT.md`; check PR #1 CI.
+
+---
+
+## 2026-10-14 — Engineering Session (final owner decisions)
+
+### People
+Technical Lead, AI/ML Architect, Principal Developer and Mentor: `ckvishwa`
+Senior AI/ML & SDET Intern: `Hani456` (collaborator invitation sent, acceptance pending)
+
+### Branch / Commit
+Branch: `chore/m0-collaboration-baseline`, PR #1 (draft). Commits from this entry onward use the owner's GitHub no-reply address.
+
+### Today's Objective
+Apply the owner's final decisions without repeating cleanup or recreating tasks.
+
+### Work Completed
+- ADR-0001 approved (ADR-0001 amendment A3): `docs/PRD.md` canonical; alternate diagram PRD stays in `docs/archive/`.
+- History and past author emails preserved; no rewrite, no force-push. Future commits use `54135438+ckvishwa@users.noreply.github.com` via repository-local Git config (the id came from the GitHub API for the authenticated account; Settings > Emails could not be read from here because the CLI token lacks the `user` scope, so the owner should confirm it there). Global config and past commits untouched.
+- Collaborator invitation (write) sent to `Hani456` (account exists, id 69955146). Not yet accepted, so Issues #8 and #10 are not yet assigned to her; assign after acceptance. Issues for her other ledger tasks (P1-03, P2-04, P5-01, P5-03, P7-03, P8-04, P9-03, P10-02, P10-03) will be created when those tasks start.
+- `TEAM_ROLES.md`, onboarding, KT plan, ledger role text and `CODEOWNERS` now carry her exact username. Task IDs, owners, reviewers and evidence unchanged.
+- Reviewed PR #12 (CI tiers); see Problems Discovered.
+
+### Evidence
+`python scripts/sync_progress.py --check` → OK. Gate A runs are in `docs/qa/GATE_A_REPORT.md` (run 4 in progress at the time of writing).
+
+### Architecture Decisions
+A3 as above. Local-first and PR #1 draft restrictions unchanged.
+
+### Problems Discovered
+PR #12 review (observations): (1) the tiered gate is sound — drafts run fast checks and skip headed Linux/Windows; ready PRs, pushes and manual dispatch require both headed jobs; (2) the draft "CI gate" is green without headed E2E, so a green draft check is **not** Gate A evidence; (3) PR #12's base is the M0 branch, so its own workflow change has not run in Actions yet; (4) to prove a full pass while PR #1 stays a draft, run the workflow manually (`workflow_dispatch`) on the branch SHA.
+
+### Blockers
+Hani456 accepting the invitation; Gate A run 4 and a second clean run; independent review.
+
+### Tasks Updated
+None changed status.
+
+### Handoff to Hani456
+Accept the invitation, then follow `docs/kt/HANI_ONBOARDING.md`; Stage 1 tasks P0-09 and P0-07.
+
+### Handoff to Technical Lead
+Confirm the no-reply address in GitHub Settings; decide when to merge PR #12 into the M0 branch.
+
+### Next Session
+Record run 4; integrate PR #12 after its fast suite is run locally; assign #8 and #10 after acceptance.

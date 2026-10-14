@@ -1219,7 +1219,7 @@
   "collaboration": {
     "roles": {
       "DEVELOPER": "ckvishwa: Technical Lead, Principal Developer, AI/ML Architect and Mentor. Owns architecture, technology decisions, AI/ML model development, full-stack implementation, delegation, integration, production model promotion.",
-      "HANI": "Senior AI/ML & SDET Intern reporting to the Technical Lead. Shadows AI/ML, writes automated tests and ML evaluation code, reports defects, independently verifies the Technical Lead's work, contributes supporting code under mentorship. No architecture or production-promotion authority unless explicitly delegated. github_username pending (not provided).",
+      "HANI": "Senior AI/ML & SDET Intern reporting to the Technical Lead. Shadows AI/ML, writes automated tests and ML evaluation code, reports defects, independently verifies the Technical Lead's work, contributes supporting code under mentorship. No architecture or production-promotion authority unless explicitly delegated. GitHub: Hani456 (invitation sent, acceptance pending).",
       "PRODUCT_OWNER": "Same person as the Technical Lead; scope/ADR decisions and release approval. Never substitutes for QA evidence."
     },
     "rule": "owner_role may not be the sole approver; reviewer_role performs QA_REVIEW -> VERIFIED only with commit-specific, actually-run test evidence",
@@ -1260,6 +1260,10 @@
       ]
     },
     "note": "M0 (collaboration-ready baseline) may complete with Gate A red; M1 requires Gate A green.",
-    "role_change_2026-10-14": "Final reporting structure (ADR-0001 amendment A2) supersedes A1: ML models are built by the Technical Lead; Hani owns test/evaluation-code tasks and independent verification."
+    "role_change_2026-10-14": "Final reporting structure (ADR-0001 amendment A2) supersedes A1: ML models are built by the Technical Lead; Hani owns test/evaluation-code tasks and independent verification.",
+    "github_accounts": {
+      "DEVELOPER": "ckvishwa",
+      "HANI": "Hani456"
+    }
   }
 }
