@@ -204,3 +204,10 @@ NOT achieved (pending gate): any autonomous parser. No model, prompt, labelled s
 - The structured schema has no slot for conditional preferences ("if the latter, some security experience is preferred") or nested boolean expressions; add behind a schema version when a consumer needs them.
 - `docs/ard/00-SHARED-CONTRACTS.md` was present in the parent checkout at Slice 2 time; earlier notes saying it was absent are superseded.
 - Dedupe tiers 3-4 (company+title+location, description fingerprint) still join postings that have no `atsIdentity`; they cannot override a conflicting identity.
+
+## 2026-10-14 — Phase A audit (read-only)
+Changed: added `docs/audit/AUDIT.md` only; no application code touched.
+Evidence: `npm run typecheck` → clean; `npx vitest run` → 1617 pass / 10 fail (parallel load); 4 of the failing files rerun alone → 93/93 pass.
+Status: Gate A: PARTIAL (e2e/headed failures not yet re-verified alone). Closed-world, plan staleness, crypto-shredding, GLiNER, tailoring, render: MISSING.
+Next: human decision on Master Prompt vs local-first ARD topology (AUDIT.md section 6), then serialized Gate A rerun.
+Risks / blockers: public repo; author email in commit headers; no independent labels.
