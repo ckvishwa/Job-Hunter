@@ -52,16 +52,16 @@
 **Depends on:** None  
 **Blocker:** Latest reported full regression Gate A is BLOCKED; current branch/CI must be audited before marking any work complete.  
 
-- [ ] ⬜ **P0-01** — Inventory branch/worktree, existing modules, dirty files and unpushed commits — `PLANNED`
+- [ ] 🟡 **P0-01** — Inventory branch/worktree, existing modules, dirty files and unpushed commits — `IN_PROGRESS`
 - [ ] ⬜ **P0-02** — Verify PostgreSQL backup, migrations, data counts, and source board coverage — `PLANNED`
-- [ ] ⬜ **P0-03** — Diagnose CI/full-suite Gate A without weakening tests — `PLANNED`
-- [ ] ⬜ **P0-04** — Capture accepted complete regression evidence and baseline commit SHA — `PLANNED`
-- [ ] ⬜ **P0-05** — Dashboard e2e sign-in regression: reproduce, root-cause, fix (6 failing tests in serialized run) — `PLANNED`
-- [ ] ⬜ **P0-06** — Browser-search e2e typing-sequence race: classify test vs product defect and fix without weakening — `PLANNED`
-- [ ] ⬜ **P0-07** — Run services/ai and services/ml pytest suites independently and record results — `PLANNED`
-- [ ] ⬜ **P0-08** — GitHub security baseline: secret/PII scan in CI, branch protection, PR/issue templates, CODEOWNERS — `PLANNED`
+- [ ] 🟡 **P0-03** — Diagnose CI/full-suite Gate A without weakening tests — `IN_PROGRESS`
+- [ ] 🟡 **P0-04** — Capture accepted complete regression evidence and baseline commit SHA — `IN_PROGRESS`
+- [ ] 🟡 **P0-05** — Dashboard e2e sign-in regression: reproduce, root-cause, fix (6 failing tests in serialized run) — `IN_PROGRESS`
+- [ ] 🟡 **P0-06** — Browser-search e2e typing-sequence race: classify test vs product defect and fix without weakening — `IN_PROGRESS`
+- [ ] 🟡 **P0-07** — Run services/ai and services/ml pytest suites independently and record results — `IN_PROGRESS`
+- [ ] 🟡 **P0-08** — GitHub security baseline: secret/PII scan in CI, branch protection, PR/issue templates, CODEOWNERS — `IN_PROGRESS`
 - [ ] ⬜ **P0-09** — Independent local setup and smoke run by QA on a second machine from docs/kt/LOCAL_SETUP.md — `PLANNED`
-- [ ] ⬜ **P0-10** — M0 collaboration baseline: governance, notebook, KT package, draft PR — `PLANNED`
+- [ ] 🟡 **P0-10** — M0 collaboration baseline: governance, notebook, KT package, draft PR — `IN_PROGRESS`
 
 ### P1 — Secure intake and parser [⬜ PLANNED]
 

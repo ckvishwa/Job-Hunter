@@ -66,3 +66,13 @@ Next single task: P#-## — ...
 ```text
 You are an implementing agent for Job Hunter. Before editing files, read docs/PRD.md, docs/AGENT_PROTOCOL.md, docs/PROGRESS_LEDGER.json, docs/PROGRESS.md and docs/DECISIONS.md. Run python scripts/sync_progress.py --check and --next. Verify live repository evidence; do not infer code exists because the PRD describes it. Pick the earliest feasible dependency-unblocked task, preserve existing working code and tests, and implement only that task. Update the ledger and regenerate the board as described. You may move a task to QA_REVIEW with genuine commit and test evidence; only independent QA marks VERIFIED. Do not mark a phase green yourself. Respect Gate A and human-only application submission. Finish with a complete handoff and one next task.
 ```
+
+## Test-running rules for coding agents (added 2026-10-14)
+Default to the smallest test that covers the change. Record why each heavy run is necessary.
+- Do **not** run `npm test` or the full headed Chrome suite after every edit. Prefer `npm run typecheck` plus `npm run test:changed` or the specific Vitest files; `npm run test:fast` for quick browser-free regression.
+- Python changes: run the relevant pytest module(s) in `services/ai` or `services/ml`.
+- Run headed E2E only for changes that affect browser behavior, and then only the affected `tests/e2e/offline/*` file(s).
+- Never run two heavy browser suites at once on one machine, and never start a second full suite while one is running.
+- Cached `test:changed` / `test:full` receipts are not fresh execution evidence; cite only commands that actually ran.
+- Exceptions that stay **complete and mandatory**: explicit Gate A verification (serialized full run), a PR marked Ready for review, pushes to `careerops-integration` or `main`, and any manually requested full regression. Never bypass required release validation to save resources.
+- Do not rerun the full suite hoping an intermittent failure disappears: diagnose the specific failure first, fix it, then rerun once and record the result.

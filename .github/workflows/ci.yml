@@ -187,13 +187,27 @@ jobs:
     needs: [static, test-fast, test-linux, test-windows, secret-scan, dependency-audit]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - name: Enforce fast-only draft versus full ready-for-review gate
         env:
-          DRAFT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
           CORE_RESULTS: ${{ format('{0} {1} {2} {3}', needs.static.result, needs['test-fast'].result, needs['secret-scan'].result, needs['dependency-audit'].result) }}
           HEADED_RESULTS: ${{ format('{0} {1}', needs['test-linux'].result, needs['test-windows'].result) }}
         run: |
+          # Fail closed: use the PR's CURRENT draft state, not the event payload. A re-run of an old draft-time run
+          # after the PR became ready would otherwise keep a stale "draft" flag and pass without headed Chrome.
+          DRAFT_PR=false
+          if [ "${EVENT_NAME}" = "pull_request" ]; then
+            DRAFT_PR=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq .draft) || { echo "CI gate FAILED: cannot read current PR draft state"; exit 1; }
+            case "${DRAFT_PR}" in true|false) ;; *) echo "CI gate FAILED: unexpected draft state '${DRAFT_PR}'"; exit 1;; esac
+          fi
+          echo "current PR draft state: ${DRAFT_PR}"
           echo "core checks: ${CORE_RESULTS}"
           echo "headed checks: ${HEADED_RESULTS}"
           for r in ${CORE_RESULTS}; do
@@ -201,7 +215,7 @@ jobs:
           done
           if [ "${DRAFT_PR}" = "true" ]; then
             for r in ${HEADED_RESULTS}; do
-              if [ "$r" != "skipped" ]; then echo "CI gate FAILED: unexpected headed job state on draft"; exit 1; fi
+              if [ "$r" != "skipped" ] && [ "$r" != "success" ]; then echo "CI gate FAILED: unexpected headed job state on draft"; exit 1; fi
             done
             echo "FAST-ONLY PASS (draft PR): headed Chrome was NOT run. This is NOT a full Gate A pass."
             echo "### Fast checks passed; headed E2E not run (draft PR)" >> "${GITHUB_STEP_SUMMARY}"

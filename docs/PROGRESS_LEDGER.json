@@ -67,15 +67,15 @@
         {
           "id": "P0-01",
           "name": "Inventory branch/worktree, existing modules, dirty files and unpushed commits",
-          "status": "PLANNED",
+          "status": "IN_PROGRESS",
           "evidence": {
-            "commit_sha": "",
-            "test_command": "",
-            "test_result": "",
-            "test_log_or_ci": "",
+            "commit_sha": "bfb21f8",
+            "test_command": "python scripts/sync_progress.py --check; git worktree list; git rev-list --left-right --count origin/main...careerops-integration",
+            "test_result": "PASS: ledger check OK; main is 118 commits behind careerops-integration (0 118); branch in sync with origin",
+            "test_log_or_ci": "docs/audit/REPOSITORY_INVENTORY.md",
             "qa_reviewer": "",
             "qa_signoff_at": "",
-            "notes": ""
+            "notes": "Inventory authored by the Technical Lead session; docs/audit/REPOSITORY_INVENTORY.md. Independent review by Hani456 pending (invitation not yet accepted). Deliverable complete and awaiting review; not moved to QA_REVIEW because the checker requires an exact PASS result and a doc inventory has no automated test."
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",
@@ -105,7 +105,7 @@
         {
           "id": "P0-03",
           "name": "Diagnose CI/full-suite Gate A without weakening tests",
-          "status": "PLANNED",
+          "status": "IN_PROGRESS",
           "evidence": {
             "commit_sha": "",
             "test_command": "",
@@ -113,18 +113,18 @@
             "test_log_or_ci": "",
             "qa_reviewer": "",
             "qa_signoff_at": "",
-            "notes": ""
+            "notes": "Serialized Gate A runs 1-4 recorded in docs/qa/GATE_A_REPORT.md. Run 4 (ae5cf95): 1636 pass / 1 fail (s1-ui e2e). No run is clean yet. No test weakened."
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",
           "github_issue": 4,
-          "branch": null,
-          "pull_request": null
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 1
         },
         {
           "id": "P0-04",
           "name": "Capture accepted complete regression evidence and baseline commit SHA",
-          "status": "PLANNED",
+          "status": "IN_PROGRESS",
           "evidence": {
             "commit_sha": "",
             "test_command": "",
@@ -132,18 +132,18 @@
             "test_log_or_ci": "",
             "qa_reviewer": "",
             "qa_signoff_at": "",
-            "notes": ""
+            "notes": "Needs two consecutive clean serialized runs on an identical code state plus independent reproduction; none yet."
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",
           "github_issue": 5,
-          "branch": null,
-          "pull_request": null
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 1
         },
         {
           "id": "P0-05",
           "name": "Dashboard e2e sign-in regression: reproduce, root-cause, fix (6 failing tests in serialized run)",
-          "status": "PLANNED",
+          "status": "IN_PROGRESS",
           "evidence": {
             "commit_sha": "",
             "test_command": "",
@@ -151,37 +151,37 @@
             "test_log_or_ci": "",
             "qa_reviewer": "",
             "qa_signoff_at": "",
-            "notes": ""
+            "notes": "Dashboard e2e: 6 failures in run 1 only; 8/8 alone and in runs 2-4. Root cause unproven (suspected resource contention; host had ~5 GB of 31.7 GB free after run 4). Open until reproduced or explained."
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",
           "github_issue": 6,
-          "branch": null,
-          "pull_request": null
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 1
         },
         {
           "id": "P0-06",
           "name": "Browser-search e2e typing-sequence race: classify test vs product defect and fix without weakening",
-          "status": "PLANNED",
+          "status": "IN_PROGRESS",
           "evidence": {
-            "commit_sha": "",
+            "commit_sha": "ae5cf95",
             "test_command": "",
             "test_result": "",
             "test_log_or_ci": "",
             "qa_reviewer": "",
             "qa_signoff_at": "",
-            "notes": ""
+            "notes": "Browser-search render-sequence loss in runs 1 and 3; fixture now chains telemetry sends with retry (ae5cf95); passed in run 4 and alone x3. One passing full run is not proof; needs repeat and independent review."
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",
           "github_issue": 7,
-          "branch": null,
-          "pull_request": null
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 1
         },
         {
           "id": "P0-07",
           "name": "Run services/ai and services/ml pytest suites independently and record results",
-          "status": "PLANNED",
+          "status": "IN_PROGRESS",
           "evidence": {
             "commit_sha": "",
             "test_command": "",
@@ -189,18 +189,18 @@
             "test_log_or_ci": "",
             "qa_reviewer": "",
             "qa_signoff_at": "",
-            "notes": ""
+            "notes": "pytest run by the Technical Lead session: services/ai 61 passed; services/ml 4 passed. Independent rerun by Hani456 pending."
           },
           "owner_role": "HANI",
           "reviewer_role": "DEVELOPER",
           "github_issue": 8,
-          "branch": null,
-          "pull_request": null
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 1
         },
         {
           "id": "P0-08",
           "name": "GitHub security baseline: secret/PII scan in CI, branch protection, PR/issue templates, CODEOWNERS",
-          "status": "PLANNED",
+          "status": "IN_PROGRESS",
           "evidence": {
             "commit_sha": "",
             "test_command": "",
@@ -208,13 +208,13 @@
             "test_log_or_ci": "",
             "qa_reviewer": "",
             "qa_signoff_at": "",
-            "notes": ""
+            "notes": "main protected (PR + CI gate + 1 review, no force push); careerops-integration blocks force push/deletion; secret scanning enabled; gitleaks job in CI; CI fix for web deps; tiered CI via PR #12 merged into the M0 branch with a fail-closed draft lookup. Required-check behaviour on GitHub still to be proven (draft/manual/ready tests)."
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",
           "github_issue": 9,
           "branch": "chore/m0-collaboration-baseline",
-          "pull_request": 1
+          "pull_request": 12
         },
         {
           "id": "P0-09",
@@ -238,7 +238,7 @@
         {
           "id": "P0-10",
           "name": "M0 collaboration baseline: governance, notebook, KT package, draft PR",
-          "status": "PLANNED",
+          "status": "IN_PROGRESS",
           "evidence": {
             "commit_sha": "",
             "test_command": "",
@@ -246,7 +246,7 @@
             "test_log_or_ci": "",
             "qa_reviewer": "",
             "qa_signoff_at": "",
-            "notes": ""
+            "notes": "PR #1 open as draft with all documents; not mergeable until Gate A and independent review."
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",

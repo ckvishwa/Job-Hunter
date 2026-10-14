@@ -29,4 +29,10 @@ describe("tiered CI static contract", () => {
     expect(workflow).toContain('if [ "$r" != "success" ]; then echo "CI gate FAILED: required full headed test job did not succeed"');
     expect(workflow).toContain("FAST-ONLY PASS (draft PR)");
   });
+  it("fails closed: the gate reads the PR's current draft state, not the stale event payload", () => {
+    expect(workflow).toContain('gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq .draft');
+    expect(workflow).toContain("pull-requests: read");
+    expect(workflow).toContain("cannot read current PR draft state");
+    expect(workflow).not.toContain("DRAFT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}");
+  });
 });
