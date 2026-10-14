@@ -7,6 +7,7 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     branches: [careerops-integration, main]
   push:
     branches: [careerops-integration, main]
@@ -53,8 +54,34 @@ jobs:
       - name: Tests do not read private candidate data (static)
         run: npm run ci:isolation -- static
 
+
+  # Fast browser-free feedback for drafts and ready pull requests.
+  test-fast:
+    name: Fast tests (browser-free)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (clean, no credentials persisted)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Setup Node.js (version pinned in .nvmrc)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check isolation before tests
+        run: npm run ci:isolation -- before
+      - name: Run deterministic tests without launching Chrome
+        run: npm run test:fast
+      - name: Check checkout remains clean
+        run: npm run ci:isolation -- after
+
   test-linux:
     name: Full tests (Linux, headed Chrome under Xvfb)
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -84,6 +111,7 @@ jobs:
 
   test-windows:
     name: Full tests (Windows, headed Chrome)
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -156,16 +184,31 @@ jobs:
   ci-gate:
     name: CI gate
     if: always()
-    needs: [static, test-linux, test-windows, secret-scan, dependency-audit]
+    needs: [static, test-fast, test-linux, test-windows, secret-scan, dependency-audit]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Every required job must have succeeded (a skipped or cancelled job is a failure)
+      - name: Enforce fast-only draft versus full ready-for-review gate
         env:
-          RESULTS: ${{ join(needs.*.result, ' ') }}
+          DRAFT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
+          CORE_RESULTS: ${{ format('{0} {1} {2} {3}', needs.static.result, needs['test-fast'].result, needs['secret-scan'].result, needs['dependency-audit'].result) }}
+          HEADED_RESULTS: ${{ format('{0} {1}', needs['test-linux'].result, needs['test-windows'].result) }}
         run: |
-          echo "job results: ${RESULTS}"
-          for r in ${RESULTS}; do
-            if [ "$r" != "success" ]; then echo "CI gate FAILED: a required job did not succeed"; exit 1; fi
+          echo "core checks: ${CORE_RESULTS}"
+          echo "headed checks: ${HEADED_RESULTS}"
+          for r in ${CORE_RESULTS}; do
+            if [ "$r" != "success" ]; then echo "CI gate FAILED: required fast/security job was not successful"; exit 1; fi
           done
-          echo "CI gate passed"
+          if [ "${DRAFT_PR}" = "true" ]; then
+            for r in ${HEADED_RESULTS}; do
+              if [ "$r" != "skipped" ]; then echo "CI gate FAILED: unexpected headed job state on draft"; exit 1; fi
+            done
+            echo "FAST-ONLY PASS (draft PR): headed Chrome was NOT run. This is NOT a full Gate A pass."
+            echo "### Fast checks passed; headed E2E not run (draft PR)" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            for r in ${HEADED_RESULTS}; do
+              if [ "$r" != "success" ]; then echo "CI gate FAILED: required full headed test job did not succeed"; exit 1; fi
+            done
+            echo "FULL CI gate passed (both headed platforms + fast/security checks)"
+            echo "### Full CI checks passed, including Linux and Windows headed Chrome" >> "${GITHUB_STEP_SUMMARY}"
+          fi

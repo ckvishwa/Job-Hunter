@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:fast": "vitest run tests/ci tests/config tests/dedup tests/domain tests/decision tests/roles tests/ml/pure.test.ts",
     "test:changed": "tsx src/testing/cli.ts changed",
     "test:failed": "tsx src/testing/cli.ts failed",
     "test:resume": "tsx src/testing/cli.ts resume",
