@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { classifyDocument } from "../../src/candidate/document-type.js";
@@ -98,20 +98,19 @@ describe("document classification", () => {
 });
 
 // Local-only check on the founder's real reference documents. They are private (git-ignored) and may be absent: skipped then.
+// File names are personal, so they live in the git-ignored manifest private-runtime/reference-docs/manifest.json:
+// [{ "file": "resumes/<name>.pdf", "expected": "RESUME" | "INTERVIEW_GUIDE" | "UNKNOWN" }].
 // Expected classes are the reviewer's reading of each document's own headings, not produced by the classifier.
 const REF = path.resolve("private-runtime", "reference-docs");
-const real: Array<[string, "RESUME" | "INTERVIEW_GUIDE" | "UNKNOWN"]> = [
-  ["resumes/reference_resume_a.pdf", "RESUME"],
-  ["resumes/reference_resume_b.pdf", "RESUME"],
-  ["resumes/reference_resume_c.pdf", "RESUME"],
-  ["interview-guides/ProdOps Engineer IC3_Initial and Full Loop.pdf", "INTERVIEW_GUIDE"],
-  ["prompts/Prompts.pdf", "UNKNOWN"],
-];
-describe.skipIf(!existsSync(REF))("document classification on the real reference PDFs (local only)", () => {
-  for (const [file, expected] of real) {
-    it(`${path.basename(file)} -> ${expected}`, async () => {
+const MANIFEST = path.join(REF, "manifest.json");
+const real: Array<{ file: string; expected: "RESUME" | "INTERVIEW_GUIDE" | "UNKNOWN" }> = existsSync(MANIFEST)
+  ? JSON.parse(readFileSync(MANIFEST, "utf8"))
+  : [];
+describe.skipIf(real.length === 0)("document classification on the real reference PDFs (local only)", () => {
+  real.forEach(({ file, expected }, i) => {
+    it(`reference document ${i + 1} -> ${expected}`, async () => {
       const { text } = await extractPdfText(path.join(REF, file));
       expect(classifyDocument(text).type).toBe(expected);
     }, 30_000);
-  }
+  });
 });
