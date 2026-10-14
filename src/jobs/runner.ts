@@ -3,10 +3,10 @@ import path from "node:path";
 import type { JobPosting } from "../adapters/types.js";
 import { buildJobFailure, evaluatePersistable, stampResolution, type JobFailureCode } from "../domain/canonical-job.js";
 import {
-  BoardError, boardApiUrl, fetchBoardPostings, loadBoardList, registryEntryFor, titleMatches, toPosting, type BoardCompany,
+  BoardError, boardApiUrl, fetchBoardPostings, loadBoardList, registryEntryFor, toPosting, type BoardCompany,
 } from "../pipeline/discovery/board-discoverer.js";
 import type { BoardRef, Counters, FailureInput, JobsRepo, PersistItem } from "../db/jobs-repo.js";
-import { bandStatus, excludedBySeniority, matchLocation, matchRoles, senioritySignal, statedYears, type DiscoveryPlan } from "./planner.js";
+import { bandStatus, screenPosting, senioritySignal, statedYears, type DiscoveryPlan } from "./planner.js";
 
 // S3 runner: drives the EXISTING official Greenhouse/Lever board reader (fetchBoardPostings), the EXISTING official-employer and
 // JD verification (stampResolution + evaluatePersistable) and stores the result in PostgreSQL. It never opens an application form,
@@ -162,26 +162,23 @@ export class DiscoveryRunner {
       const nowIso = this.now().toISOString();
       const registryEntry = registryEntryFor(company);
       const exclude = config?.excludeTitleKeywords ?? [];
-      const candidates: Array<{ p: (typeof postings)[number]; roles: ReturnType<typeof matchRoles>; signal: ReturnType<typeof senioritySignal>; location: Exclude<ReturnType<typeof matchLocation>, "NO_MATCH"> }> = [];
+      const candidates: Array<{ p: (typeof postings)[number]; roleSlugs: string[]; phrases: string[]; signal: ReturnType<typeof senioritySignal>; location: "MATCH" | "UNKNOWN" | "UNSPECIFIED" }> = [];
       for (const p of postings) {
-        if (exclude.length > 0 && titleMatches(p.title, exclude).length > 0) continue;
-        const roles = matchRoles(p.title, plan);
-        if (roles.roleSlugs.length === 0) continue; // not a selected role: never stored, never shown
-        counters.titleMatched += 1;
-        const sig = senioritySignal(p.title);
-        if (excludedBySeniority(sig, plan)) {
+        const screen = screenPosting({ title: p.title, description: p.descriptionText, location: p.location, excludeTitleKeywords: exclude, plan });
+        if (screen.gate === "EXCLUDED_KEYWORD" || screen.gate === "NO_ROLE") continue;
+        if (screen.basis === "title") counters.titleMatched += 1;
+        if (screen.gate === "SENIORITY") {
           counters.seniorityExcluded += 1;
           continue;
         }
-        const location = matchLocation(p.location, plan);
-        if (location === "NO_MATCH") {
+        if (screen.gate === "LOCATION") {
           counters.locationExcluded += 1;
           continue;
         }
-        candidates.push({ p, roles, signal: sig, location });
+        candidates.push({ p, roleSlugs: screen.roleSlugs, phrases: screen.phrases, signal: senioritySignal(p.title), location: screen.location });
       }
-      for (const { p, roles, signal: sig, location } of candidates.slice(0, Math.min(limits.maxMatchedPerBoard, budget))) {
-        const stamped: JobPosting = stampResolution(toPosting(company, p, roles.phrases, [], "", nowIso), {
+      for (const { p, roleSlugs, phrases, signal: sig, location } of candidates.slice(0, Math.min(limits.maxMatchedPerBoard, budget))) {
+        const stamped: JobPosting = stampResolution(toPosting(company, p, phrases, [], "", nowIso), {
           sourceKind: "board-api", observedUrl: boardApiUrl(company), observedAt: nowIso, finalUrl: p.url, extractionMethod: "ats-api",
           discoveredCompany: company.company, registryEntry, apiJobId: p.externalId,
           confirmedGreenhouseJobId: company.ats === "greenhouse" ? p.externalId : null, now: nowIso,
@@ -208,7 +205,7 @@ export class DiscoveryRunner {
           observation: {
             observedUrl: boardApiUrl(company), finalUrl: p.url, sourceKind: "board-api", extractionMethod: "ats-api",
             verification: { method: "official-board-api", board: `${company.ats}:${company.board}`, employer: company.company, employerMatchedBoard: true, atsIdentity: posting.atsIdentity, jdGate: "passed" },
-            matchedRoles: roles.roleSlugs, matchedPhrases: roles.phrases, locationStatus: location, bandStatus: bandStatus(years.years, plan.searchBand),
+            matchedRoles: roleSlugs, matchedPhrases: phrases, locationStatus: location, bandStatus: bandStatus(years.years, plan.searchBand),
             statedYears: years.years, yearsQuote: years.quote, senioritySignal: sig, observedAt: nowIso,
           },
         });

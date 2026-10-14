@@ -1,12 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
-  PlanError, bandStatus, buildPlan, excludedBySeniority, matchLocation, matchRoles, senioritySignal, statedYears, type CatalogRoleLike, type SelectionLike,
+  PlanError, bandStatus, buildPlan, excludedBySeniority, matchLocation, matchRoles, screenPosting, senioritySignal, statedYears, type CatalogRoleLike, type SelectionLike,
 } from "../../src/jobs/planner.js";
 
 const catalog: CatalogRoleLike[] = [
   { roleSlug: "soc-analyst", title: "SOC Analyst", aliases: ["Security Operations Center Analyst", "Cybersecurity Analyst", "Tier 1 SOC Analyst"], active: true },
   { roleSlug: "incident-response-analyst", title: "Incident Response Analyst", aliases: ["Incident Responder"], active: true },
   { roleSlug: "sdet", title: "SDET", aliases: ["Test Automation Engineer"], active: true },
+  {
+    roleSlug: "iam-analyst", title: "IAM Analyst", aliases: ["Identity Analyst"], active: true,
+    evidence: {
+      minCoreMatches: 2,
+      requirements: [
+        { id: "platforms", importance: "core", terms: ["okta", "active directory"] },
+        { id: "lifecycle", importance: "core", terms: ["access review", "mfa"] },
+        { id: "audit", importance: "supporting", terms: ["sox"] },
+      ],
+    },
+  },
   { roleSlug: "retired-role", title: "Retired Role", aliases: [], active: false },
 ];
 
@@ -97,5 +108,55 @@ describe("S3 planner: location, seniority and band are filters for what to LOOK 
     expect(bandStatus(7, p.searchBand)).toBe("OUTSIDE");
     expect(statedYears("We want 3+ years of experience in security operations.").years).toBe(3);
     expect(statedYears("A friendly team that likes tea.")).toEqual({ years: null, quote: null });
+  });
+});
+
+describe("S3 planner: description evidence admits only the selected role", () => {
+  const iam = () => plan({ roleSlugs: ["iam-analyst"], targetFamilies: ["identity-access"], seniorityLevels: ["entry"] });
+  const jd = "Administer Okta and Active Directory. Run an access review and enforce MFA for joiners.";
+
+  it("a different title is admitted when two core groups of the selected role appear in the description", () => {
+    const screen = screenPosting({ title: "IT Analyst", description: jd, location: "Remote - US", plan: iam() });
+    expect(screen).toMatchObject({ gate: "ADMIT", basis: "description", roleSlugs: ["iam-analyst"], evidenceGroups: ["lifecycle", "platforms"] });
+  });
+
+  it("one core group is not enough, and an unselected role's vocabulary does not admit the posting", () => {
+    expect(screenPosting({ title: "IT Analyst", description: "We use Okta for SSO.", location: "Austin, TX", plan: iam() }).gate).toBe("NO_ROLE");
+    const socOnly = plan();
+    expect(screenPosting({ title: "IT Analyst", description: jd, location: "Austin, TX", plan: socOnly }).gate).toBe("NO_ROLE");
+  });
+
+  it("a senior title is not admitted from keywords when senior was not selected", () => {
+    const screen = screenPosting({ title: "Senior IT Analyst", description: jd, location: "United States", plan: iam() });
+    expect(screen).toMatchObject({ gate: "SENIORITY", basis: "description" });
+  });
+
+  it("a product-manager title is not admitted from identity keywords", () => {
+    expect(screenPosting({ title: "Product Manager, Identity", description: jd, location: "Remote", plan: iam() }).gate).toBe("NO_ROLE");
+  });
+
+  it("an exact selected title still uses the title path and still honors location", () => {
+    expect(screenPosting({ title: "Identity Analyst", description: "Unrelated text.", location: "London, UK", plan: iam() })).toMatchObject({ gate: "LOCATION", basis: "title" });
+    expect(screenPosting({ title: "Identity Analyst", description: "Unrelated text.", location: "Austin, TX", plan: iam() })).toMatchObject({ gate: "ADMIT", basis: "title", phrases: ["identity analyst"] });
+  });
+
+  it("the board exclude list is counted before role matching", () => {
+    expect(screenPosting({ title: "Senior Identity Analyst", description: jd, location: "Austin, TX", excludeTitleKeywords: ["Senior"], plan: iam() })).toMatchObject({ gate: "EXCLUDED_KEYWORD", terms: ["Senior"] });
+  });
+
+  it("generic protocol words alone do not admit an unrelated title", () => {
+    const generic = "Help developers configure SSO, OAuth, SAML and MFA.";
+    expect(screenPosting({ title: "Developer Success Engineer", description: generic, location: "Austin, TX", plan: iam() }).gate).toBe("NO_ROLE");
+    expect(screenPosting({ title: "IT Support Specialist", description: "Reset Okta passwords and enroll MFA devices.", location: "Remote - US", plan: iam() }).gate).toBe("NO_ROLE");
+  });
+
+  it("a title that names the selected role can be admitted from one specific evidence group", () => {
+    const screen = screenPosting({
+      title: "IAM Security Engineer",
+      description: "Run an access review for joiners. Federation uses SAML and OAuth.",
+      location: "Remote - US",
+      plan: iam(),
+    });
+    expect(screen).toMatchObject({ gate: "ADMIT", basis: "description", roleSlugs: ["iam-analyst"] });
   });
 });
