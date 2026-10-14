@@ -90,8 +90,17 @@ function render(q) {
   });
   document.getElementById("empty").hidden = list.length !== 0;
   history.replaceState(null, "", q ? "?query=" + encodeURIComponent(q) : location.pathname);
-  fetch("/__render", { method: "POST", body: JSON.stringify({ query: q, count: list.length }) });
+  report({ query: q, count: list.length });
 }
+// Render telemetry for the test server. Sent strictly in order through one chain and retried on a failed request, so a
+// stalled loopback connection cannot silently drop one keystroke's record (the page itself still re-rendered for it).
+var chain = Promise.resolve();
+function send(payload, attempt) {
+  return fetch("/__render", { method: "POST", body: JSON.stringify(payload) }).catch(function () {
+    if (attempt < 3) return send(payload, attempt + 1);
+  });
+}
+function report(payload) { chain = chain.then(function () { return send(payload, 0); }); }
 var box = document.getElementById("q");
 if (box) { box.addEventListener("input", function () { render(box.value); }); }
 render("");
