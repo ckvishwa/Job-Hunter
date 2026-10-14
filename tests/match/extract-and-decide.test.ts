@@ -27,6 +27,17 @@ describe("deterministic JD extraction (AI off baseline)", () => {
     expect(structured.providerRevision).toMatch(/^rules-jd-extractor@1/);
   });
 
+  it("an oversized source item still validates, and its quote is an exact slice no longer than 2000 characters", async () => {
+    const blob = ["Required Qualifications", "- " + `${"Experience with Splunk and daily alert triage. ".repeat(80)}`].join("\n");
+    const { job, structured } = await analyze(blob);
+    expect(blob.length).toBeGreaterThan(2000);
+    expect(structured.requirements.some((r) => r.value === "Splunk")).toBe(true);
+    for (const r of structured.requirements) for (const e of r.evidence) {
+      expect(e.quote.length).toBeLessThanOrEqual(2000);
+      expect(job.descriptionText.slice(e.start, e.end)).toBe(e.quote);
+    }
+  });
+
   it("takes required vs preferred from the section the item sits in", async () => {
     const { analysis } = await analyze(SYNTHETIC_JD);
     const by = (v: string) => analysis.requirements.find((r) => r.value === v)!;
@@ -148,6 +159,17 @@ describe("requirement decisions", () => {
     expect(status(res, "SIEM").support[0]).toMatchObject({ basis: "category-member", strength: "mention", quote: "Splunk", resumeId: "res-1" });
     expect(status(res, "EDR").status).toBe("UNSUPPORTED");
     expect(res.decisions.every((d) => d.explanation.length > 0)).toBe(true);
+  });
+
+  it("a generic infrastructure mention such as DNS stays PARTIAL until use is shown", async () => {
+    const jd = QUAL(["Familiarity with DNS."]);
+    const mention = await decide(jd, corpusOf([fact({ factId: "f-dns", kind: "skill", value: "DNS" })]));
+    expect(status(mention, "DNS")).toMatchObject({ status: "PARTIAL" });
+    const shown = await decide(jd, corpusOf([
+      fact({ factId: "f-dns", kind: "skill", value: "DNS" }),
+      fact({ factId: "f-p", kind: "project", value: "Resolver", attributes: { technologies: ["DNS"] } }),
+    ]));
+    expect(status(shown, "DNS")).toMatchObject({ status: "SUPPORTED" });
   });
 
   it("hands-on wording is only PARTIAL on a skills-list mention, and SUPPORTED once a project demonstrates it", async () => {

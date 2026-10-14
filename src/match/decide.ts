@@ -206,6 +206,11 @@ export function decideRequirements(input: DecideInput): { decisions: Requirement
       done("PARTIAL", `${term.canonical} appears only as a skills-list mention; the wording asks for hands-on experience and no approved project, statement or certification shows use.`, { support, missingEvidence: [`Approved project, employment or certification showing use of ${term.canonical}`] });
       continue;
     }
+    const ubiquitous = new Set(["dns", "tcp/ip", "operating systems", "network protocols"]);
+    if (!demonstrated && ubiquitous.has(term.canonical.toLowerCase())) {
+      done("PARTIAL", `${term.canonical} is a generic infrastructure term. A skills-list mention does not establish it; an approved project, employment statement, or certification must show use.`, { support, missingEvidence: [`Approved project, employment or certification showing use of ${term.canonical}`] });
+      continue;
+    }
     done("SUPPORTED", `Approved fact(s) state ${term.canonical}${support.some((s) => s.basis === "category-member") ? " (a tool of that kind)" : ""}${demonstrated ? ", including demonstrated use" : " at the level of familiarity the wording asks for"}.`, { support });
   }
 

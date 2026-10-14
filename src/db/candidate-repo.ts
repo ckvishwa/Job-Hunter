@@ -413,4 +413,20 @@ export class CandidateRepo {
       [userId, next, digestOfProfile(profile), rows.filter((r) => r.approval_status === "approved").length, reason.slice(0, 200)],
     );
   }
+
+  /**
+   * Read-only review history for the parser-feedback dataset (src/ml/fact-feedback.ts). Limited to facts from résumés the owner AUTHORIZED as personal
+   * evidence. Returns facts and their revision snapshots; it never writes and is not a scoring read.
+   */
+  async reviewHistoryForFeedback(): Promise<{ facts: Array<Record<string, any>>; revisions: Array<{ fact_pk: string; revision: number; action: string; snapshot: any }> }> {
+    const facts = (await this.pool.query(
+      `SELECT f.id AS pk, f.fact_id, f.kind, f.value, f.approval_status, f.sensitivity, f.attributes, f.span, f.notes, v.parser_revision, v.resume_id
+         FROM candidate_facts f
+         JOIN resume_versions v ON v.id = f.resume_version_id
+         JOIN profile_sources ps ON ps.resume_id = v.resume_id AND ps.provenance = 'personal' AND ps.authorized
+        WHERE f.resume_version_id IS NOT NULL`,
+    )).rows as Array<Record<string, any>>;
+    const revisions = (await this.pool.query(`SELECT fact_pk, revision, action, snapshot FROM fact_revisions ORDER BY fact_pk, revision`)).rows as Array<{ fact_pk: string; revision: number; action: string; snapshot: any }>;
+    return { facts, revisions };
+  }
 }

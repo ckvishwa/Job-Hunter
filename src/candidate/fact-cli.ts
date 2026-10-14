@@ -4,7 +4,7 @@ import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import { CandidateRepo } from "../db/candidate-repo.js";
 import { RolesRepo } from "../db/roles-repo.js";
-import { DEFAULT_ENV_FILE, createPool, loadEnvFile, pgSettingsFromEnv } from "../db/pool.js";
+import { DEFAULT_ENV_FILE, createPool, loadEnvFile, pgSettingsFromEnv, retryConnect } from "../db/pool.js";
 import { collectEmploymentConflicts } from "./fact-context.js";
 import { assertConfirmed, planCorrection, toEditInput, type ConfirmedField } from "./fact-correct.js";
 import { applyPlan, planApply, type Plan } from "./fact-review-apply.js";
@@ -73,8 +73,9 @@ async function main(): Promise<number> {
   if (!["list", "export", "review", "apply", "correct"].includes(command ?? "")) {
     fail("usage: facts:list | facts:export --resume <id> | facts:review --resume <id> | facts:apply --file <review.json> [--dry-run] | facts:correct --resume <id> --fact <factId> [--employer ..] [--title ..] [--start YYYY-MM] [--end YYYY-MM|current] [--category professional|internship|academic|volunteer|none] [--value ..] --reason ..");
   }
-  const pool = createPool(pgSettingsFromEnv(), { max: 2, connectTimeoutMs: 15_000 });
+  const pool = createPool(pgSettingsFromEnv(), { max: 2, connectTimeoutMs: 30_000 });
   try {
+    await retryConnect(() => pool.query("SELECT 1"));
     const repo = new CandidateRepo(pool);
     const user = await repo.findUser(handle);
     if (!user) return fail(`No user "${handle}" in the database.`);

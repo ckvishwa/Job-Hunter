@@ -46,7 +46,29 @@ export function pgSettingsFromEnv(env: Env = process.env, databaseOverride?: str
 
 export function createPool(settings: PgSettings, options: { max?: number; connectTimeoutMs?: number; idleTimeoutMs?: number } = {}): pg.Pool {
   const pool = new pg.Pool({ ...settings, max: options.max ?? 8, connectionTimeoutMillis: options.connectTimeoutMs ?? 5000, idleTimeoutMillis: options.idleTimeoutMs ?? 10_000 });
-  // An idle-client error must not crash the process; the next query surfaces a real failure.
+  // pg-pool in this install does not listen on the client. A Windows loopback ECONNRESET is then an
+  // unhandled 'error' on the Client and kills the process, leaving a discovery run RUNNING. The query
+  // still rejects; this only keeps the process alive so the caller can record the failure.
+  pool.on("connect", (client) => {
+    client.on("error", (error) => {
+      pool.emit("error", error, client);
+    });
+  });
   pool.on("error", () => undefined);
   return pool;
+}
+
+/** Windows loopback sometimes fails the first PostgreSQL connect (docs/KNOWN_FLAKES.md). Retry only that failure. */
+export const CONNECT_FAILURE = /ETIMEDOUT|ECONNRESET|ECONNREFUSED|Connection terminated/;
+
+export async function retryConnect<T>(run: () => Promise<T>, attempts = 4): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      const message = error instanceof Error ? `${error.message} ${(error as { code?: string }).code ?? ""}` : String(error);
+      if (attempt >= attempts - 1 || !CONNECT_FAILURE.test(message)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 750 * (attempt + 1)));
+    }
+  }
 }

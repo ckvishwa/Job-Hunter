@@ -1,5 +1,7 @@
 # Continuous integration (SDLC-T01)
 
+> **Updated CI tiers (Oct 2026):** draft PRs now run fast checks only. A Ready-for-review PR or explicit full run runs Linux and Windows headed E2E. A draft's passing `CI gate` is **NOT a full Gate A pass**. See [CI-TIERS.md](CI-TIERS.md). The old full-on-every-PR description below is historical context.
+
 **Status:** implemented and verified **locally**; **UNVERIFIED on GitHub** (no push, no workflow run, no branch protection has been authorized or performed). Policy context: `docs/AGENT-OPERATING-SYSTEM.md` §5, backlog ticket `SDLC-T01` in `docs/audit/2026-10-09-backlog.md`.
 **Scope:** CI only. Nothing here deploys, publishes, releases, uploads artifacts or contacts an employer. It does not change any V1–V5 application-safety gate or the DRAFT status of the PRD, and it is not UAT.
 

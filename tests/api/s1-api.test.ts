@@ -183,6 +183,8 @@ suite("S1 API (PostgreSQL)", () => {
       const calls = ai.calls;
       const results = await Promise.all(Array.from({ length: 6 }, () => upload(h, s, docxBytes("concurrent-case"))));
       await h.queue.idle();
+      // Report transport/server errors as such: a failed request has no resumeId and would otherwise look like a second resume.
+      expect(results.map((r) => r.statusCode)).toEqual(Array(6).fill(202));
       expect(new Set(results.map((r) => r.json().resumeId)).size).toBe(1);
       expect(results.filter((r) => r.json().duplicate === false)).toHaveLength(1);
       expect(ai.calls - calls).toBe(1);

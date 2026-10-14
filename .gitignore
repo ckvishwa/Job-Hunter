@@ -50,3 +50,9 @@ web/.build-lock/
 
 # S3: the owner's own list of official employer boards (see config/company-boards.example.json)
 config/company-boards.json
+
+# ML build output / private reference imagery
+services/ml/__pycache__/
+**/__pycache__/
+*.pyc
+docs/evidence/orbital-screens/
