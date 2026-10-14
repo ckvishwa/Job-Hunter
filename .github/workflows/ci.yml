@@ -69,6 +69,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Install web (Astro) dependencies; tests/web and the UI e2e import web/ (Astro tsconfig)
+        run: npm ci --prefix web
       - name: Checkout holds no private data
         run: npm run ci:isolation -- before
       - name: Install browsers (Playwright-pinned Chromium and Google Chrome for the headed channel) and Xvfb
@@ -96,6 +98,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Install web (Astro) dependencies; tests/web and the UI e2e import web/ (Astro tsconfig)
+        run: npm ci --prefix web
       - name: Checkout holds no private data
         run: npm run ci:isolation -- before
       - name: Install browsers (Playwright-pinned Chromium and Google Chrome for the headed channel)
