@@ -79,9 +79,9 @@
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",
-          "github_issue": null,
-          "branch": null,
-          "pull_request": null
+          "github_issue": 2,
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 1
         },
         {
           "id": "P0-02",
@@ -98,7 +98,7 @@
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",
-          "github_issue": null,
+          "github_issue": 3,
           "branch": null,
           "pull_request": null
         },
@@ -117,7 +117,7 @@
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",
-          "github_issue": null,
+          "github_issue": 4,
           "branch": null,
           "pull_request": null
         },
@@ -136,7 +136,7 @@
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",
-          "github_issue": null,
+          "github_issue": 5,
           "branch": null,
           "pull_request": null
         },
@@ -155,7 +155,7 @@
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",
-          "github_issue": null,
+          "github_issue": 6,
           "branch": null,
           "pull_request": null
         },
@@ -174,7 +174,7 @@
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",
-          "github_issue": null,
+          "github_issue": 7,
           "branch": null,
           "pull_request": null
         },
@@ -193,7 +193,7 @@
           },
           "owner_role": "HANI",
           "reviewer_role": "DEVELOPER",
-          "github_issue": null,
+          "github_issue": 8,
           "branch": null,
           "pull_request": null
         },
@@ -212,9 +212,9 @@
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",
-          "github_issue": null,
-          "branch": null,
-          "pull_request": null
+          "github_issue": 9,
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 1
         },
         {
           "id": "P0-09",
@@ -231,7 +231,7 @@
           },
           "owner_role": "HANI",
           "reviewer_role": "DEVELOPER",
-          "github_issue": null,
+          "github_issue": 10,
           "branch": null,
           "pull_request": null
         },
@@ -250,9 +250,9 @@
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",
-          "github_issue": null,
-          "branch": null,
-          "pull_request": null
+          "github_issue": 11,
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 1
         }
       ]
     },
@@ -1218,11 +1218,11 @@
   ],
   "collaboration": {
     "roles": {
-      "DEVELOPER": "Technical lead: architecture, backend, frontend, DB, Python/ML, resume pipeline, Playwright",
-      "HANI": "QA automation and independent ML evaluation; github_username pending (not provided)",
-      "PRODUCT_OWNER": "Scope/ADR decisions and release approval"
+      "DEVELOPER": "ckvishwa: Technical Lead, Principal Developer, AI/ML Architect and Mentor. Owns architecture, technology decisions, AI/ML model development, full-stack implementation, delegation, integration, production model promotion.",
+      "HANI": "Senior AI/ML & SDET Intern reporting to the Technical Lead. Shadows AI/ML, writes automated tests and ML evaluation code, reports defects, independently verifies the Technical Lead's work, contributes supporting code under mentorship. No architecture or production-promotion authority unless explicitly delegated. github_username pending (not provided).",
+      "PRODUCT_OWNER": "Same person as the Technical Lead; scope/ADR decisions and release approval. Never substitutes for QA evidence."
     },
-    "rule": "owner_role may not be the sole approver; reviewer_role performs QA_REVIEW -> VERIFIED",
+    "rule": "owner_role may not be the sole approver; reviewer_role performs QA_REVIEW -> VERIFIED only with commit-specific, actually-run test evidence",
     "milestones": {
       "M0": [
         "P0-01",
@@ -1259,6 +1259,7 @@
         "P10"
       ]
     },
-    "note": "M0 (collaboration-ready baseline) may complete with Gate A red; M1 requires Gate A green."
+    "note": "M0 (collaboration-ready baseline) may complete with Gate A red; M1 requires Gate A green.",
+    "role_change_2026-10-14": "Final reporting structure (ADR-0001 amendment A2) supersedes A1: ML models are built by the Technical Lead; Hani owns test/evaluation-code tasks and independent verification."
   }
 }

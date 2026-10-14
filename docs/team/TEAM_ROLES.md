@@ -1,14 +1,20 @@
-# Team roles
+# Team roles and reporting structure (final, 2026-10-14)
 
-Two people. Both write code and tests; **the author of a change is never its only approver.**
+Two people. Hani reports to the Technical Lead.
 
-| Role | Person | Owns |
+| Role | Person | Responsibilities |
 |---|---|---|
-| DEVELOPER (technical lead) | repository owner (GitHub `ckvishwa`) | Architecture and ADRs; Fastify API; Astro UI; PostgreSQL and migrations; Python integration; GLiNER integration; classical ML training; Qwen/Ollama; JD interpretation, matching, eligibility; resume planning and tailoring; ATS document generation; local Playwright automation; integration and technical release readiness. Writes unit and integration tests for what they build. |
-| HANI (QA automation and ML evaluation lead) | Hani, GitHub username **pending (not provided; do not guess, do not invite)** | Test strategy; API, Playwright E2E and pytest suites; regression, negative and edge cases; migration verification; ML gold-set guidance; precision/recall/F1, calibration and error analysis; résumé factual-integrity tests; DOCX/PDF parser tests; browser field read-back validation; independent QA sign-off; release-blocker tracking. May contribute code (test tooling, fixtures, evaluation scripts) through reviewed branches. |
-| PRODUCT_OWNER | repository owner | Scope and ADR decisions; release approval. Never substitutes for QA evidence. |
+| **Technical Lead, Principal Developer, AI/ML Architect and Mentor** (ledger role `DEVELOPER`; also acts as `PRODUCT_OWNER`) | repository owner, GitHub `ckvishwa` | Owns product architecture and technology decisions; AI/ML model development (GLiNER, classifier training, Qwen/Ollama, retrieval); full-stack implementation (Fastify, Astro, PostgreSQL, Python services, resume planning, ATS rendering, Playwright); task delegation and integration; ADRs; **production model promotion decisions**; release approval. Mentors Hani and reviews her work. |
+| **Senior AI/ML & SDET Intern** (ledger role `HANI`) | Hani, reports to the Technical Lead; GitHub username **pending (not provided; do not guess, do not invite)** | Shadows AI/ML development and learns the underlying technologies; writes automated tests (Vitest, pytest, Playwright) and ML evaluation code; reports defects with reproducible evidence; performs independent verification of the Technical Lead's work; contributes supporting engineering code (fixtures, test tooling, evaluation scripts, small fixes) under mentorship through reviewed PRs. |
 
-Review pairing (also encoded as `owner_role` / `reviewer_role` per task in `docs/PROGRESS_LEDGER.json`):
-- Hani changes code or test tooling → Developer reviews.
-- Developer changes extraction, matching, résumé or automation logic → Hani independently validates (reproduces, adds negative cases, signs off).
-- Only `reviewer_role` moves a task `QA_REVIEW` → `VERIFIED`, with commit SHA, command, result and log/CI link in the ledger.
+## Authority limits
+- Hani does **not** independently own system architecture, technology choices, or production ML model promotion. These stay with the Technical Lead unless explicitly delegated in writing (record delegations in `docs/DECISIONS.md`).
+- Delegated tasks are small, scoped and reviewed; the Technical Lead assigns them via the ledger and GitHub Issues.
+- The author of a change is never its only approver. Hani's PRs are reviewed by the Technical Lead; Hani independently verifies the Technical Lead's tasks. A task becomes `VERIFIED` only with commit-specific evidence from tests that actually ran, recorded by someone other than the author.
+- Hani may stop a task from reaching `VERIFIED` by recording a reproduced failure; she may not be pressured to sign off without evidence.
+
+## Where the ownership lives
+Per-task `owner_role` and `reviewer_role` in `docs/PROGRESS_LEDGER.json` are the source of truth. Pattern: Technical Lead owns implementation tasks (reviewer: Hani); Hani owns test/evaluation-code and verification-support tasks (reviewer: Technical Lead). ML models are built by the Technical Lead and evaluated by Hani's evaluation code on the frozen held-out set, so implementer and evaluator differ.
+
+## History
+This replaces the earlier "Hani as AI/ML implementation owner" arrangement (ADR-0001 amendment A1) and the first "QA lead" wording. See ADR-0001 amendment A2.

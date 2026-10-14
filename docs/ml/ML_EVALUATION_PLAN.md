@@ -1,4 +1,4 @@
-# ML evaluation plan (evaluation: Hani; training: Developer)
+# ML evaluation plan (models: Technical Lead; evaluation code and independent evaluation: Hani under mentorship; promotion decision: Technical Lead)
 
 1. Audit the 216 historical labels (P5-01): who labeled, with which visible features, consent, and leakage between train, validation and test (group by employer and near-duplicate JD).
 2. Freeze a held-out split by employer and time before any training result is seen (frozen-eval claim ledger, migration 0011). No label edits after the freeze.

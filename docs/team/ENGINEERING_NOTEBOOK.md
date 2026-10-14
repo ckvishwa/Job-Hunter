@@ -49,3 +49,48 @@ Resolve Gate A per `GATE_A_REPORT.md`; confirm ADR-0001; provide Hani's username
 
 ### Next Session
 P0-03/P0-04 once Gate A is reproducibly green.
+
+---
+
+## 2026-10-14 — Engineering Session (team-role clarification, appended)
+
+### People
+Technical Lead / Principal Developer / AI/ML Architect / Mentor: ckvishwa
+Senior AI/ML & SDET Intern (reports to the Technical Lead): Hani, GitHub username pending
+
+### Branch / Commit
+Branch: `chore/m0-collaboration-baseline`, PR #1 (draft). Last pushed commit `96bd9f8`; local commit `891b3e2` (document-type test fix) and the changes below not yet pushed at the time of writing.
+
+### Today's Objective
+Record the final reporting structure and align governance documents without repeating cleanup or creating a second tracker.
+
+### Work Completed
+- `TEAM_ROLES.md` rewritten: Technical Lead owns architecture, technology, AI/ML model development, full-stack, delegation, integration, production promotion; Hani shadows AI/ML, writes tests and ML evaluation code, reports defects, verifies independently, contributes supporting code under mentorship; no architecture or promotion authority unless delegated in `DECISIONS.md`.
+- Ledger `owner_role`/`reviewer_role` reset (ADR-0001 amendment A2): Hani owns P0-07, P0-09, P1-03, P2-04, P5-01, P5-03, P7-03, P8-04, P9-03, P10-02, P10-03; all others Technical Lead with Hani as reviewer. Task IDs, statuses and evidence untouched.
+- Hani onboarding and KT plan updated; five-stage growth plan added (guided testing, supervised automation, independent verification, ML evaluation tooling, independently developed automation).
+- GitHub issue assignments checked: Technical Lead tasks are assigned to `ckvishwa`; Hani-owned issues (#8 P0-07, #10 P0-09) stay unassigned because her username was not provided. No change needed.
+
+### Evidence
+`python scripts/sync_progress.py --check` → OK after the update. No tests were rerun for this documentation change.
+
+### Architecture Decisions
+ADR-0001 amendment A1 (earlier today) moved AI/ML implementation to Hani; **A2 supersedes the ownership part of A1**. Local-first (ADR-0002) unchanged. Public-email decision (A1): no history rewrite; noreply switch for future commits remains an open owner choice. PRD canonical choice (ADR-0001) still awaits Product Owner confirmation.
+
+### Problems Discovered
+- Correction to the earlier entry: it said the notebook would hold the Gate A result of the second serialized run. That run's result: 3 failed tests in 2 files (my own redaction of reference-document names broke a local-only test; one Postgres loopback connect timeout that passes alone). Fixed/classified in `docs/qa/GATE_A_REPORT.md`.
+- Observation: in the second serialized run the dashboard and browser-search e2e files passed, unlike the first run; cause of the first-run failures remains unproven.
+
+### Blockers
+Hani's GitHub username; PRD confirmation; PR #1 CI results.
+
+### Tasks Updated
+None changed status. Ownership fields only.
+
+### Handoff to Hani
+Stage 1 of the growth plan: P0-09 and reproduction of the Gate A failures.
+
+### Handoff to Technical Lead
+Review/merge conditions for PR #1 (draft): CI green, two clean serialized Gate A runs recorded, independent review.
+
+### Next Session
+Record Gate A run 3 and write `GATE_A_REPORT.md`; check PR #1 CI.
