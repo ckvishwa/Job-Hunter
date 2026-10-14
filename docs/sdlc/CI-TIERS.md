@@ -26,3 +26,16 @@ The fast suite is an **explicit smoke subset**, not a claim that all unit/integr
 
 ### Fail-closed amendment (Technical Lead review of PR #12)
 The `CI gate` job reads the pull request's **current** draft state through the GitHub API instead of trusting the event payload. A re-run of an old draft-time workflow after the PR became ready therefore cannot pass without both headed jobs succeeding (skipped headed jobs on a non-draft PR fail the gate). If the draft state cannot be read, the gate fails. Manual (`workflow_dispatch`) and push runs always require both headed platforms. To prove a full pass while a PR stays a draft, trigger the workflow manually on the branch.
+
+### Verified behaviour on GitHub Actions (2026-10-14)
+| Test | Evidence | Result |
+|---|---|---|
+| A. Draft PR | PR #1 run 38640863205 (SHA `00d86e9`) and probe PR #13 draft run 38641092817 | Fast tests, static/build, gitleaks, dependency audit and ledger integrity ran; both headed jobs `skipped`; gate log: `current PR draft state: true` ... `FAST-ONLY PASS (draft PR): headed Chrome was NOT run. This is NOT a full Gate A pass.` |
+| B. Manual full CI | `workflow_dispatch` run 38641035560 on `chore/m0-collaboration-baseline` (SHA `00d86e9`) | success; Linux headed 131 s, Windows headed 225 s; full gate passed |
+| C. Ready for review | probe PR #13 (closed unmerged, branch deleted) run 38641659563 after `gh pr ready` | success; Linux headed 137 s, Windows headed 262 s; full gate passed |
+| D. Fail closed | probe PR #13: re-ran the old draft-time run 38641092817 after the PR became ready | headed jobs `skipped` (stale payload) but gate read `current PR draft state: false` and **failed**: `CI gate FAILED: required full headed test job did not succeed`. Side effect: the re-run shares the concurrency group and cancelled the in-flight ready run, which is why Test C was repeated. |
+
+Runtime (wall clock, GitHub): before, every PR push ran the full suite: run 38637158898 took 241 s (Linux 137 s, Windows 231 s). After, a draft push takes 52 s (fast 24 s, static 40 s). Ready, push and manual runs are unchanged (about 130-140 s Linux, 225-265 s Windows). The saving applies only to draft pushes; headed suites and dependency installs in the full jobs were not changed or reduced.
+
+The probe PR #13 was a throwaway; nothing from it was merged. A green gate on a draft remains fast-only evidence.
+

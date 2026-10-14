@@ -208,7 +208,7 @@
             "test_log_or_ci": "",
             "qa_reviewer": "",
             "qa_signoff_at": "",
-            "notes": "main protected (PR + CI gate + 1 review, no force push); careerops-integration blocks force push/deletion; secret scanning enabled; gitleaks job in CI; CI fix for web deps; tiered CI via PR #12 merged into the M0 branch with a fail-closed draft lookup. Required-check behaviour on GitHub still to be proven (draft/manual/ready tests)."
+            "notes": "main protected (PR + CI gate + 1 review, no force push); careerops-integration blocks force push/deletion; secret scanning enabled; gitleaks job in CI; CI fix for web deps; tiered CI via PR #12 merged into the M0 branch with a fail-closed draft lookup. Required-check behaviour on GitHub still to be proven (draft/manual/ready tests). Verified on Actions: draft = FAST-ONLY (runs 38640863205, 38641092817), manual full success (38641035560), ready_for_review full success (38641659563), stale draft re-run fails closed (38641092817 rerun). Still IN_PROGRESS: Hani review and required-check settings review pending."
           },
           "owner_role": "DEVELOPER",
           "reviewer_role": "HANI",

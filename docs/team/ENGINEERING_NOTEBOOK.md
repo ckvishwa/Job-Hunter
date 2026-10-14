@@ -139,3 +139,51 @@ Confirm the no-reply address in GitHub Settings; decide when to merge PR #12 int
 
 ### Next Session
 Record run 4; integrate PR #12 after its fast suite is run locally; assign #8 and #10 after acceptance.
+
+---
+
+## 2026-10-14 — Engineering Session (Gate A run 4, tiered CI, access check)
+
+### People
+Technical Lead / SDET Lead: `ckvishwa`. Senior AI/ML & SDET Intern: `Hani456` (invitation still pending; `gh api .../collaborators` lists only `ckvishwa`).
+
+### Branch / Commit
+Branch `chore/m0-collaboration-baseline`, PR #1 (draft). HEAD `00d86e9` pushed, ahead of the Gate A tested code state `ae5cf95` by documentation/CI-config changes only (verified with `git diff --name-only ae5cf95 HEAD`; the only non-doc changes before the merge were none, after the merge `.github/workflows/ci.yml`, `package.json` script, `tests/ci`).
+
+### Today's Objective
+Finish Gate A run 4, integrate PR #12 safely, prove the tiered CI on GitHub, record evidence.
+
+### Work Completed
+- Run 4 inspected from its log: commit `ae5cf95`, 7 min 44 s, 1636 pass / 1 fail (s1-ui sign-in panel not visible within 15 s). Browser-search and dashboard passed. s1-ui passed alone 2/2 afterwards.
+- No further full local suite was started (diagnose-first rule). Host had 5.2 GB free of 31.7 GB after the run; classification environment/resource contention is **suspected, unproven**.
+- Browser-search fixture reviewed: telemetry now chained and retried; exact-sequence assertion unchanged; one full passing run so far.
+- PR #12 reviewed (clean merge state, diff limited to ci.yml, package.json, docs, tests/ci), `npm run typecheck` exit 0 and `npm run test:fast` 24 files / 378 tests in 3.6 s with no Chrome (grep confirms none of the fast directories launch a browser). Merged into the M0 branch with a merge commit (`bbe4df8`, no force-push).
+- Review finding fixed in `00d86e9`: the original gate trusted the event payload's draft flag, so re-running an old draft-time run after the PR became ready could pass without headed Chrome. The gate now reads the live PR draft state and fails closed.
+- GitHub Actions proof (details in `docs/sdlc/CI-TIERS.md`): draft = fast-only; manual full run green; ready_for_review full run green on a throwaway probe PR #13 (closed unmerged, branch deleted); stale draft re-run correctly failed.
+- Agent test-running rules added to `AGENT_PROTOCOL.md` and `TEST_STRATEGY.md`.
+- Ledger: evidence notes and IN_PROGRESS for P0-01/03/04/05/06/07/08/10; no task is QA_REVIEW or VERIFIED. Issues #2-#11 map one-to-one to P0-01..P0-10 (unchanged).
+
+### Evidence
+Run logs: Gate A run 4 log kept in the session job directory; summary in `docs/qa/GATE_A_REPORT.md`. Actions run IDs above. `python scripts/sync_progress.py --check` → OK.
+
+### Architecture Decisions
+None new. Local-first unchanged. Full headed suite remains mandatory at review/release gates.
+
+### Problems Discovered
+- Observation: in every serialized local run exactly one headed-Chrome test fails with a 15 s visibility wait (dashboard, browser-search, s1-ui in different runs); each passes alone. Hypothesis: resource contention on this machine. The hosted full runs pass on both Linux and Windows.
+- Observation: a re-run of an old workflow run cancels the newer run in the same concurrency group.
+
+### Blockers
+Hani456 has not accepted the invitation, so issues #8 and #10 are not assigned; Gate A needs two clean serialized runs and independent reproduction; noreply address awaits owner confirmation in GitHub Settings.
+
+### Tasks Updated
+Ledger status IN_PROGRESS for P0-01, P0-03, P0-04, P0-05, P0-06, P0-07, P0-08, P0-10 (evidence notes only).
+
+### Handoff to Hani456
+Accept the invitation, then P0-09 (setup from `docs/kt/LOCAL_SETUP.md`), P0-07 (pytest), run the dashboard, browser-search and s1-ui files alone with `JH_UI_DIAG=1` on her machine, and report whether any fail.
+
+### Handoff to Technical Lead
+Add a failure-time diagnostic (Chrome start time, page-load timing, free memory) to the headed e2e helpers before authorizing another full local run; then run twice on an idle machine.
+
+### Next Session
+Assign #8/#10 after acceptance; first QA review record; P0-05/P0-06 diagnostics.
