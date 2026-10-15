@@ -187,3 +187,21 @@ Add a failure-time diagnostic (Chrome start time, page-load timing, free memory)
 
 ### Next Session
 Assign #8/#10 after acceptance; first QA review record; P0-05/P0-06 diagnostics.
+
+---
+
+## 2026-10-14 — Engineering Session (Project command center, P0-11)
+
+Branch `feature/project-command-center`, based on `chore/m0-collaboration-baseline` (`e6d90b5`). Product Owner priority: a read-only visual ledger; Gate A stays BLOCKED and is not affected.
+
+### Done
+Read-only API `/api/v1/project/{overview,phases,tasks,prd,notebook}` (fixed sources, session required), Astro page `/project` (overview, PRD explorer with search, roadmap, board with filters, team, task detail, notebook), safe text-only Markdown rendering, startup notes in `docs/PROJECT_DASHBOARD.md`, ADR-0003, ledger task P0-11 (IN_PROGRESS, M0).
+
+### Checks (developer, not independent)
+`npm run typecheck` clean; `npm run test:fast` 29 files / 418 tests; `tests/e2e/offline/project.e2e.test.ts` 13/13 in headed Chrome on synthetic data; `npm run build --prefix web` OK; `python scripts/sync_progress.py --check` OK. The TypeScript ledger rules agree with `sync_progress.py` on the synthetic and the real ledger (parity test). Two real defects were found and fixed while testing: a stray "null" in the task dialog and the End/Home tab keys.
+
+### Not done / limits
+Not VERIFIED: Hani456 must reproduce the commands in `docs/PROJECT_DASHBOARD.md` independently. The full headed suite and CI were not run for this change. No GitHub issue was created. Tasks have no description or priority fields in the ledger, so the UI shows the task name and a status-derived next action (labelled as derived).
+
+### Next Session
+Draft PR review; Hani456 independent run; then P0-03/P0-04 Gate A diagnostics.

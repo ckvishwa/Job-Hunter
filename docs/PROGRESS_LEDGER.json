@@ -253,6 +253,25 @@
           "github_issue": 11,
           "branch": "chore/m0-collaboration-baseline",
           "pull_request": 1
+        },
+        {
+          "id": "P0-11",
+          "name": "Internal read-only Project command center (/project): ledger/PRD/notebook dashboard and API",
+          "status": "IN_PROGRESS",
+          "evidence": {
+            "commit_sha": "d3959ee",
+            "test_command": "npm run typecheck; npm run test:fast; npx vitest run tests/e2e/offline/project.e2e.test.ts; npm run build --prefix web; python scripts/sync_progress.py --check",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": "Developer-run 2026-10-14 on feature/project-command-center (src/project/*, src/api/project-routes.ts, web/src/pages/project.astro, web/src/lib/project-model.ts, markdown-lite.ts, tests/project/*, tests/web/project-model.test.ts, tests/e2e/offline/project.e2e.test.ts): typecheck clean; test:fast 29 files / 418 tests pass; project e2e 13/13 (headed Chrome, synthetic data); web build OK; sync_progress --check OK. NOT VERIFIED: needs Hani456 independent reproduction on her machine plus CI at the review checkpoint. test_result is left empty on purpose (QA_REVIEW requires a recorded PASS from a clean reproduced run). Acceptance: counts/phase progress from ledger records, only accepted evidence counts as verified, Gate A shown BLOCKED while the ledger records a blocker, read-only authenticated API with fixed sources, text-only Markdown rendering, existing candidate routes unchanged. Dependency: branch is based on chore/m0-collaboration-baseline (e6d90b5); it needs that branch's ledger, notebook and tiered CI. Not Gate A evidence. No GitHub issue created yet."
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": "feature/project-command-center",
+          "pull_request": null
         }
       ]
     },
@@ -1231,7 +1250,8 @@
         "P0-07",
         "P0-08",
         "P0-09",
-        "P0-10"
+        "P0-10",
+        "P0-11"
       ],
       "M1": [
         "P0-02",
