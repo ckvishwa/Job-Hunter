@@ -17,7 +17,8 @@ export function registerProjectRoutes(
       try {
         return await build(project);
       } catch (error) {
-        if (error instanceof ProjectSourceError) return send(reply, 503, error.code, error.message);
+        // 404/422, not 5xx: the UI proxy treats 502-504 as "API down", and a missing or unusable source is a precise, expected state.
+        if (error instanceof ProjectSourceError) return send(reply, error.code === "PROJECT_SOURCE_MISSING" ? 404 : 422, error.code, error.message);
         throw error;
       }
     });

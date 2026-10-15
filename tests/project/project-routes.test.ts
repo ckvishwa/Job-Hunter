@@ -60,7 +60,7 @@ describe("GET /api/v1/project/*", () => {
   it("returns a typed unavailable state when the ledger is missing", async () => {
     const { app } = await appFor({ ledgerRaw: null });
     const res = await app.inject({ method: "GET", url: "/api/v1/project/overview" });
-    expect(res.statusCode).toBe(503);
+    expect(res.statusCode).toBe(404);
     expect(res.json().error.code).toBe("PROJECT_SOURCE_MISSING");
     expect(res.body).not.toContain(os.tmpdir()); // no filesystem path in the message
   });
@@ -70,7 +70,7 @@ describe("GET /api/v1/project/*", () => {
       const { app } = await appFor({ ledgerRaw: raw });
       for (const u of ["overview", "phases", "tasks"]) {
         const res = await app.inject({ method: "GET", url: `/api/v1/project/${u}` });
-        expect(res.statusCode).toBe(503);
+        expect(res.statusCode).toBe(422);
         expect(res.json().error.code).toBe("PROJECT_SOURCE_INVALID");
       }
     }
@@ -93,7 +93,7 @@ describe("GET /api/v1/project/*", () => {
   it("reports a missing notebook as unavailable", async () => {
     const { app } = await appFor({ notebook: null });
     const res = await app.inject({ method: "GET", url: "/api/v1/project/notebook" });
-    expect(res.statusCode).toBe(503);
+    expect(res.statusCode).toBe(404);
     expect(res.json().error.code).toBe("PROJECT_SOURCE_MISSING");
   });
 
@@ -107,7 +107,7 @@ describe("GET /api/v1/project/*", () => {
       return; // symlink creation needs privileges on some Windows setups; the containment rule is also covered by the realpath check
     }
     const res = await app.inject({ method: "GET", url: "/api/v1/project/notebook" });
-    expect(res.statusCode).toBe(503);
+    expect(res.statusCode).toBe(422);
     expect(res.json().error.code).toBe("PROJECT_SOURCE_INVALID");
     expect(res.body).not.toContain("leaked");
   });
