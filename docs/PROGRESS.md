@@ -3,7 +3,7 @@
 **Canonical PRD:** [`PRD.md`](PRD.md) (locked requirements baseline)  
 **Source of truth:** [`PROGRESS_LEDGER.json`](PROGRESS_LEDGER.json) (edit here, NOT in this dashboard)  
 **Agent contract:** [`AGENT_PROTOCOL.md`](AGENT_PROTOCOL.md)  
-**Status:** 0/49 tasks independently verified; 0/11 phases green.  
+**Status:** 0/50 tasks independently verified; 0/11 phases green.  
 **Evidence cut-off:** Reported as of Oct 14 2026; not a live code audit
 
 > 🚦 **Never turn a row green from an agent assertion.** Green is computed only from recorded commit-specific passing tests, independent QA approval, cleared blockers and completed dependencies. This checker validates evidence fields but **cannot establish that the cited tests/logs are genuine**.
@@ -16,7 +16,7 @@
 
 | Phase | Workstream | Status | Tasks verified | Dependencies |
 |---|---|---|---:|---|
-| P0 | Audit, stabilize and recover | 🔴 BLOCKED | 0/10 | — |
+| P0 | Audit, stabilize and recover | 🔴 BLOCKED | 0/11 | — |
 | P1 | Secure intake and parser | ⬜ PLANNED | 0/3 | P0 |
 | P2 | Resume fact intelligence | ⬜ PLANNED | 0/4 | P1 |
 | P3 | Auto-grounding and fact persistence | ⬜ PLANNED | 0/4 | P2 |
@@ -62,6 +62,7 @@
 - [ ] 🟡 **P0-08** — GitHub security baseline: secret/PII scan in CI, branch protection, PR/issue templates, CODEOWNERS — `IN_PROGRESS`
 - [ ] ⬜ **P0-09** — Independent local setup and smoke run by QA on a second machine from docs/kt/LOCAL_SETUP.md — `PLANNED`
 - [ ] 🟡 **P0-10** — M0 collaboration baseline: governance, notebook, KT package, draft PR — `IN_PROGRESS`
+- [ ] 🟡 **P0-11** — Internal read-only Project command center (/project): ledger/PRD/notebook dashboard and API — `IN_PROGRESS`
 
 ### P1 — Secure intake and parser [⬜ PLANNED]
 

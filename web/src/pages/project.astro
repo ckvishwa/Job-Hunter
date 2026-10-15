@@ -1,0 +1,485 @@
+---
+import Base from "../layouts/Base.astro";
+import PageHead from "../components/PageHead.astro";
+import "../styles/project.css";
+---
+
+<Base title="Orbital — Project" crumbs={[{ label: "Project" }]}>
+  <PageHead eyebrow="Internal · Engineering" number="PM" title="Project command center" lead="A read-only view of the real PRD, phases, tasks and evidence. Nothing here edits a status: the ledger file is the only source of truth.">
+    <span class="muted small" id="pj-meta"></span>
+  </PageHead>
+
+  <div id="pj-unavailable" class="pj-card pj-state" role="alert" hidden>
+    <h2 id="pj-unavailable-title">Project data is unavailable</h2>
+    <p id="pj-unavailable-text" class="muted"></p>
+    <p class="small muted">Run <code>python scripts/sync_progress.py --check</code> to see what is wrong with the ledger, then reload.</p>
+    <div class="row"><button id="pj-unavailable-retry" type="button">Try again</button></div>
+  </div>
+
+  <div id="pj-main">
+    <div class="pj-tabs" role="tablist" aria-label="Project views" id="pj-tabs">
+      <button type="button" role="tab" id="tab-overview" aria-controls="panel-overview" data-tab="overview">Overview</button>
+      <button type="button" role="tab" id="tab-prd" aria-controls="panel-prd" data-tab="prd">PRD</button>
+      <button type="button" role="tab" id="tab-roadmap" aria-controls="panel-roadmap" data-tab="roadmap">Roadmap</button>
+      <button type="button" role="tab" id="tab-board" aria-controls="panel-board" data-tab="board">Board</button>
+      <button type="button" role="tab" id="tab-team" aria-controls="panel-team" data-tab="team">Team</button>
+      <button type="button" role="tab" id="tab-notebook" aria-controls="panel-notebook" data-tab="notebook">Notebook</button>
+    </div>
+    <div class="pj-panel" role="tabpanel" id="panel-overview" aria-labelledby="tab-overview" tabindex="-1"></div>
+    <div class="pj-panel" role="tabpanel" id="panel-prd" aria-labelledby="tab-prd" tabindex="-1" hidden></div>
+    <div class="pj-panel" role="tabpanel" id="panel-roadmap" aria-labelledby="tab-roadmap" tabindex="-1" hidden></div>
+    <div class="pj-panel" role="tabpanel" id="panel-board" aria-labelledby="tab-board" tabindex="-1" hidden></div>
+    <div class="pj-panel" role="tabpanel" id="panel-team" aria-labelledby="tab-team" tabindex="-1" hidden></div>
+    <div class="pj-panel" role="tabpanel" id="panel-notebook" aria-labelledby="tab-notebook" tabindex="-1" hidden></div>
+  </div>
+
+  <dialog class="pj-dialog" id="pj-dialog" aria-labelledby="pj-dialog-title">
+    <div class="head">
+      <h2 id="pj-dialog-title">Task</h2>
+      <button type="button" class="secondary" id="pj-dialog-close" aria-label="Close task detail">Close</button>
+    </div>
+    <div class="body" id="pj-dialog-body"></div>
+  </dialog>
+</Base>
+
+<script>
+  import { api, ApiError } from "../lib/api";
+  import { reloadPage, startPage } from "../lib/gate";
+  import { $, clear, h } from "../lib/dom";
+  import { renderMarkdown } from "../lib/markdown-lite";
+  import {
+    BOARD_COLUMNS, NO_FILTER, STATUS_GLYPH, STATUS_LABEL, STATUS_ORDER, TABS, filterTasks, groupByStatus, parseRoute, prdRefTarget, roleName,
+    routeHref, searchPrd, sectionForNumber, statusKey, statusText, taskHref, teamView,
+    type Notebook, type Overview, type Phase, type Prd, type PrdSection, type Status, type Tab, type Task, type TaskFilter,
+  } from "../lib/project-model";
+
+  // Everything below renders API data with text nodes only (lib/dom.ts h() and lib/markdown-lite.ts). Nothing from the ledger, PRD
+  // or notebook is ever assigned to innerHTML.
+
+  let overview: Overview | null = null;
+  let phases: Phase[] = [];
+  let tasks: Task[] = [];
+  let prd: Prd | null = null;
+  let notebook: Notebook | null = null;
+  let prdError = "";
+  let notebookError = "";
+  let filter: TaskFilter = { ...NO_FILTER };
+  let currentTab: Tab = "overview";
+  let lastTab: Tab = "overview";
+  let wired = false;
+  let loadedAt = "";
+
+  const panel = (tab: Tab): HTMLElement => $(`#panel-${tab}`);
+  const pct = (n: number): string => `${n}%`;
+  const short = (sha: string | null): string => (sha ? sha.slice(0, 10) : "none");
+
+  function chip(task: Pick<Task, "status" | "accepted">): HTMLElement {
+    const key = statusKey(task);
+    const glyph = key === "rejected" ? "!" : STATUS_GLYPH[task.status];
+    return h("span", { class: "pj-chip", "data-s": key }, h("span", { "aria-hidden": "true" }, glyph), statusText(task));
+  }
+  const phaseChip = (s: Status): HTMLElement => h("span", { class: "pj-chip", "data-s": s.toLowerCase() }, h("span", { "aria-hidden": "true" }, STATUS_GLYPH[s]), STATUS_LABEL[s]);
+  const ext = (href: string, label: string): HTMLElement => h("a", { href, target: "_blank", rel: "noopener noreferrer" }, label);
+  const taskLink = (id: string): HTMLElement => h("a", { class: "pj-id", href: taskHref(id) }, id);
+
+  function progress(label: string, done: number, total: number, percent: number): HTMLElement {
+    return h("div", {},
+      h("div", { class: "pj-bar-label" }, h("span", {}, label), h("span", {}, `${done} of ${total} · ${pct(percent)}`)),
+      h("div", { class: "pj-bar", role: "progressbar", "aria-label": label, "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(percent), "data-zero": String(percent === 0) },
+        h("span", { style: `width:${percent}%` })));
+  }
+
+  // --- overview -----------------------------------------------------------------------------------------------------------
+  function renderOverview(): void {
+    const root = panel("overview");
+    clear(root);
+    const o = overview!;
+    const c = o.counts;
+    const stat = (key: string, n: number, label: string): HTMLElement => h("div", { class: "pj-stat", "data-key": key, "data-zero": String(n === 0) }, h("span", { class: "n" }, String(n)), h("span", { class: "l" }, label));
+    root.append(
+      h("div", { class: "pj-stats", "aria-label": "Counts from the ledger" },
+        stat("phases", c.phases, "Phases"), stat("tasks", c.tasks, "Tasks"), stat("verified", c.verified, "Verified"),
+        stat("in_progress", c.byStatus.IN_PROGRESS, "In progress"), stat("blocked", c.byStatus.BLOCKED, "Blocked"), stat("planned", c.byStatus.PLANNED, "Planned"),
+        stat("qa", c.byStatus.QA_REVIEW, "QA review queue"), stat("reported", c.byStatus.REPORTED_UNVERIFIED, "Reported, unverified")),
+      h("div", { class: "pj-card" },
+        progress("Independently verified tasks", c.verified, c.tasks, c.percentVerified),
+        h("p", { class: "pj-note" }, `Only tasks whose evidence the ledger rules accept count. In progress, QA review and reported work are not completed. Phases verified: ${c.phasesVerified} of ${c.phases}.`)),
+    );
+
+    const gate = h("div", { class: "pj-card pj-gate", "data-passed": String(o.gate.passed) },
+      h("h2", {}, `Release gate: ${o.gate.label}`),
+      h("div", { class: "state" }, o.gate.passed ? "PASSED (accepted evidence)" : o.gate.state === "BLOCKED" ? "BLOCKED" : `NOT PASSED · ${STATUS_LABEL[o.gate.state]}`),
+      h("p", {}, `Gate phase ${o.gate.phaseId}: ${o.gate.phaseName}.`),
+      o.gate.blocker ? h("p", { class: "pj-bad" }, `Blocker: ${o.gate.blocker}`) : null,
+      h("p", { class: "pj-note" }, `Exit criterion: ${o.gate.exitCriterion}`),
+      h("p", { class: "pj-note" }, "The gate turns green only when the ledger itself records every task verified with accepted evidence and QA sign-off. This page cannot change it."));
+
+    const next = h("div", { class: "pj-card" }, h("h2", {}, "Next eligible task"),
+      o.nextTask
+        ? h("div", {}, h("p", {}, taskLink(o.nextTask.id), ` ${o.nextTask.name}`), h("p", { class: "pj-note" }, `Phase ${o.nextTask.phase} · ${o.nextTask.status.replace(/_/g, " ").toLowerCase()} · first dependency-unblocked task in ledger order.`))
+        : h("p", { class: "pj-empty" }, "No task is currently unblocked. Resolve recorded blockers first."));
+
+    const queue = h("div", { class: "pj-card" }, h("h2", {}, `QA review queue (${o.qaQueue.length})`),
+      o.qaQueue.length
+        ? h("ul", { class: "pj-list" }, ...o.qaQueue.map((q) => h("li", {}, taskLink(q.id), h("span", {}, q.name), h("span", { class: "muted small" }, `reviewer: ${roleName(q.reviewerRole, o.team)}`))))
+        : h("p", { class: "pj-empty" }, "Nothing is waiting for independent QA."));
+
+    const ev = h("div", { class: "pj-card" }, h("h2", {}, "Latest commit and PR evidence"),
+      o.latestEvidence.length
+        ? h("ul", { class: "pj-list" }, ...o.latestEvidence.map((e) => h("li", {},
+            taskLink(e.taskId),
+            e.commit ? (e.links.commit ? ext(e.links.commit, `commit ${short(e.commit)}`) : h("span", {}, `commit ${short(e.commit)} (not a valid SHA)`)) : null,
+            e.pullRequest && e.links.pullRequest ? ext(e.links.pullRequest, `PR #${e.pullRequest}`) : null,
+            h("span", { class: "pj-chip", "data-s": e.accepted ? "evidence-ok" : "evidence-none" }, e.accepted ? "accepted" : "not accepted evidence"))))
+        : h("p", { class: "pj-empty" }, "No commit or pull request is recorded on any task yet."),
+      h("p", { class: "pj-note" }, "A recorded commit is a pointer, not proof. Only QA-verified tasks with a PASS result are accepted."));
+
+    const integ = h("div", { class: "pj-card" }, h("h2", {}, "Source integrity"),
+      h("dl", { class: "small" },
+        h("dt", {}, "Ledger"), h("dd", {}, ext(o.ledger.sourceUrl, o.ledger.source), ` · ${o.ledger.name}`),
+        h("dt", {}, "Evidence cut-off"), h("dd", {}, o.ledger.baseline || "not recorded"),
+        h("dt", {}, "Ledger claim"), h("dd", {}, o.ledger.statusClaim || "none"),
+        h("dt", {}, "PRD file"), h("dd", {}, ext(o.prd.sourceUrl, o.prd.source)),
+        h("dt", {}, "PRD hash"), h("dd", {}, h("span", { class: "pj-hash" }, short(o.prd.sha256)), o.prd.hashMatches ? " matches the locked baseline" : " DOES NOT match the locked baseline")),
+      o.validation.ok
+        ? h("p", { class: "pj-note" }, "The ledger rules (evidence fields, dependencies, PRD hash) report no problems.")
+        : h("div", {}, h("p", { class: "pj-bad" }, `The ledger rules report ${o.validation.errors.length} problem${o.validation.errors.length === 1 ? "" : "s"}. Affected tasks are not counted as verified.`),
+            h("ul", { class: "pj-errors" }, ...o.validation.errors.map((e) => h("li", {}, e)))));
+
+    root.append(h("div", { class: "pj-grid" }, gate, next, queue, ev, integ));
+  }
+
+  // --- PRD explorer ---------------------------------------------------------------------------------------------------------
+  function renderPrd(sectionId: string | null, query: string, focusSearch = false): void {
+    const root = panel("prd");
+    clear(root);
+    if (prdError) { root.append(h("div", { class: "pj-card pj-state", role: "alert" }, h("h2", {}, "The PRD is unavailable"), h("p", { class: "muted" }, prdError))); return; }
+    if (!prd) { root.append(h("div", { class: "pj-card" }, h("span", { class: "skeleton w80" }), h("span", { class: "skeleton w60" }))); return; }
+    const doc = prd;
+    const q = query.trim();
+    const hits = q ? searchPrd(doc, q) : [];
+    const hitCount = new Map(hits.map((x) => [x.section.id, x.count]));
+    const visible: PrdSection[] = q ? hits.map((x) => x.section) : doc.sections;
+    const selected = doc.sections.find((s) => s.id === sectionId) ?? (q && hits[0] ? hits[0].section : null) ?? null;
+
+    const search = h("input", { id: "prd-search", type: "search", value: q, placeholder: "Search the PRD (for example FR-0301)", "aria-label": "Search within the PRD", autocomplete: "off" }) as HTMLInputElement;
+    search.addEventListener("input", () => {
+      // Typing refines the view in place (no history entry per keystroke, no re-fetch).
+      history.replaceState(null, "", routeHref("prd", null, search.value || null));
+      renderPrd(null, search.value, true);
+    });
+    const outline = h("nav", { class: "pj-card pj-outline", "aria-label": "PRD outline" },
+      h("ul", {}, ...visible.map((s) => h("li", { "data-level": String(Math.min(s.level, 3)) },
+        h("a", { href: routeHref("prd", s.id, q || null), "aria-current": String(selected?.id === s.id) },
+          s.title, q && hitCount.get(s.id) ? h("span", { class: "count" }, `${hitCount.get(s.id)}×`) : null)))),
+      q && visible.length === 0 ? h("p", { class: "pj-empty" }, `No section mentions “${q}”.`) : null);
+
+    const body = h("article", { class: "pj-card pj-doc", "aria-live": "polite" });
+    if (selected) {
+      body.append(h("h2", {}, selected.title), renderMarkdown(selected.body || "_This section has no body text of its own; see the subsections._", { highlight: q, headingOffset: 1 }));
+    } else {
+      body.append(h("h2", {}, doc.title), renderMarkdown(doc.intro || "Select a section from the outline.", { highlight: q, headingOffset: 1 }));
+    }
+    root.append(
+      h("div", { class: "pj-card" },
+        h("div", { class: "row" },
+          h("strong", {}, doc.title), doc.version ? h("span", { class: "pj-chip" }, `version ${doc.version}`) : null,
+          h("span", { class: "pj-chip", "data-s": doc.hashMatches ? "evidence-ok" : "blocked" }, doc.hashMatches ? "locked hash matches" : "hash differs from lock"),
+          h("span", { class: "pj-hash" }, short(doc.sha256)), ext(doc.sourceUrl, "Source file")),
+        h("p", { class: "pj-note" }, "Read-only. Edit the PRD only through an approved change in Git; its hash is locked in the ledger."),
+        h("label", { class: "sr-only", for: "prd-search" }, "Search the PRD"), search,
+        q ? h("p", { class: "pj-note", role: "status" }, `${hits.length} section${hits.length === 1 ? "" : "s"} match “${q}”.`) : null),
+      h("div", { class: "pj-prd" }, outline, body));
+    if (focusSearch) { search.focus(); search.setSelectionRange(search.value.length, search.value.length); }
+  }
+
+  function prdRefLinks(refs: string[]): Array<Node | string> {
+    const out: Array<Node | string> = [];
+    refs.forEach((ref, i) => {
+      const t = prdRefTarget(ref);
+      const href = t.kind === "section" ? routeHref("prd", null, null) + `?s=${encodeURIComponent(t.number)}` : routeHref("prd", null, t.query);
+      out.push(i ? ", " : "", h("a", { href, "data-prd-ref": ref }, ref));
+    });
+    return out;
+  }
+
+  // --- roadmap ----------------------------------------------------------------------------------------------------------------
+  function renderRoadmap(openId: string | null): void {
+    const root = panel("roadmap");
+    clear(root);
+    root.append(h("p", { class: "pj-note" }, "Every figure comes from the ledger. A phase is verified only when all its tasks are accepted, its dependencies are verified and QA signed it off."));
+    const list = h("div", { class: "pj-phases" });
+    for (const p of phases) {
+      const open = p.id === openId;
+      const toggle = h("button", { type: "button", class: "secondary", "aria-expanded": String(open), "aria-controls": `phase-tasks-${p.id}`, "data-phase": p.id }, open ? "Hide tasks" : `Show ${p.totalTasks} task${p.totalTasks === 1 ? "" : "s"}`);
+      toggle.addEventListener("click", () => { location.hash = routeHref("roadmap", open ? null : p.id); });
+      const taskBox = h("div", { class: "tasks", id: `phase-tasks-${p.id}`, hidden: !open });
+      if (open) {
+        const mine = tasks.filter((t) => t.phaseId === p.id);
+        taskBox.append(...(mine.length ? mine.map((t) => h("div", { class: "row" }, taskLink(t.id), h("span", {}, t.name), chip(t))) : [h("p", { class: "pj-empty" }, "This phase has no tasks in the ledger.")]));
+      }
+      list.append(h("article", { class: "pj-phase", "data-s": p.state.toLowerCase(), "data-phase-id": p.id },
+        h("header", {}, h("span", { class: "pj-id" }, p.id), h("span", { class: "name" }, p.name), phaseChip(p.state)),
+        progress("Verified tasks", p.verifiedTasks, p.totalTasks, p.percent),
+        h("p", { class: "sub" }, p.dependsOn.length ? `Depends on: ${p.dependsOn.join(", ")}. ` : "No dependencies. ",
+          p.waitingOn.length ? h("span", { class: "pj-warn" }, `Waiting on ${p.waitingOn.join(", ")} (not verified).`) : p.dependsOn.length ? "All dependencies verified." : ""),
+        p.blocker ? h("p", { class: "sub pj-bad" }, `Blocker: ${p.blocker}`) : null,
+        h("p", { class: "sub" }, `Exit criterion: ${p.exitCriterion}`),
+        p.prdRefs.length ? h("p", { class: "sub" }, "PRD: ", ...prdRefLinks(p.prdRefs)) : null,
+        h("div", { class: "row", style: "margin-top:8px" }, toggle),
+        taskBox));
+    }
+    root.append(list);
+  }
+
+  // --- board --------------------------------------------------------------------------------------------------------------------
+  function renderBoard(): void {
+    const root = panel("board");
+    clear(root);
+    const o = overview!;
+    const owners = [...new Set(tasks.map((t) => t.ownerRole).filter((r): r is string => !!r))];
+    const select = (id: string, label: string, value: string, options: Array<[string, string]>, key: keyof TaskFilter): HTMLElement => {
+      const el = h("select", { id }, ...[["", `All`] as [string, string], ...options].map(([v, text]) => h("option", { value: v, ...(v === value ? { selected: true } : {}) }, text))) as HTMLSelectElement;
+      el.addEventListener("change", () => { filter = { ...filter, [key]: el.value }; paintBoard(); });
+      return h("label", {}, label, el);
+    };
+    const search = h("input", { id: "task-search", type: "search", value: filter.query, placeholder: "Search id, name, phase, owner…", autocomplete: "off" }) as HTMLInputElement;
+    search.addEventListener("input", () => { filter = { ...filter, query: search.value }; paintBoard(); });
+    const reset = h("button", { type: "button", class: "secondary", id: "filter-reset" }, "Reset");
+    reset.addEventListener("click", () => { filter = { ...NO_FILTER }; renderBoard(); });
+    root.append(
+      h("div", { class: "pj-filters", role: "search", "aria-label": "Filter tasks" },
+        h("label", {}, "Search tasks", search),
+        select("filter-phase", "Phase", filter.phase, phases.map((p) => [p.id, `${p.id} ${p.name}`]), "phase"),
+        select("filter-owner", "Owner", filter.owner, owners.map((r) => [r, roleName(r, o.team)]), "owner"),
+        select("filter-status", "Status", filter.status, STATUS_ORDER.map((s) => [s, STATUS_LABEL[s]]), "status"),
+        reset),
+      h("p", { class: "pj-note", id: "board-count", role: "status", "aria-live": "polite" }),
+      h("div", { class: "pj-board", id: "pj-board", role: "group", "aria-label": "Task board, read only" }));
+    paintBoard();
+  }
+
+  function card(t: Task): HTMLElement {
+    const o = overview!;
+    const title = h("button", { type: "button", class: "pj-link title", "data-task": t.id }, `${t.id} · ${t.name}`);
+    title.addEventListener("click", () => { location.hash = taskHref(t.id); });
+    return h("article", { class: "pj-task", "data-s": statusKey(t), "data-task-id": t.id },
+      title, h("div", {}, chip(t)),
+      h("div", { class: "meta" },
+        h("span", {}, `Owner: ${roleName(t.ownerRole, o.team)}`), h("span", {}, `Reviewer: ${roleName(t.reviewerRole, o.team)}`),
+        t.priority !== null && t.priority !== undefined ? h("span", {}, `Priority: ${String(t.priority)}`) : null,
+        t.githubIssue && t.links.issue ? ext(t.links.issue, `Issue #${t.githubIssue}`) : h("span", {}, "No issue")),
+      t.waitingOn.length ? h("div", { class: "meta pj-warn" }, `Phase waits on ${t.waitingOn.join(", ")}`) : null);
+  }
+
+  function paintBoard(): void {
+    const board = $("#pj-board");
+    clear(board);
+    const shown = filterTasks(tasks, filter);
+    const groups = groupByStatus(shown);
+    $("#board-count").textContent = `${shown.length} of ${tasks.length} tasks shown.`;
+    for (const col of BOARD_COLUMNS) {
+      const items = groups[col.key] ?? [];
+      board.append(h("section", { class: "pj-col", "data-col": col.key.toLowerCase(), "aria-label": `${col.title}, ${items.length} tasks` },
+        h("h3", {}, h("span", {}, `${STATUS_GLYPH[col.key]} ${col.title}`), h("span", {}, String(items.length))),
+        h("div", { class: "pj-cards" }, ...(items.length ? items.map(card) : [h("div", { class: "pj-empty" }, "No tasks")]))));
+    }
+  }
+
+  // --- team ---------------------------------------------------------------------------------------------------------------------
+  function renderTeam(): void {
+    const root = panel("team");
+    clear(root);
+    const o = overview!;
+    root.append(h("p", { class: "pj-note" }, "Assignments come from owner_role and reviewer_role in the ledger. An assignee does not mean the work is done."));
+    const grid = h("div", { class: "pj-grid" });
+    for (const m of o.team) {
+      const v = teamView(tasks, m.role);
+      const row = (t: Task): HTMLElement => h("li", {}, taskLink(t.id), h("span", {}, t.name), chip(t), t.ownerRole === "PRODUCT_OWNER" ? h("span", { class: "muted small" }, "(as Product Owner)") : null);
+      grid.append(h("div", { class: "pj-card pj-person", "data-member": m.handle },
+        h("h2", {}, ext(m.url, m.handle), h("span", { class: "role" }, m.title)),
+        h("p", { class: "small" }, `${v.assigned.length} assigned · ${v.awaitingReview.length} awaiting their review · reviewer on ${v.reviewerOn}`),
+        h("h3", {}, "Awaiting review"),
+        v.awaitingReview.length ? h("ul", { class: "pj-list" }, ...v.awaitingReview.map(row)) : h("p", { class: "pj-empty" }, "Nothing is in QA review for this reviewer."),
+        h("h3", { style: "margin-top:14px" }, "Current blockers"),
+        v.blockers.length ? h("ul", { class: "pj-list" }, ...v.blockers.map((b) => h("li", {}, taskLink(b.taskId), h("span", { class: "pj-bad" }, b.text)))) : h("p", { class: "pj-empty" }, "No blocker is recorded on this person's tasks."),
+        h("h3", { style: "margin-top:14px" }, "Assigned tasks"),
+        v.assigned.length ? h("ul", { class: "pj-list" }, ...v.assigned.map(row)) : h("p", { class: "pj-empty" }, "No tasks are assigned."),
+        h("h3", { style: "margin-top:14px" }, "Knowledge-transfer links"),
+        v.ktLinks.length ? h("ul", { class: "pj-list" }, ...v.ktLinks.map((k) => h("li", {}, ext(k.url, k.title)))) : h("p", { class: "pj-empty" }, "No KT document mentions these task IDs.")));
+    }
+    root.append(grid);
+  }
+
+  // --- notebook -------------------------------------------------------------------------------------------------------------------
+  function renderNotebook(): void {
+    const root = panel("notebook");
+    clear(root);
+    if (notebookError) { root.append(h("div", { class: "pj-card pj-state", role: "alert" }, h("h2", {}, "The engineering notebook is unavailable"), h("p", { class: "muted" }, notebookError))); return; }
+    if (!notebook) { root.append(h("div", { class: "pj-card" }, h("span", { class: "skeleton w80" }), h("span", { class: "skeleton w60" }))); return; }
+    const nb = notebook;
+    root.append(h("div", { class: "pj-card" }, h("p", { class: "pj-note" }, "Read-only preview, newest first. The Markdown file stays the authoritative record: ", ext(nb.sourceUrl, nb.source)),
+      nb.intro ? h("div", { class: "pj-doc" }, renderMarkdown(nb.intro, { headingOffset: 1 })) : null));
+    if (nb.entries.length === 0) root.append(h("div", { class: "pj-empty" }, "The notebook has no dated entries yet."));
+    [...nb.entries].reverse().forEach((e, i) => {
+      root.append(h("details", { class: "pj-entry", ...(i === 0 ? { open: true } : {}) }, h("summary", {}, e.title), h("div", { class: "pj-doc" }, renderMarkdown(e.body, { headingOffset: 1 }))));
+    });
+  }
+
+  // --- task detail --------------------------------------------------------------------------------------------------------------------
+  function openTask(id: string): void {
+    const t = tasks.find((x) => x.id === id);
+    const dialog = $("#pj-dialog") as HTMLDialogElement;
+    const body = $("#pj-dialog-body");
+    clear(body);
+    if (!t) {
+      $("#pj-dialog-title").textContent = "Unknown task";
+      body.append(h("p", {}, `The ledger has no task “${id}”.`));
+    } else {
+      const o = overview!;
+      const phase = phases.find((p) => p.id === t.phaseId);
+      $("#pj-dialog-title").textContent = `${t.id} · ${t.name}`;
+      const dd = (label: string, ...value: Array<Node | string | null>): Node[] => [h("dt", {}, label), h("dd", {}, ...value)];
+      body.append(...[
+        h("div", { class: "row" }, chip(t), h("span", { class: "pj-chip", "data-s": t.evidenceState === "accepted" ? "evidence-ok" : t.evidenceState === "invalid" ? "rejected" : "evidence-none" },
+          { accepted: "Evidence accepted", "awaiting-qa": "Evidence recorded, awaiting QA", invalid: "Evidence rejected by ledger rules", partial: "Evidence partly recorded", none: "No evidence recorded" }[t.evidenceState])),
+        h("dl", {},
+          ...dd("Phase", h("a", { href: routeHref("roadmap", t.phaseId) }, `${t.phaseId} · ${t.phaseName}`)),
+          ...dd("Description", t.name, h("span", { class: "muted small" }, " (the ledger records a task name only)")),
+          ...dd("PRD references", ...(t.prdRefs.length ? prdRefLinks(t.prdRefs) : ["none recorded"])),
+          ...dd("Owner", roleName(t.ownerRole, o.team)), ...dd("Reviewer", roleName(t.reviewerRole, o.team)),
+          ...dd("Dependencies", t.dependencies.length ? `${t.dependencies.join(", ")}${t.waitingOn.length ? ` · not yet verified: ${t.waitingOn.join(", ")}` : " · all verified"}` : "none (phase level)"),
+          ...dd("GitHub issue", t.links.issue ? ext(t.links.issue, `#${t.githubIssue}`) : h("span", { class: "pj-missing" }, "none")),
+          ...dd("Pull request", t.links.pullRequest ? ext(t.links.pullRequest, `#${t.pullRequest}`) : h("span", { class: "pj-missing" }, "none")),
+          ...dd("Branch", t.links.branch ? ext(t.links.branch, t.branch!) : h("span", { class: "pj-missing" }, t.branch ? "name not linkable" : "none")),
+          ...dd("Commit", t.links.commit ? ext(t.links.commit, t.evidence.find((e) => e.field === "commit_sha")!.value) : h("span", { class: "pj-missing" }, "none recorded")),
+          ...dd("Phase blocker", t.blocker ? h("span", { class: "pj-bad" }, t.blocker) : h("span", { class: "pj-missing" }, "none"))),
+        h("div", {}, h("h3", {}, "Evidence fields"),
+          h("div", { class: "pj-evidence" }, ...t.evidence.map((e) => h("div", { class: "r" }, h("span", { class: "muted" }, e.field),
+            e.recorded ? h("code", {}, e.value) : h("span", { class: "pj-missing" }, "missing"))))),
+        t.validationErrors.length ? h("div", {}, h("h3", {}, "Ledger rule problems"), h("ul", { class: "pj-errors" }, ...t.validationErrors.map((e) => h("li", { class: "pj-bad" }, e)))) : null,
+        h("div", {}, h("h3", {}, "Next action (derived from the status)"), h("p", {}, t.nextAction), phase ? h("p", { class: "pj-note" }, `Phase exit criterion: ${phase.exitCriterion}`) : null),
+        t.ktLinks.length ? h("div", {}, h("h3", {}, "KT documents"), h("ul", { class: "pj-list" }, ...t.ktLinks.map((k) => h("li", {}, ext(k.url, k.title))))) : null].filter((n): n is HTMLElement => n !== null));
+    }
+    if (!dialog.open) dialog.showModal();
+  }
+
+  function closeTask(): void {
+    const dialog = $("#pj-dialog") as HTMLDialogElement;
+    if (dialog.open) dialog.close();
+  }
+
+  // --- routing ------------------------------------------------------------------------------------------------------------------------
+  async function ensurePrd(): Promise<void> {
+    if (prd || prdError) return;
+    try { prd = await api.get<Prd>("/api/v1/project/prd"); } catch (e) { if (e instanceof ApiError && e.kind === "client") prdError = e.message; else throw e; }
+  }
+  async function ensureNotebook(): Promise<void> {
+    if (notebook || notebookError) return;
+    try { notebook = await api.get<Notebook>("/api/v1/project/notebook"); } catch (e) { if (e instanceof ApiError && e.kind === "client") notebookError = e.message; else throw e; }
+  }
+
+  let shown = false;
+
+  async function renderTab(r: { tab: Tab; arg: string | null; query: string | null }): Promise<void> {
+    currentTab = r.tab;
+    lastTab = r.tab;
+    shown = true;
+    showTab(r.tab);
+    try {
+      if (r.tab === "overview") renderOverview();
+      else if (r.tab === "roadmap") renderRoadmap(r.arg);
+      else if (r.tab === "board") renderBoard();
+      else if (r.tab === "team") renderTeam();
+      else if (r.tab === "prd") {
+        renderPrd(null, r.query ?? ""); // skeleton first
+        await ensurePrd();
+        let section = r.arg;
+        const byNumber = new URLSearchParams(location.hash.split("?")[1] ?? "").get("s");
+        if (!section && byNumber && prd) section = sectionForNumber(prd, byNumber)?.id ?? null;
+        renderPrd(section, r.query ?? "");
+        if (section) document.querySelector("#panel-prd article")?.scrollIntoView({ block: "nearest" });
+      } else if (r.tab === "notebook") {
+        renderNotebook();
+        await ensureNotebook();
+        renderNotebook();
+      }
+    } catch (e) {
+      panel(r.tab).replaceChildren(h("div", { class: "pj-card pj-state", role: "alert" }, h("h2", {}, "This view could not load"),
+        h("p", { class: "muted" }, e instanceof ApiError ? e.message : "Something unexpected went wrong."), h("p", { class: "small" }, "Reload the page to try again.")));
+    }
+  }
+
+  async function route(): Promise<void> {
+    if (!overview) return;
+    const r = parseRoute(location.hash);
+    if (r.task) {
+      // A direct link to a task shows the board behind the dialog; closing returns to the tab the user came from.
+      if (!shown) await renderTab({ tab: "board", arg: null, query: null });
+      openTask(r.task);
+      return;
+    }
+    closeTask();
+    await renderTab(r);
+  }
+
+  function showTab(tab: Tab): void {
+    for (const t of TABS) {
+      const selected = t === tab;
+      const btn = $(`#tab-${t}`);
+      btn.setAttribute("aria-selected", String(selected));
+      btn.tabIndex = selected ? 0 : -1;
+      panel(t).hidden = !selected;
+    }
+  }
+
+  function wire(): void {
+    if (wired) return;
+    wired = true;
+    const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>("#pj-tabs [role=tab]"));
+    tabs.forEach((btn, i) => {
+      btn.addEventListener("click", () => { location.hash = routeHref(btn.dataset.tab as Tab); });
+      btn.addEventListener("keydown", (ev) => {
+        const target = ev.key === "ArrowRight" ? (i + 1) % tabs.length : ev.key === "ArrowLeft" ? (i - 1 + tabs.length) % tabs.length : ev.key === "Home" ? 0 : ev.key === "End" ? tabs.length - 1 : -1;
+        if (target < 0) return;
+        ev.preventDefault();
+        const next = tabs[target]!;
+        next.focus();
+        location.hash = routeHref(next.dataset.tab as Tab);
+      });
+    });
+    window.addEventListener("hashchange", () => { void route(); });
+    const dialog = $("#pj-dialog") as HTMLDialogElement;
+    $("#pj-dialog-close").addEventListener("click", () => { location.hash = routeHref(lastTab); });
+    dialog.addEventListener("cancel", (ev) => { ev.preventDefault(); location.hash = routeHref(lastTab); });
+    dialog.addEventListener("click", (ev) => { if (ev.target === dialog) location.hash = routeHref(lastTab); });
+    $("#pj-unavailable-retry").addEventListener("click", () => { void reloadPage(); });
+  }
+
+  function setUnavailable(message: string | null): void {
+    $("#pj-unavailable").hidden = message === null;
+    $("#pj-main").hidden = message !== null;
+    if (message !== null) $("#pj-unavailable-text").textContent = message;
+  }
+
+  async function boot(): Promise<void> {
+    try {
+      // One request per resource per page load; the PRD and notebook are fetched only when their tab is opened. No polling.
+      const [o, p, t] = await Promise.all([
+        api.get<Overview>("/api/v1/project/overview"), api.get<{ phases: Phase[] }>("/api/v1/project/phases"), api.get<{ tasks: Task[] }>("/api/v1/project/tasks"),
+      ]);
+      overview = o; phases = p.phases; tasks = t.tasks;
+      loadedAt = new Date().toLocaleTimeString();
+      $("#pj-meta").textContent = `Read from ${o.ledger.source} at ${loadedAt}`;
+      setUnavailable(null);
+      await route();
+    } catch (e) {
+      // A missing or unusable source file is a precise state of its own, not a sign-in or connectivity problem.
+      if (e instanceof ApiError && e.kind === "client" && e.code.startsWith("PROJECT_SOURCE")) { overview = null; setUnavailable(`${e.message} (${e.code})`); return; }
+      throw e;
+    }
+  }
+
+  wire();
+  startPage({ load: boot });
+</script>

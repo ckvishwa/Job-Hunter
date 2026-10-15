@@ -58,3 +58,14 @@ The PRD is the **product baseline** and `PROGRESS_LEDGER.json` is the **executio
 - **Approval / reviewer:** Product Owner (instruction above); Hani review pending.
 - **Implementation commit / test evidence:** documentation only.
 - **New PRD version and SHA-256 (if altered):** n/a
+
+### ADR-0003 — Internal read-only Project command center inside the existing app
+- **Date (UTC):** 2026-10-14
+- **Proposed by / reviewed by:** Product Owner decision in session / Developer (via agent); independent review by Hani456 pending
+- **PRD requirement IDs affected:** none. The locked PRD, its checksum and every task status are untouched; the dashboard reads them.
+- **Problem and alternatives:** The team needs one place to see real phases, task evidence and review queues. Alternatives: (1) keep reading `docs/PROGRESS.md` (static, no filtering, no PRD navigation); (2) a separate editable tracker or database (rejected: a second source of truth would drift from the ledger); (3) an external tool such as Notion (rejected: not local-first, would copy project records off the machine).
+- **Decision and rationale:** Add a read-only authenticated API (`/api/v1/project/*`, fixed source files, no write route) and an Astro page `/project` in the existing app. Phase state and evidence rules are a TypeScript port of `scripts/sync_progress.py`, pinned to it by a parity test that runs the Python script on a synthetic ledger and on the real ledger. Only evidence accepted by those rules counts as verified.
+- **Security, candidate consent and regression impact:** Reuses the existing session, loopback host guard and no-store headers; no new credential; no candidate or resume data is read. Markdown is rendered with text nodes only. The only change to shared UI is one navigation link; existing routes still build and respond.
+- **Approval / reviewer:** Product Owner (scope); QA review pending (ledger task P0-11). The dashboard is not Gate A evidence and does not change Gate A.
+- **Implementation commit / test evidence:** branch `feature/project-command-center`, see P0-11 in the ledger.
+- **New PRD version and SHA-256 (if altered):** unchanged.
