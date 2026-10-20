@@ -5,6 +5,7 @@ import multipart from "@fastify/multipart";
 import { ZodError, z } from "zod";
 import { FactRuleError, attestFact, type FactRuleCode } from "../candidate/fact-lifecycle.js";
 import { SENSITIVE_FACT_KINDS } from "../domain/candidate-profile.js";
+import { summarizeResumeFacts } from "../candidate/resume-summary.js";
 import type { CandidateRepo } from "../db/candidate-repo.js";
 import { RolesRepo } from "../db/roles-repo.js";
 import { ProfileRepo } from "../db/profile-repo.js";
@@ -76,6 +77,7 @@ const attestBody = z
   .strict();
 
 const loginBody = z.object({ accessToken: z.string().min(1).max(512) }).strict();
+const pastedResumeBody = z.object({ text: z.string().min(1).max(500_000) }).strict();
 const uuid = z.string().uuid();
 
 function sniffType(bytes: Buffer): "pdf" | "docx" | null {
@@ -193,6 +195,21 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   });
 
   // --- resumes ------------------------------------------------------------------------------------------------------
+  app.post("/api/v1/resumes/text", { bodyLimit: config.maxUploadBytes }, async (req, reply) => {
+    const { text } = pastedResumeBody.parse(req.body);
+    if (!text.trim()) return send(reply, 400, "EMPTY_TEXT", "Paste resume text before saving.");
+    const bytes = Buffer.from(text, "utf8");
+    if (bytes.length > config.maxUploadBytes) return send(reply, 413, "FILE_TOO_LARGE", `The text exceeds ${config.maxUploadBytes} bytes.`);
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const storageRef = files.save(sha256, "text", bytes);
+    const result = await repo.registerResume({ userId: user.id, sha256, fileType: "text", byteSize: bytes.length, storageRef, retryableErrorCodes: RETRYABLE_CODES });
+    if (result.version.state === "UPLOADED" || result.version.state === "EXTRACTING") queue.enqueue(result.version.id);
+    if (config.demoProfile && (await profiles.active(user.id))?.kind === "demo") {
+      await profiles.classify(user.id, { resumeId: result.resume.id, provenance: "fixture", authorized: true, basis: "demo mode (JH_DEMO_PROFILE=1): uploads are fixtures", actor: "demo-mode" });
+    }
+    return reply.code(202).send({ resumeId: result.resume.id, versionId: result.version.id, state: result.version.state, duplicate: !result.created, requeued: result.requeued });
+  });
+
   app.post("/api/v1/resumes", async (req, reply) => {
     if (!req.isMultipart()) return send(reply, 415, "UNSUPPORTED_MEDIA_TYPE", "Send the resume as multipart/form-data with a file field.");
     const part = await req.file();
@@ -216,6 +233,14 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   });
 
   app.get("/api/v1/resumes", async () => ({ resumes: await repo.listResumes(user.id) }));
+
+  app.get("/api/v1/resumes/:id/summary", async (req, reply) => {
+    const id = uuid.safeParse((req.params as { id: string }).id);
+    const detail = id.success ? await repo.getResumeDetail(user.id, id.data) : null;
+    if (!detail) return send(reply, 404, "NOT_FOUND", "Unknown resume.");
+    const facts = await repo.listFacts(user.id, detail.resumeId);
+    return { state: detail.version.state, ...summarizeResumeFacts(facts) };
+  });
 
   app.get("/api/v1/resumes/:id", async (req, reply) => {
     const id = uuid.safeParse((req.params as { id: string }).id);

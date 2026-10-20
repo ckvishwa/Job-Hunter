@@ -4,7 +4,17 @@ import PageHead from "../components/PageHead.astro";
 ---
 
 <Base title="Orbital — Résumés" crumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Résumés" }]}>
-  <PageHead eyebrow="Step 1 · Your résumé" number="01" title="Turn your résumé into facts you can verify." lead="Upload a PDF or DOCX. Facts are proposed from the text; nothing counts until you review and approve it." />
+  <PageHead eyebrow="Step 1 · Your résumé" number="01" title="Turn your résumé into facts you can verify." lead="Upload a PDF or DOCX, or paste resume text. Facts are proposed from the text; nothing counts until you review and approve it." />
+    <section>
+      <h2>Paste a résumé</h2>
+      <p class="muted">For pasted text, Job Hunter extracts name, phone, email, and skills. Check the results before approving them.</p>
+      <form id="paste-form">
+        <label for="resume-text">Résumé text</label>
+        <textarea id="resume-text" rows="12" maxlength="500000" required></textarea>
+        <div><button type="submit">Analyze pasted résumé</button> <span id="paste-msg" role="status"></span></div>
+      </form>
+      <div id="paste-summary" hidden></div>
+    </section>
     <section>
       <h2>Upload a résumé</h2>
       <p class="muted">PDF or DOCX, up to 5 MB. Files are checked on the server (type, size, safe structure); scanned images are not read.</p>
@@ -22,7 +32,7 @@ import PageHead from "../components/PageHead.astro";
         <thead><tr><th>Uploaded</th><th>Type</th><th>State</th><th>Pending</th><th>Approved</th><th>Rejected</th><th></th></tr></thead>
         <tbody id="resumes"></tbody>
       </table>
-      <p id="resumes-empty" class="empty" hidden>No résumés yet. Upload one above; the first step is always your own document.</p>
+      <p id="resumes-empty" class="empty" hidden>No résumés yet. Upload a file or paste text above.</p>
     </section>
 </Base>
 
@@ -38,9 +48,27 @@ import PageHead from "../components/PageHead.astro";
 
   const ACTIVE = new Set(["UPLOADED", "EXTRACTING"]);
   let timer: number | undefined;
+  let pastedResumeId: string | null = null;
+
+  async function showPastedSummary(state: string): Promise<void> {
+    if (!pastedResumeId || state !== "PROPOSED") return;
+    const summary = await api.get<{ name: string | null; phone: string | null; email: string | null; skills: string[] }>(`/api/v1/resumes/${encodeURIComponent(pastedResumeId)}/summary`);
+    const box = $("#paste-summary");
+    clear(box);
+    box.append(
+      h("h3", {}, "Details to review"),
+      h("p", {}, `Name: ${summary.name ?? "Not found"}`),
+      h("p", {}, `Phone: ${summary.phone ?? "Not found"}`),
+      h("p", {}, `Email: ${summary.email ?? "Not found"}`),
+      h("p", {}, `Skills: ${summary.skills.length ? summary.skills.join(", ") : "None found"}`),
+      h("a", { href: `/review?id=${encodeURIComponent(pastedResumeId)}` }, "Review these facts"),
+    );
+    box.hidden = false;
+  }
 
   async function refresh(): Promise<void> {
     const { resumes } = await api.get<{ resumes: ResumeRow[] }>("/api/v1/resumes");
+    if (!pastedResumeId) pastedResumeId = resumes.find((r) => r.fileType === "text")?.resumeId ?? null;
     const body = $("#resumes");
     clear(body);
     $("#resumes-empty").hidden = resumes.length > 0;
@@ -58,6 +86,9 @@ import PageHead from "../components/PageHead.astro";
         ),
       );
     }
+    const pasted = resumes.find((r) => r.resumeId === pastedResumeId);
+    if (pasted?.state === "PROPOSED") await showPastedSummary(pasted.state);
+    if (pasted?.state === "FAILED") say($("#paste-msg"), `Analysis failed (${pasted.errorCode ?? "unknown error"}).`, "error");
     window.clearTimeout(timer);
     // Polling only while something is processing; a failed poll is shown, not thrown into the void.
     if (resumes.some((r) => ACTIVE.has(r.state))) timer = window.setTimeout(() => void refresh().catch(pollFailed), 1200);
@@ -81,6 +112,23 @@ import PageHead from "../components/PageHead.astro";
       await refresh();
     } catch (error) {
       say($("#upload-msg"), error instanceof ApiError ? `${error.message} (${error.code})` : "Upload failed.", "error");
+    }
+  });
+
+  $("#paste-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const input = $("#resume-text") as HTMLTextAreaElement;
+    if (!input.value.trim()) return;
+    $("#paste-summary").hidden = true;
+    say($("#paste-msg"), "Analyzing...", "info");
+    try {
+      const result = await api.post<{ resumeId: string; state: string }>("/api/v1/resumes/text", { text: input.value });
+      pastedResumeId = result.resumeId;
+      input.value = "";
+      say($("#paste-msg"), `Saved. State: ${result.state}.`, "ok");
+      await refresh();
+    } catch (error) {
+      say($("#paste-msg"), error instanceof ApiError ? `${error.message} (${error.code})` : "Analysis failed.", "error");
     }
   });
 

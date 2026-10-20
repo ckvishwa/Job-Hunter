@@ -62,8 +62,8 @@ def create_app(settings: Settings) -> FastAPI:
     async def extract_resume(request: Request, fileType: str = ""):
         if not authorized(request):
             return error(401, "UNAUTHORIZED", "Missing or invalid service token.")
-        if fileType not in ("pdf", "docx"):
-            return error(400, "UNSUPPORTED_FILE_TYPE", "fileType must be pdf or docx.")
+        if fileType not in ("pdf", "docx", "text"):
+            return error(400, "UNSUPPORTED_FILE_TYPE", "fileType must be pdf, docx or text.")
         declared = request.headers.get("content-length")
         if declared and declared.isdigit() and int(declared) > MAX_BODY_BYTES:
             return error(413, "FILE_TOO_LARGE", "Body exceeds the service limit.")

@@ -5,10 +5,10 @@ import { randomBytes } from "node:crypto";
 // Private storage for uploaded resumes. Files are named by content hash; no user-supplied name ever reaches the filesystem.
 // The upload directory lives under gitignored private-runtime/.
 
-const REF = /^[a-f0-9]{64}\.(pdf|docx)$/;
+const REF = /^[a-f0-9]{64}\.(pdf|docx|text)$/;
 
 export interface FileStore {
-  save(sha256: string, fileType: "pdf" | "docx", bytes: Buffer): string;
+  save(sha256: string, fileType: "pdf" | "docx" | "text", bytes: Buffer): string;
   read(ref: string): Buffer;
 }
 

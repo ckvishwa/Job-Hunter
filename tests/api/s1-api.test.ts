@@ -118,6 +118,35 @@ suite("S1 API (PostgreSQL)", () => {
   // --- upload validation and idempotency ---------------------------------------------------------------------------------
 
   describe("upload", () => {
+    it("persists pasted text and only the requested contact and skill proposals", async () => {
+      ai.set(() => sampleResponse({ fileType: "text" }));
+      const first = await postJson(h, s, "/api/v1/resumes/text", { text: SAMPLE_TEXT });
+      expect(first.status).toBe(202);
+      await h.queue.idle();
+      const id = first.body.resumeId as string;
+      const detail = (await getJson(h, s, `/api/v1/resumes/${id}`)).body;
+      expect(detail.fileType).toBe("text");
+      expect(detail.version.state).toBe("PROPOSED");
+      const facts = (await getJson(h, s, `/api/v1/resumes/${id}/facts`)).body.facts;
+      expect(facts).toHaveLength(4);
+      expect(facts.every((fact: { approvalStatus: string }) => fact.approvalStatus === "pending")).toBe(true);
+      expect(facts.map((fact: { kind: string }) => fact.kind).sort()).toEqual(["email", "legal_name", "skill", "skill"]);
+      expect((await getJson(h, s, `/api/v1/resumes/${id}/summary`)).body).toEqual({
+        state: "PROPOSED", name: "Jordan Rivers", phone: null, email: "jordan@example.com", skills: ["Python", "Splunk"],
+      });
+      const stored = await h.pool.query("SELECT file_type, storage_ref FROM resumes WHERE id=$1", [id]);
+      expect(stored.rows[0].file_type).toBe("text");
+      expect(stored.rows[0].storage_ref).toMatch(/^[a-f0-9]{64}\.text$/);
+      const again = await postJson(h, s, "/api/v1/resumes/text", { text: SAMPLE_TEXT });
+      expect(again.body).toMatchObject({ resumeId: id, duplicate: true, state: "PROPOSED" });
+      ai.set(() => sampleResponse());
+    });
+
+    it("rejects blank pasted text without saving it", async () => {
+      const result = await postJson(h, s, "/api/v1/resumes/text", { text: "   " });
+      expect([result.status, result.body.error.code]).toEqual([400, "EMPTY_TEXT"]);
+    });
+
     it("rejects non-multipart bodies, empty files and unsupported content, whatever the file name says", async () => {
       const json = await h.app.inject({ method: "POST", url: "/api/v1/resumes", headers: authHeaders(s, { "content-type": "application/json" }), payload: { x: 1 } });
       expect(json.statusCode).toBe(415);

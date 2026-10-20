@@ -233,11 +233,11 @@ export function sampleResponse(overrides: Partial<ExtractResponse> = {}): Extrac
 
 export class FakeAi implements AiClient {
   calls = 0;
-  constructor(private behavior: (bytes: Uint8Array, fileType: "pdf" | "docx") => ExtractResponse | AiServiceError = () => sampleResponse()) {}
+  constructor(private behavior: (bytes: Uint8Array, fileType: "pdf" | "docx" | "text") => ExtractResponse | AiServiceError = () => sampleResponse()) {}
   set(behavior: FakeAi["behavior"]): void {
     this.behavior = behavior;
   }
-  async extractResume(bytes: Uint8Array, fileType: "pdf" | "docx"): Promise<ExtractResponse> {
+  async extractResume(bytes: Uint8Array, fileType: "pdf" | "docx" | "text"): Promise<ExtractResponse> {
     this.calls += 1;
     const out = this.behavior(bytes, fileType);
     if (out instanceof AiServiceError) throw out;

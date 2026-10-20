@@ -1,4 +1,4 @@
-"""PDF / DOCX -> normalized plain text. Deterministic, no network, no OCR.
+"""PDF / DOCX / pasted UTF-8 -> normalized plain text. Deterministic, no network, no OCR.
 
 Typed failures (ExtractError.code): UNREADABLE_FILE, ENCRYPTED_PDF, TOO_MANY_PAGES, NO_TEXT_LAYER, UNSAFE_DOCX,
 NO_DOCX_BODY. A scanned PDF is reported as NO_TEXT_LAYER; it is never silently treated as an empty resume.
@@ -133,4 +133,12 @@ def extract(data: bytes, file_type: str) -> ExtractedDocument:
         return extract_pdf(data)
     if file_type == "docx":
         return extract_docx(data)
+    if file_type == "text":
+        try:
+            text = normalize_text(data.decode("utf-8", errors="strict"))
+        except UnicodeDecodeError as error:
+            raise ExtractError("UNREADABLE_FILE", "Pasted resume text must be valid UTF-8.") from error
+        if not text.strip():
+            raise ExtractError("NO_TEXT_LAYER", "The pasted resume is empty.")
+        return ExtractedDocument(text=text, page_count=1)
     raise ExtractError("UNSUPPORTED_FILE_TYPE", f"Unsupported file type {file_type!r}.")

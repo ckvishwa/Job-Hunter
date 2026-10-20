@@ -41,7 +41,7 @@ export const extractResponseSchema = z
   .object({
     schemaRevision: z.literal(AI_SCHEMA_REVISION),
     parserRevision: z.string().min(1).max(200),
-    fileType: z.enum(["pdf", "docx"]),
+    fileType: z.enum(["pdf", "docx", "text"]),
     text: z.string().min(1).max(500_000),
     textSha256: z.string().regex(/^[a-f0-9]{64}$/),
     warnings: z.array(z.object({ code: z.string().min(1).max(80), message: z.string().max(500), start: z.number().int().nullish(), end: z.number().int().nullish() }).strict()).max(200),

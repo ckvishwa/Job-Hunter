@@ -74,7 +74,11 @@ export class ExtractionQueue {
       return fail("INTERNAL_ERROR", "Extraction failed unexpectedly.");
     }
     try {
-      const { drafts, dropped } = buildPendingFacts(response, {
+      if (response.fileType !== loaded.resume.fileType) return fail("AI_SCHEMA_INVALID", "The extracted document type did not match the upload.");
+      const proposed = loaded.resume.fileType === "text"
+        ? { ...response, facts: response.facts.filter((fact) => ["legal_name", "phone", "email", "skill"].includes(fact.kind)) }
+        : response;
+      const { drafts, dropped } = buildPendingFacts(proposed, {
         resumeReference: `resume-${loaded.resume.sha256.slice(0, 12)}.${loaded.resume.fileType}`,
         scope: versionId,
       });
