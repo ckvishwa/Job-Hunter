@@ -15,7 +15,7 @@ import {
 export interface ResumeRow {
   id: string;
   sha256: string;
-  fileType: "pdf" | "docx";
+  fileType: "pdf" | "docx" | "text";
   byteSize: number;
   storageRef: string;
   createdAt: Date;
@@ -139,7 +139,7 @@ export class CandidateRepo {
 
   /** Idempotent: the same bytes for the same user always resolve to the same resume and the same version. */
   async registerResume(input: {
-    userId: string; sha256: string; fileType: "pdf" | "docx"; byteSize: number; storageRef: string; retryableErrorCodes: ReadonlySet<string>;
+    userId: string; sha256: string; fileType: "pdf" | "docx" | "text"; byteSize: number; storageRef: string; retryableErrorCodes: ReadonlySet<string>;
   }): Promise<{ resume: ResumeRow; version: VersionRow; created: boolean; requeued: boolean }> {
     return this.tx(async (c) => {
       const inserted = await c.query(

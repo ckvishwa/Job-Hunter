@@ -61,7 +61,7 @@ class ExtractStats(Strict):
 class ExtractResponse(Strict):
     schemaRevision: Literal[1] = 1
     parserRevision: str
-    fileType: Literal["pdf", "docx"]
+    fileType: Literal["pdf", "docx", "text"]
     text: str
     textSha256: str
     warnings: list[Warning_]

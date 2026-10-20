@@ -47,6 +47,19 @@ def test_rejects_unknown_file_type():
     assert post(make_client(), b"x", file_type="exe").json()["error"]["code"] == "UNSUPPORTED_FILE_TYPE"
 
 
+def test_pasted_text_uses_the_resume_parser():
+    text = "Jordan Rivers\njordan@example.com | (555) 010-1234\nSKILLS\nPython, Splunk\nEXPERIENCE\nNorthwind | SOC Analyst | Jan 2022 – Present"
+    response = post(make_client(), text.encode("utf-8"), file_type="text")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["fileType"] == "text"
+    assert body["text"] == text
+    assert {(fact["kind"], fact["value"]) for fact in body["facts"]} >= {
+        ("legal_name", "Jordan Rivers"), ("email", "jordan@example.com"),
+        ("phone", "(555) 010-1234"), ("skill", "Python"),
+    }
+
+
 def test_corrupt_files_are_typed_errors_not_500s():
     c = make_client()
     assert post(c, b"%PDF-1.4 not really a pdf").json()["error"]["code"] == "UNREADABLE_FILE"

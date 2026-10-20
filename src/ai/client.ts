@@ -22,7 +22,7 @@ export class AiServiceError extends Error {
 }
 
 export interface AiClient {
-  extractResume(bytes: Uint8Array, fileType: "pdf" | "docx"): Promise<ExtractResponse>;
+  extractResume(bytes: Uint8Array, fileType: "pdf" | "docx" | "text"): Promise<ExtractResponse>;
 }
 
 export interface AiClientOptions {
