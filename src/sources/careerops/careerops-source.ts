@@ -27,6 +27,10 @@ function describeRunFailure(run: CareerOpsRunResult): string {
       return `spawn error: ${run.message}`;
     case "timeout":
       return `timed out after ${run.timeoutMs}ms`;
+    case "stdout-capped":
+      return `stdout exceeded ${run.maxStdoutBytes} bytes`;
+    case "cancelled":
+      return "cancelled";
     case "non-zero-exit":
       return `exited with code ${run.exitCode}: ${run.stderr || "(no stderr)"}`;
     case "empty-stdout":

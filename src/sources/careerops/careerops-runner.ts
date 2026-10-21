@@ -5,7 +5,9 @@ import {
 } from "./careerops-preflight.js";
 import { careerOpsScanResultSchema, type CareerOpsScanResult } from "./careerops-schema.js";
 
-export const CAREER_OPS_ATS_SOURCES = ["greenhouse", "lever", "ashby", "workday", "icims"] as const;
+/** ATS families scan-ats-full.mjs accepts at pinned Career Ops dff9703a. */
+export const CAREER_OPS_ATS_SOURCES = ["greenhouse", "lever", "ashby", "workday", "icims", "bamboohr"] as const;
+export const DEFAULT_MAX_STDOUT_BYTES = 8 * 1024 * 1024;
 export type CareerOpsAtsSource = (typeof CAREER_OPS_ATS_SOURCES)[number];
 
 export interface RunCareerOpsScanOptions {
@@ -17,6 +19,10 @@ export interface RunCareerOpsScanOptions {
   atsCompanyLimit?: number;
   atsSources?: CareerOpsAtsSource[];
   timeoutMs: number;
+  /** Hard cap so a long scan cannot grow an unbounded stdout string. */
+  maxStdoutBytes?: number;
+  signal?: AbortSignal;
+  onHeartbeat?: (event: { stdoutBytes: number; stderrBytes: number; at: string }) => void;
 }
 
 // Narrow structural subset of ChildProcess this module actually uses -- real `spawn`'s return
@@ -49,6 +55,8 @@ export type CareerOpsRunResult =
   | { kind: "preflight-failed"; preflight: CareerOpsPreflightResult }
   | { kind: "spawn-error"; message: string }
   | { kind: "timeout"; timeoutMs: number; stdout: string; stderr: string }
+  | { kind: "stdout-capped"; maxStdoutBytes: number; stdoutBytes: number; stderr: string }
+  | { kind: "cancelled"; stderr: string }
   | { kind: "non-zero-exit"; exitCode: number | null; stdout: string; stderr: string }
   | { kind: "empty-stdout"; stderr: string }
   | { kind: "invalid-json"; stdout: string; stderr: string; parseError: string }
@@ -99,6 +107,9 @@ interface RawProcessResult {
   stdout: string;
   stderr: string;
   timedOut: boolean;
+  capped: boolean;
+  cancelled: boolean;
+  stdoutBytes: number;
   spawnErrorMessage?: string;
 }
 
@@ -108,16 +119,24 @@ function runProcess(
   args: string[],
   cwd: string,
   timeoutMs: number,
+  maxStdoutBytes: number,
+  signal?: AbortSignal,
+  onHeartbeat?: RunCareerOpsScanOptions["onHeartbeat"],
 ): Promise<RawProcessResult> {
   return new Promise((resolve) => {
     let settled = false;
     let stdout = "";
     let stderr = "";
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
+    let capped = false;
+    let cancelled = false;
 
     const settle = (result: RawProcessResult) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
       resolve(result);
     };
 
@@ -125,27 +144,45 @@ function runProcess(
     try {
       child = spawnFn(execPath, args, { cwd, shell: false });
     } catch (err) {
-      // Thrown synchronously by spawnFn itself, before any timer exists -- nothing to clear.
-      resolve({ exitCode: null, stdout: "", stderr: "", timedOut: false, spawnErrorMessage: (err as Error).message });
+      resolve({ exitCode: null, stdout: "", stderr: "", timedOut: false, capped: false, cancelled: false, stdoutBytes: 0, spawnErrorMessage: (err as Error).message });
       return;
     }
 
     const timer = setTimeout(() => {
       child.kill();
-      settle({ exitCode: null, stdout, stderr, timedOut: true });
+      settle({ exitCode: null, stdout, stderr, timedOut: true, capped, cancelled, stdoutBytes });
     }, timeoutMs);
 
+    const onAbort = () => {
+      cancelled = true;
+      child.kill();
+      settle({ exitCode: null, stdout, stderr, timedOut: false, capped, cancelled: true, stdoutBytes });
+    };
+    if (signal?.aborted) onAbort();
+    else signal?.addEventListener("abort", onAbort, { once: true });
+
     child.stdout?.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf-8");
+      const text = chunk.toString("utf-8");
+      stdoutBytes += Buffer.byteLength(text);
+      if (stdoutBytes > maxStdoutBytes) {
+        capped = true;
+        child.kill();
+        settle({ exitCode: null, stdout, stderr, timedOut: false, capped: true, cancelled, stdoutBytes });
+        return;
+      }
+      stdout += text;
+      onHeartbeat?.({ stdoutBytes, stderrBytes, at: new Date().toISOString() });
     });
     child.stderr?.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf-8");
+      const text = chunk.toString("utf-8");
+      stderrBytes += Buffer.byteLength(text);
+      if (stderrBytes <= maxStdoutBytes) stderr += text;
     });
     child.on("error", (err: Error) => {
-      settle({ exitCode: null, stdout, stderr, timedOut: false, spawnErrorMessage: err.message });
+      settle({ exitCode: null, stdout, stderr, timedOut: false, capped, cancelled, stdoutBytes, spawnErrorMessage: err.message });
     });
     child.on("close", (code: number | null) => {
-      settle({ exitCode: code, stdout, stderr, timedOut: false });
+      settle({ exitCode: code, stdout, stderr, timedOut: false, capped, cancelled, stdoutBytes });
     });
   });
 }
@@ -169,10 +206,25 @@ export async function runCareerOpsScan(
 
   const spawnFn = deps.spawnFn ?? defaultSpawnFn;
   const args = buildArgs(preflight.scanScriptPath!, validated.value);
-  const raw = await runProcess(spawnFn, process.execPath, args, options.careerOpsHome, validated.value.timeoutMs);
+  const raw = await runProcess(
+    spawnFn,
+    process.execPath,
+    args,
+    options.careerOpsHome,
+    validated.value.timeoutMs,
+    options.maxStdoutBytes ?? DEFAULT_MAX_STDOUT_BYTES,
+    options.signal,
+    options.onHeartbeat,
+  );
 
   if (raw.spawnErrorMessage !== undefined) {
     return { kind: "spawn-error", message: raw.spawnErrorMessage };
+  }
+  if (raw.cancelled) {
+    return { kind: "cancelled", stderr: raw.stderr };
+  }
+  if (raw.capped) {
+    return { kind: "stdout-capped", maxStdoutBytes: options.maxStdoutBytes ?? DEFAULT_MAX_STDOUT_BYTES, stdoutBytes: raw.stdoutBytes, stderr: raw.stderr };
   }
   if (raw.timedOut) {
     return { kind: "timeout", timeoutMs: validated.value.timeoutMs, stdout: raw.stdout, stderr: raw.stderr };
