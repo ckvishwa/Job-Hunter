@@ -21,6 +21,20 @@ function validDeps(overrides: Partial<Parameters<typeof preflightCareerOps>[1]> 
 }
 
 describe("preflightCareerOps", () => {
+  test("honors CAREER_OPS_PORTALS when the pin has no portals.yml", async () => {
+    const previous = process.env.CAREER_OPS_PORTALS;
+    process.env.CAREER_OPS_PORTALS = path.join("C:", "fake", "broad-portals.yml");
+    try {
+      const existsFn = vi.fn((target: string) => [HOME, SCAN_SCRIPT, process.env.CAREER_OPS_PORTALS, process.execPath].includes(target));
+      const result = await preflightCareerOps({ careerOpsHome: HOME }, { existsFn, statFn: vi.fn((target: string) => (target === HOME ? fakeDir() : fakeFile())), execFileFn: vi.fn().mockResolvedValue({ stdout: "abc123\n", stderr: "" }) });
+      expect(result.ok).toBe(true);
+      expect(result.errors).toEqual([]);
+    } finally {
+      if (previous === undefined) delete process.env.CAREER_OPS_PORTALS;
+      else process.env.CAREER_OPS_PORTALS = previous;
+    }
+  });
+
   test("a valid installation passes with no errors or warnings", async () => {
     const result = await preflightCareerOps({ careerOpsHome: HOME }, validDeps());
 

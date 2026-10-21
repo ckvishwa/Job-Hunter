@@ -44,6 +44,7 @@ describe("careerops process bounds", () => {
     await vi.waitFor(() => expect(spawnFn).toHaveBeenCalled());
     const call = spawnFn.mock.calls[0] as unknown as [string, string[]] | undefined;
     expect(call?.[1].join(" ")).toContain("--ats bamboohr");
+    expect(call?.[1].join(" ")).not.toContain("--include-undated");
     child.stdout.emit("data", Buffer.from(JSON.stringify({
       date: "2026-10-21", sources: ["bamboohr"], resumed: false, sinceDays: 1,
       companiesAvailable: 1, companiesScanned: 0, capHit: false, datasetStatus: {},
@@ -53,5 +54,20 @@ describe("careerops process bounds", () => {
     })));
     child.emit("close", 0);
     expect((await promise).kind).toBe("success");
+  });
+
+  test("passes --include-undated only when the caller asks to keep unknown dates", async () => {
+    const child = new FakeChild();
+    const spawnFn = vi.fn(() => child);
+    const promise = runCareerOpsScan(
+      { careerOpsHome: PASSING.careerOpsHome, sinceDays: 14, timeoutMs: 5000, atsCompanyLimit: 2, includeUndated: true },
+      { spawnFn, preflightFn: async () => PASSING },
+    );
+    await vi.waitFor(() => expect(spawnFn).toHaveBeenCalled());
+    const call = spawnFn.mock.calls[0] as unknown as [string, string[]] | undefined;
+    expect(call?.[1].join(" ")).toContain("--include-undated");
+    expect(call?.[1].join(" ")).toContain("--limit 2");
+    child.emit("close", 0);
+    await promise;
   });
 });

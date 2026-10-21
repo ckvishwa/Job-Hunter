@@ -70,7 +70,8 @@ export async function preflightCareerOps(
 
   const { careerOpsHome, pinnedCommit } = options;
   const scanScriptPath = path.join(careerOpsHome, "scan-ats-full.mjs");
-  const portalsPath = path.join(careerOpsHome, "portals.yml");
+  const override = process.env.CAREER_OPS_PORTALS?.trim();
+  const portalsPath = override || path.join(careerOpsHome, "portals.yml");
 
   if (!existsFn(careerOpsHome)) {
     errors.push({ code: "HOME_NOT_FOUND", message: `CareerOps home not found: ${careerOpsHome}` });

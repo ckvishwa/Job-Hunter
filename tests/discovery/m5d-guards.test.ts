@@ -20,6 +20,7 @@ describe("posting dates and checkpoints", () => {
     expect(postingDatePrecision("Posted 3 days ago").precision).toBe("approximate");
     expect(postingDatePrecision(null)).toEqual({ postedAt: null, precision: "unknown" });
     expect(postingDatePrecision("2026-03-01").precision).toBe("exact");
+    expect(postingDatePrecision("October 21, 2026").precision).toBe("exact");
   });
 
   test("a corrupted checkpoint is refused", () => {

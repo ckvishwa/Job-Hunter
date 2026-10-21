@@ -18,6 +18,8 @@ export interface RunCareerOpsScanOptions {
   // this module, so the two concepts can never be accidentally wired together.
   atsCompanyLimit?: number;
   atsSources?: CareerOpsAtsSource[];
+  /** Keep postings the scanner would otherwise drop for having no publish date. */
+  includeUndated?: boolean;
   timeoutMs: number;
   /** Hard cap so a long scan cannot grow an unbounded stdout string. */
   maxStdoutBytes?: number;
@@ -67,6 +69,7 @@ interface NormalizedOptions {
   sinceDays: number;
   atsCompanyLimit?: number;
   atsSources: CareerOpsAtsSource[];
+  includeUndated: boolean;
   timeoutMs: number;
 }
 
@@ -91,7 +94,7 @@ function validateOptions(options: RunCareerOpsScanOptions): { ok: true; value: N
 
   return {
     ok: true,
-    value: { sinceDays: options.sinceDays, atsCompanyLimit: options.atsCompanyLimit, atsSources, timeoutMs: options.timeoutMs },
+    value: { sinceDays: options.sinceDays, atsCompanyLimit: options.atsCompanyLimit, atsSources, includeUndated: options.includeUndated === true, timeoutMs: options.timeoutMs },
   };
 }
 
@@ -99,6 +102,7 @@ function buildArgs(scanScriptPath: string, opts: NormalizedOptions): string[] {
   const args = [scanScriptPath, "--json", "--dry-run", "--since", String(opts.sinceDays)];
   if (opts.atsCompanyLimit !== undefined) args.push("--limit", String(opts.atsCompanyLimit));
   if (opts.atsSources.length > 0) args.push("--ats", opts.atsSources.join(","));
+  if (opts.includeUndated) args.push("--include-undated");
   return args;
 }
 
