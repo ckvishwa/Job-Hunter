@@ -29,12 +29,12 @@ function executors(): Executors {
       calls.vitest.push(files);
       return new Map(files.map((f) => [f, failing.has(f) ? { status: "fail", tests: 3, failedTests: [`${f} > case`], durationMs: 5, skipped: 0 } : skipping.has(f) ? { ...pass(3), skipped: 1 } : pass(3)]));
     },
-    async python() { calls.python += 1; return pass(7); },
+    async python(files) { calls.python += 1; return new Map(files.map((file) => [file, pass(7)])); },
     async typecheck() { calls.typecheck += 1; return pass(0); },
   };
 }
 const ctx = (): Context => ({ root, chromeVersion: "1.0", vitestVersion: "2.1.9", nodeVersion: "v24", neverCache: [] });
-const engine = (batchSize = 2, neverCache: RegExp[] = []): TestEngine => new TestEngine({ ctx: { ...ctx(), neverCache }, executors: executors(), batchSize, now: () => new Date("2026-10-11T12:00:00Z") });
+const engine = (batchSize = 2, neverCache: RegExp[] = [], gitChangedFiles: () => string[] | null = () => null): TestEngine => new TestEngine({ ctx: { ...ctx(), neverCache }, executors: executors(), batchSize, now: () => new Date("2026-10-11T12:00:00Z"), gitChangedFiles });
 
 beforeEach(() => {
   root = mkdtempSync(path.join(os.tmpdir(), "orbital-testcache-"));
@@ -62,8 +62,24 @@ const executedFiles = (): string[] => calls.vitest.flat().sort();
 const ALL = ["tests/a.test.ts", "tests/b.test.ts", "tests/c.test.ts", "tests/db.test.ts", "tests/dyn.test.ts"];
 
 describe("TEST-EFFICIENCY: change-aware execution with verified reuse", () => {
-  it("first run executes everything; an unchanged repeat executes nothing but the uncertain unit, and says what was reused", async () => {
+  it("a cold cache without a git diff refuses to become a full run", async () => {
     const first = await engine().run("changed");
+    expect(first.executedNow.units).toBe(0);
+    expect(first.selectionReason).toMatch(/refused to expand/);
+    expect(calls.vitest).toEqual([]);
+    expect(calls.python + calls.typecheck).toBe(0);
+  });
+
+  it("a cold cache with a git diff runs only the affected tests", async () => {
+    const selected = await engine(2, [], () => ["src/b.ts"]).run("changed");
+    expect(executedFiles()).toEqual(["tests/b.test.ts"]);
+    expect(calls.typecheck).toBe(1);
+    expect(calls.python).toBe(0);
+    expect(selected.selectionReason).toMatch(/git diff/);
+  });
+
+  it("a full run seeds receipts; an unchanged repeat executes nothing but the uncertain unit", async () => {
+    const first = await engine().run("full");
     expect(first.executedNow.files).toEqual(expect.arrayContaining(ALL));
     expect(first.executedNow.units).toBe(7); // 5 test files + python + typecheck
     expect(first.reused).toEqual({ units: 0, tests: 0 });
@@ -78,7 +94,7 @@ describe("TEST-EFFICIENCY: change-aware execution with verified reuse", () => {
   });
 
   it("an edit to a source file invalidates exactly the tests that import it, and names the changed file", async () => {
-    await engine().run("changed");
+    await engine().run("full");
     calls = { vitest: [], python: 0, typecheck: 0 };
     write("src/b.ts", "export const b = 2;");
     const s = await engine().run("changed");
@@ -89,7 +105,7 @@ describe("TEST-EFFICIENCY: change-aware execution with verified reuse", () => {
   });
 
   it("a shared utility invalidates every test that imports it, and a brand-new untracked file is picked up", async () => {
-    await engine().run("changed");
+    await engine().run("full");
     calls = { vitest: [], python: 0, typecheck: 0 };
     write("src/shared.ts", "export const shared = 2;");
     write("tests/new.test.ts", 'import { a } from "../src/a.js";\nvoid a;');
@@ -98,7 +114,7 @@ describe("TEST-EFFICIENCY: change-aware execution with verified reuse", () => {
   });
 
   it("a data file named by a string literal (fixtures, config, SQL) is part of the fingerprint", async () => {
-    await engine().run("changed");
+    await engine().run("full");
     calls = { vitest: [], python: 0, typecheck: 0 };
     write("config/x.json", '{"x":2}');
     await engine().run("changed");
@@ -106,7 +122,7 @@ describe("TEST-EFFICIENCY: change-aware execution with verified reuse", () => {
   });
 
   it("a database migration invalidates database tests only; package lock and config changes invalidate everything", async () => {
-    await engine().run("changed");
+    await engine().run("full");
     calls = { vitest: [], python: 0, typecheck: 0 };
     write("db/migrations/0001.sql", "select 2;");
     await engine().run("changed");
@@ -124,7 +140,7 @@ describe("TEST-EFFICIENCY: change-aware execution with verified reuse", () => {
   });
 
   it("a failing test is never hidden by an older green result, and passing again needs a real pass", async () => {
-    await engine().run("changed");
+    await engine().run("full");
     write("src/b.ts", "export const b = 99;");
     failing.add("tests/b.test.ts");
     const bad = await engine().run("changed");
@@ -151,7 +167,7 @@ describe("TEST-EFFICIENCY: change-aware execution with verified reuse", () => {
 
   it("tests that skipped anything, uncertain scans and never-cache policies are never served from a receipt", async () => {
     skipping.add("tests/c.test.ts");
-    await engine(2, [/^tests\/a\.test\.ts$/]).run("changed");
+    await engine(2, [/^tests\/a\.test\.ts$/]).run("full");
     calls = { vitest: [], python: 0, typecheck: 0 };
     const s = await engine(2, [/^tests\/a\.test\.ts$/]).run("changed");
     expect(executedFiles()).toEqual(["tests/a.test.ts", "tests/c.test.ts", "tests/dyn.test.ts"]);
@@ -161,7 +177,7 @@ describe("TEST-EFFICIENCY: change-aware execution with verified reuse", () => {
   });
 
   it("a corrupt or tampered receipt is ignored and the unit is rerun", async () => {
-    await engine().run("changed");
+    await engine().run("full");
     const dir = path.join(root, "private-runtime", "test-cache", "receipts");
     for (const f of readdirSync(dir)) {
       const text = JSON.parse(readFileSync(path.join(dir, f), "utf8"));
@@ -177,7 +193,7 @@ describe("TEST-EFFICIENCY: change-aware execution with verified reuse", () => {
 describe("crash recovery", () => {
   it("resumes an interrupted run: verified completed units are reused, the interrupted batch and the rest are rerun", async () => {
     interruptAtBatch = 2; // batch size 2 over 5 files: batch 1 completes, batch 2 'crashes'
-    const first = await engine().run("changed");
+    const first = await engine().run("full");
     expect(first.pending.length).toBeGreaterThan(0);
     const done = first.executedNow.files.filter((f) => f.startsWith("tests/"));
     expect(done).toHaveLength(2);
@@ -193,7 +209,7 @@ describe("crash recovery", () => {
 
   it("a file edited between the interruption and the resume is rerun even though its batch had finished", async () => {
     interruptAtBatch = 2;
-    await engine().run("changed");
+    await engine().run("full");
     interruptAtBatch = null;
     write("src/a.ts", "export const a = 5;");
     calls = { vitest: [], python: 0, typecheck: 0 };
@@ -203,7 +219,7 @@ describe("crash recovery", () => {
 
   it("a corrupt checkpoint is ignored (nothing to resume) and the receipts still prevent duplicate work", async () => {
     interruptAtBatch = 2;
-    await engine().run("changed");
+    await engine().run("full");
     writeFileSync(path.join(root, "private-runtime", "test-cache", "current-run.json"), "garbage");
     interruptAtBatch = null;
     expect(await engine().resume()).toBeNull();
@@ -222,7 +238,7 @@ describe("full regression gate", () => {
   });
 
   it("test:full ignores receipts, and its gate is PASS_CURRENT only for the exact tree it passed on", async () => {
-    await engine().run("changed");
+    await engine().run("full");
     calls = { vitest: [], python: 0, typecheck: 0 };
     const full = await engine().run("full");
     expect(executedFiles()).toEqual(ALL); // uncached: every file ran again

@@ -68,16 +68,24 @@ export function realExecutors(ctx: Context, log: (s: string) => void = () => und
       for (const f of files) if (!out.has(f)) out.set(f, { status: "fail", tests: 0, failedTests: ["(no result reported for this file)"], skipped: 0, durationMs: 0 });
       return out;
     },
-    async python() {
+    async python(files) {
       const py = path.join(ctx.root, "services", "ai", ".venv", process.platform === "win32" ? "Scripts" : "bin", process.platform === "win32" ? "python.exe" : "python");
-      if (!existsSync(py)) return { status: "fail", tests: 0, failedTests: ["services/ai/.venv is missing"], durationMs: 0 } as UnitResult;
-      const started = Date.now();
-      const logFile = path.join(cache, "logs", `pytest-${process.pid}.log`);
-      const code = await run(py, ["-m", "pytest", "-q", "-p", "no:cacheprovider"], path.join(ctx.root, "services", "ai"), logFile);
-      const text = existsSync(logFile) ? readFileSync(logFile, "utf8") : "";
-      const passed = Number(/(\d+) passed/.exec(text)?.[1] ?? 0);
-      const failed = Number(/(\d+) failed/.exec(text)?.[1] ?? 0);
-      return { status: code === 0 && failed === 0 ? "pass" : "fail", tests: passed + failed, failedTests: failed ? [`${failed} pytest failure(s)`] : [], skipped: Number(/(\d+) skipped/.exec(text)?.[1] ?? 0), durationMs: Date.now() - started };
+      const out = new Map<string, UnitResult>();
+      if (!existsSync(py)) {
+        for (const file of files) out.set(file, { status: "fail", tests: 0, failedTests: ["services/ai/.venv is missing"], skipped: 0, durationMs: 0 });
+        return out;
+      }
+      for (const file of files) {
+        const started = Date.now();
+        const target = file === "python:services/ai" ? "." : file.replace(/^python:/, "");
+        const logFile = path.join(cache, "logs", `pytest-${process.pid}-${Buffer.from(file).toString("hex").slice(0, 12)}.log`);
+        const code = await run(py, ["-m", "pytest", "-q", "-p", "no:cacheprovider", target], path.join(ctx.root, "services", "ai"), logFile);
+        const text = existsSync(logFile) ? readFileSync(logFile, "utf8") : "";
+        const passed = Number(/(\d+) passed/.exec(text)?.[1] ?? 0);
+        const failed = Number(/(\d+) failed/.exec(text)?.[1] ?? 0);
+        out.set(file, { status: code === 0 && failed === 0 ? "pass" : "fail", tests: passed + failed, failedTests: failed ? [`${failed} pytest failure(s)`] : [], skipped: Number(/(\d+) skipped/.exec(text)?.[1] ?? 0), durationMs: Date.now() - started });
+      }
+      return out;
     },
     async typecheck() {
       const started = Date.now();

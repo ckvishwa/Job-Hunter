@@ -192,6 +192,11 @@ export function discoverTests(root: string): string[] {
   return walkFiles(path.join(root, "tests"), (n) => n.endsWith(".test.ts"));
 }
 
+/** One fingerprintable pytest module. Empty when the AI package has no test files. */
+export function discoverPythonTests(root: string): string[] {
+  return walkFiles(path.join(root, "services", "ai", "tests"), (n) => n.startsWith("test_") && n.endsWith(".py")).map((file) => rel(root, file));
+}
+
 export const unitFingerprint = (root: string, unit: string, dirs: string[], accept: (n: string) => boolean, files: string[] = [], tokens: string[] = []): { hash: string; components: Record<string, string> } => {
   const components: Record<string, string> = { tree: treeHash(root, dirs, accept), runtime: tokens.join("; "), ...Object.fromEntries(files.map((f) => [f, hashFile(path.join(root, f))])) };
   return { hash: sha(JSON.stringify([unit, components])), components };

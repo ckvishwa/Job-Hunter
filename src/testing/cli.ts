@@ -20,6 +20,7 @@ function print(s: Summary): number {
   console.log(`  invalidated  : ${s.invalidated.length}${s.invalidated.slice(0, 6).map((i) => `\n      ${i.unit}: ${i.reasons.slice(0, 4).join("; ")}`).join("")}`);
   console.log(`  FAILED       : ${s.failed.length}${s.failed.map((f) => `\n      ${f.unit}: ${f.tests.slice(0, 3).join(" | ")}`).join("")}`);
   console.log(`  skipped      : ${s.skipped.length}   pending: ${s.pending.length}${s.pending.slice(0, 6).map((p) => `\n      ${p}`).join("")}`);
+  console.log(`  selection    : ${s.selectionReason}`);
   console.log(`  full regression gate: ${s.fullGate.state}. ${s.fullGate.detail}${s.fullGate.tests !== undefined ? ` (${s.fullGate.tests} tests, ${s.fullGate.units} units, run ${s.fullGate.runId}, ${s.fullGate.finishedAt})` : ""}`);
   return s.failed.length ? 1 : s.pending.length ? 3 : 0;
 }

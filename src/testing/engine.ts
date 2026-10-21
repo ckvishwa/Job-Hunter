@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { closureHashes, discoverTests, explainChange, fingerprintTest, resetFileHashCache, treeFingerprint, unitFingerprint, type Context, type Fingerprint } from "./fingerprint.js";
+import { closureHashes, discoverPythonTests, discoverTests, explainChange, fingerprintTest, resetFileHashCache, treeFingerprint, unitFingerprint, type Context, type Fingerprint } from "./fingerprint.js";
+import { gitChangedFiles, selectChangedUnits } from "./selection.js";
 
 // Smart test engine. Receipts and checkpoints live in private-runtime/test-cache/ (git-ignored). Rules it never breaks:
 //   * a receipt is reused only when its fingerprint equals the current one AND it passed AND the unit is not uncertain / never-cache
@@ -53,7 +54,7 @@ export interface Checkpoint {
 
 export interface Executors {
   vitest(files: string[]): Promise<Map<string, UnitResult> | null>;
-  python(): Promise<UnitResult | null>;
+  python(files: string[]): Promise<Map<string, UnitResult> | null>;
   typecheck(): Promise<UnitResult | null>;
 }
 
@@ -63,6 +64,8 @@ export interface EngineOptions {
   batchSize?: number;
   now?: () => Date;
   log?: (line: string) => void;
+  /** null means git cannot be asked. The CLI uses the real worktree; tests inject a list. */
+  gitChangedFiles?: () => string[] | null;
 }
 
 const sha = (s: string): string => createHash("sha256").update(s).digest("hex");
@@ -93,6 +96,7 @@ export interface Summary {
   pending: string[];
   durationMs: number;
   fullGate: GateStatus;
+  selectionReason: string;
 }
 
 export type GateStatus = { state: "PASS_CURRENT" | "PASS_STALE" | "FAILED" | "NONE"; detail: string; finishedAt?: string; runId?: string; tests?: number; units?: number };
@@ -133,11 +137,18 @@ export class TestEngine {
       const f: Fingerprint = fingerprintTest(ctx, abs);
       return { ref: { id: f.unit, kind: "vitest" as const }, fp: () => ({ hash: f.hash, components: f.components, closure: f.closure, uncertain: f.uncertain }) };
     });
-    const py = unitFingerprint(ctx.root, "python", ["services/ai"], (n) => /\.(?:py|txt|json|ini)$/.test(n), [], ["python-tests"]);
+    const pyFiles = discoverPythonTests(ctx.root);
+    const pythonUnits = pyFiles.length > 0
+      ? pyFiles.map((file) => {
+          const id = `python:${file}`;
+          const fp = unitFingerprint(ctx.root, id, [], () => false, [file, "services/ai/requirements.txt"], ["pytest-module"]);
+          return { ref: { id, kind: "python" as const }, fp: () => ({ ...fp, closure: [file, "services/ai/requirements.txt"], uncertain: null }) };
+        })
+      : [{ ref: { id: "python:services/ai", kind: "python" as const }, fp: () => ({ ...unitFingerprint(ctx.root, "python", ["services/ai"], (n) => /\.(?:py|txt|json|ini)$/.test(n), [], ["python-tests"]), closure: [], uncertain: null }) }];
     const tc = unitFingerprint(ctx.root, "typecheck", ["src", "tests"], (n) => n.endsWith(".ts"), ["tsconfig.json", "package-lock.json", "package.json"], [`node ${ctx.nodeVersion}`]);
     return [
       ...tests,
-      { ref: { id: "python:services/ai", kind: "python" }, fp: () => ({ ...py, closure: [], uncertain: null }) },
+      ...pythonUnits,
       { ref: { id: "typecheck:tsc", kind: "typecheck" }, fp: () => ({ ...tc, closure: [], uncertain: null }) },
     ];
   }
@@ -180,8 +191,19 @@ export class TestEngine {
     const lineageFull = mode === "full";
     const validForLineage = (s: UnitState): boolean => (lineageFull ? s.reusable && s.receipt?.runId === runId : s.reusable);
     let toRun: UnitState[];
-    if (mode === "failed") toRun = states.filter((s) => s.receipt?.status === "fail" && !(resumeRun && validForLineage(s)));
-    else toRun = states.filter((s) => !validForLineage(s));
+    let selectionReason = "full suite";
+    if (mode === "failed") {
+      selectionReason = "failed receipts only";
+      toRun = states.filter((s) => s.receipt?.status === "fail" && !(resumeRun && validForLineage(s)));
+    } else if (mode === "changed" && !resumeRun) {
+      const gitFiles = this.o.gitChangedFiles ? this.o.gitChangedFiles() : gitChangedFiles(this.o.ctx.root);
+      const selected = selectChangedUnits(states, gitFiles);
+      selectionReason = selected.reason;
+      toRun = states.filter((s) => selected.ids.has(s.unit.id));
+    } else {
+      selectionReason = resumeRun ? `resume ${resumeRun.mode}` : "full suite";
+      toRun = states.filter((s) => !validForLineage(s));
+    }
     const reused = mode === "failed" ? [] : states.filter((s) => !toRun.includes(s) && s.reusable);
     const skipped = mode === "failed" ? states.filter((s) => !toRun.includes(s)).map((s) => s.unit.id) : [];
     const checkpoint = (status: Checkpoint["status"], done: string[]): void =>
@@ -216,11 +238,21 @@ export class TestEngine {
       }
       checkpoint("running", done);
     }
-    for (const kind of ["python", "typecheck"] as const) {
+    for (const kind of ["typecheck"] as const) {
       const s = toRun.find((x) => x.unit.kind === kind);
       if (!s) continue;
-      const r = await (kind === "python" ? this.o.executors.python() : this.o.executors.typecheck());
+      const r = await this.o.executors.typecheck();
       if (r) record(s, r);
+      checkpoint("running", done);
+    }
+    const pythonUnitsToRun = toRun.filter((s) => s.unit.kind === "python");
+    if (pythonUnitsToRun.length > 0) {
+      const results = await this.o.executors.python(pythonUnitsToRun.map((s) => s.unit.id));
+      if (!results) this.log("python produced no result; its modules stay pending");
+      else for (const s of pythonUnitsToRun) {
+        const r = results.get(s.unit.id);
+        if (r) record(s, r);
+      }
       checkpoint("running", done);
     }
 
@@ -242,6 +274,7 @@ export class TestEngine {
       executedNow: { units: executed.length, tests: executed.reduce((n, e) => n + e.result.tests, 0), files: executed.map((e) => e.id) },
       reused: { units: reused.length, tests: reused.reduce((n, s) => n + (s.receipt?.tests ?? 0), 0) },
       invalidated: stale, failed, skipped, pending: [...pending], durationMs: Date.now() - started, fullGate: this.gateStatus(),
+      selectionReason,
     };
   }
 
