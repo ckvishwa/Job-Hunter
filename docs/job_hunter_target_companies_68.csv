@@ -1,0 +1,69 @@
+﻿id,displayName,sector,priority,parentCompany,aliases,existingFortune500RegistryMatch,registryCareersUrlCandidate,registryCareersUrlAsOf,registryAtsType,sponsorshipHistoryStatus,roleLevelSponsorshipStatus,searchCoverageStatus
+palo-alto-networks,Palo Alto Networks,Cybersecurity & Identity,P0_OWNER_TARGET,,,Palo Alto Networks,,,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+crowdstrike,CrowdStrike,Cybersecurity & Identity,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+zscaler,Zscaler,Cybersecurity & Identity,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+okta,Okta,Cybersecurity & Identity,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+fortinet,Fortinet,Cybersecurity & Identity,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+cloudflare,Cloudflare,Cybersecurity & Identity,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+splunk,Splunk,Cybersecurity & Identity,P0_OWNER_TARGET,Cisco Systems,Cisco; Cisco Splunk,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+rapid7,Rapid7,Cybersecurity & Identity,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+qualys,Qualys,Cybersecurity & Identity,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+check-point-software-technologies,Check Point Software Technologies,Cybersecurity & Identity,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+tenable,Tenable,Cybersecurity & Identity,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+google,Google,Big Tech & Cloud,P0_OWNER_TARGET,Alphabet,Alphabet; Google LLC; Google Cloud; Mandiant,Alphabet,https://www.google.com/about/careers/applications,2026-07-30,greenhouse,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+amazon-aws,Amazon / AWS,Big Tech & Cloud,P0_OWNER_TARGET,Amazon,Amazon; Amazon Web Services; AWS,Amazon,https://www.amazon.jobs,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+microsoft,Microsoft,Big Tech & Cloud,P0_OWNER_TARGET,,,Microsoft,https://careers.microsoft.com/,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+meta-platforms,Meta Platforms,Big Tech & Cloud,P0_OWNER_TARGET,,Meta,Meta Platforms,https://www.metacareers.com/,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+apple,Apple,Big Tech & Cloud,P0_OWNER_TARGET,,,Apple,https://jobs.apple.com,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+cisco-systems,Cisco Systems,Big Tech & Cloud,P0_OWNER_TARGET,,Cisco,Cisco Systems,,,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+oracle,Oracle,Big Tech & Cloud,P0_OWNER_TARGET,,,Oracle,,,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+ibm,IBM,Big Tech & Cloud,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+salesforce,Salesforce,Enterprise Software & Data,P0_OWNER_TARGET,,,Salesforce,,,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+servicenow,ServiceNow,Enterprise Software & Data,P0_OWNER_TARGET,,,ServiceNow,,,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+databricks,Databricks,Enterprise Software & Data,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+snowflake,Snowflake,Enterprise Software & Data,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+paypal,PayPal,Enterprise Software & Data,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+stripe,Stripe,Enterprise Software & Data,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+uber-technologies,Uber Technologies,Enterprise Software & Data,P0_OWNER_TARGET,,,Uber Technologies,,,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+linkedin,LinkedIn,Enterprise Software & Data,P0_OWNER_TARGET,Microsoft,Microsoft LinkedIn,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+adobe,Adobe,Enterprise Software & Data,P0_OWNER_TARGET,,,Adobe,,,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+intuit,Intuit,Enterprise Software & Data,P0_OWNER_TARGET,,,Intuit,,,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+nvidia,Nvidia,Enterprise Software & Data,P0_OWNER_TARGET,,NVIDIA,Nvidia,https://www.nvidia.com/en-us/about-nvidia/careers/,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+amd,AMD,Enterprise Software & Data,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+intel-corporation,Intel Corporation,Enterprise Software & Data,P0_OWNER_TARGET,,Intel,Intel,,,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+vmware-by-broadcom,VMware by Broadcom,Enterprise Software & Data,P0_OWNER_TARGET,Broadcom,VMware; Broadcom; VMware Cloud Foundation,Broadcom,https://www.broadcom.com/company/careers,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+nutanix,Nutanix,Enterprise Software & Data,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+sprinklr,Sprinklr,Enterprise Software & Data,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+freshworks,Freshworks,Enterprise Software & Data,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+jpmorgan-chase-co,JPMorgan Chase & Co.,Banking & Fintech,P0_OWNER_TARGET,,JPMorgan Chase; JPMC,JPMorgan Chase,https://www.jpmorganchase.com/careers,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+goldman-sachs,Goldman Sachs,Banking & Fintech,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+bank-of-america,Bank of America,Banking & Fintech,P0_OWNER_TARGET,,,Bank of America,https://careers.bankofamerica.com/en-us,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+citigroup,Citigroup,Banking & Fintech,P0_OWNER_TARGET,,,Citigroup,https://jobs.citi.com/,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+wells-fargo,Wells Fargo,Banking & Fintech,P0_OWNER_TARGET,,,Wells Fargo,https://www.wellsfargojobs.com/en/,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+capital-one,Capital One,Banking & Fintech,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+fidelity-investments,Fidelity Investments,Banking & Fintech,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+morgan-stanley,Morgan Stanley,Banking & Fintech,P0_OWNER_TARGET,,,Morgan Stanley,https://www.morganstanley.com/careers/career-opportunities-search,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+charles-schwab,Charles Schwab,Banking & Fintech,P0_OWNER_TARGET,,,Charles Schwab,,,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+american-express,American Express,Banking & Fintech,P0_OWNER_TARGET,,,American Express,https://www.americanexpress.com/en-us/careers/,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+blackrock,BlackRock,Banking & Fintech,P0_OWNER_TARGET,,,BlackRock,,,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+discover-financial-services,Discover Financial Services,Banking & Fintech,P0_OWNER_TARGET,Capital One,Discover; Discover Bank; Capital One,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+deloitte,Deloitte,Consulting & Integration,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+ernst-young-ey,Ernst & Young (EY),Consulting & Integration,P0_OWNER_TARGET,,EY; Ernst and Young,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+pricewaterhousecoopers-pwc,PricewaterhouseCoopers (PwC),Consulting & Integration,P0_OWNER_TARGET,,PwC; PricewaterhouseCoopers,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+accenture,Accenture,Consulting & Integration,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+cognizant,Cognizant,Consulting & Integration,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+infosys,Infosys,Consulting & Integration,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+tata-consultancy-services-tcs,Tata Consultancy Services (TCS),Consulting & Integration,P0_OWNER_TARGET,,TCS; Tata Consultancy Services,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+wipro,Wipro,Consulting & Integration,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+hcl-america,HCL America,Consulting & Integration,P0_OWNER_TARGET,HCLTech,HCLTech; HCL Technologies,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+capgemini,Capgemini,Consulting & Integration,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+epam-systems,EPAM Systems,Consulting & Integration,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+perficient,Perficient,Consulting & Integration,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+slalom-consulting,Slalom Consulting,Consulting & Integration,P0_OWNER_TARGET,,,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+t-mobile-usa,T-Mobile USA,"Telecom, Retail & Industrial",P0_OWNER_TARGET,,T-Mobile; T-Mobile US,,,,,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+at-t,AT&T,"Telecom, Retail & Industrial",P0_OWNER_TARGET,,,AT&T,https://www.att.jobs/,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+comcast,Comcast,"Telecom, Retail & Industrial",P0_OWNER_TARGET,,,Comcast,https://jobs.comcast.com/,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+walmart-associates,Walmart Associates,"Telecom, Retail & Industrial",P0_OWNER_TARGET,Walmart,Walmart,Walmart,https://careers.walmart.com,2026-07-30,workday,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+cvs-health,CVS Health,"Telecom, Retail & Industrial",P0_OWNER_TARGET,,,CVS Health,https://jobs.cvshealth.com/us/en,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+general-motors,General Motors,"Telecom, Retail & Industrial",P0_OWNER_TARGET,,,General Motors,https://search-careers.gm.com/en/,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN
+ford-motor-company,Ford Motor Company,"Telecom, Retail & Industrial",P0_OWNER_TARGET,,Ford; Ford Motor,Ford Motor,https://www.careers.ford.com/,2026-07-30,unknown,USER_SUPPLIED_UNVERIFIED,UNKNOWN,NOT_RUN

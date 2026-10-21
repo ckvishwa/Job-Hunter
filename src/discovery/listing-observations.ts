@@ -89,10 +89,6 @@ export function appendListingObservations(filePath: string, records: readonly Li
   appendJsonlRecords(filePath, records);
 }
 
-export function appendSearchRuns(filePath: string, records: readonly SearchRunRecord[]): void {
-  appendJsonlRecords(filePath, records);
-}
-
 export function searchRun(
   searchRunId: string,
   source: string,
@@ -104,16 +100,16 @@ export function searchRun(
   error: string | null,
   skipped: boolean,
   skipReason: string | null,
-  now = new Date(),
 ): SearchRunRecord {
+  const endedAt = new Date();
   return {
     kind: "search-run",
     searchRunId,
     source,
     keyword,
     location,
-    startedAt: new Date(now.getTime() - durationMs).toISOString(),
-    endedAt: now.toISOString(),
+    startedAt: new Date(endedAt.getTime() - durationMs).toISOString(),
+    endedAt: endedAt.toISOString(),
     durationMs,
     listingsDiscovered,
     listingsRetained,
@@ -121,6 +117,10 @@ export function searchRun(
     skipped,
     skipReason,
   };
+}
+
+export function appendSearchRuns(filePath: string, records: readonly SearchRunRecord[]): void {
+  appendJsonlRecords(filePath, records);
 }
 
 export function defaultObservationPaths(discoveredJobsPath: string, overrides?: { observationsPath?: string; searchRunsPath?: string }): {
