@@ -17,7 +17,7 @@ from .contracts import FactAttributes, ProposedFact, Span, Warning_
 from .linebreaks import NormalizedText, normalize_line_breaks
 from .offsets import Utf16Map
 
-PARSER_REVISION = "resume-rules@2"
+PARSER_REVISION = "resume-rules@3"
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Lines and sections
@@ -48,14 +48,18 @@ def split_lines(text: str) -> list[Line]:
 HEADINGS: dict[str, str] = {
     "skills": "skills", "technical skills": "skills", "core skills": "skills", "key skills": "skills",
     "technologies": "skills", "technical proficiencies": "skills", "core competencies": "skills", "skills and tools": "skills",
+    "technical expertise": "skills", "technical and organizational expertise": "skills",
     "experience": "experience", "professional experience": "experience", "work experience": "experience",
     "employment": "experience", "employment history": "experience", "work history": "experience",
     "relevant experience": "experience", "career history": "experience",
+    "experience continued": "experience", "professional experience continued": "experience",
     "internship": "internship", "internships": "internship", "internship experience": "internship",
     "education": "education", "academic background": "education", "education and training": "education",
+    "education and certifications": "education_certifications",
     "certifications": "certifications", "certification": "certifications", "certificates": "certifications",
     "licenses and certifications": "certifications", "certifications and training": "certifications",
     "projects": "projects", "personal projects": "projects", "academic projects": "projects", "selected projects": "projects",
+    "enterprise programs": "projects", "enterprise programs continued": "projects",
     "summary": "summary", "professional summary": "summary", "objective": "summary", "profile": "summary",
     "volunteer experience": "other", "volunteering": "other", "awards": "other", "references": "other", "publications": "other",
     "interests": "other", "languages": "other",
@@ -195,7 +199,13 @@ _PART_SEP = re.compile(r"\s*[|•·]\s*|\s+[—–-]\s+|\s*[—–]\s*|\s+at\s+|
 
 
 def split_parts(s: str) -> list[str]:
-    s = strip_location(s.strip(" ,|—–-()\t"))
+    s = s.strip(" ,|—–-()\t")
+    # Remove a whole location component, not just its state suffix.
+    pieces = [p.strip() for p in s.split("|")]
+    if len(pieces) > 1 and re.fullmatch(r"[A-Za-z .-]+,\s*(?:[A-Z]{2}|Remote)", pieces[-1]) and pieces[-1].split(",")[-1].strip() in STATES | {"Remote"}:
+        s = "|".join(pieces[:-1]).strip()
+    else:
+        s = strip_location(s)
     parts = [p.strip(" ,()") for p in _PART_SEP.split(s) if p and p.strip(" ,()")]
     if len(parts) == 1 and parts[0].count(", ") == 1:
         parts = [p.strip() for p in parts[0].split(", ")]
@@ -240,6 +250,7 @@ class _Draft:
     end: int
     attributes: dict = field(default_factory=dict)
     notes: str | None = None
+    field_spans: dict[str, tuple[int, int]] = field(default_factory=dict)
 
 
 @dataclass
@@ -279,8 +290,20 @@ def parse_resume(original: str) -> ParseOutput:
     section_of: dict[int, str] = {}
     current = "header"
     first_heading_line: int | None = None
+    after_page_header = False
     for ln in lines:
         h = heading_of(ln)
+        if re.fullmatch(r"(?:.+?\s+)?PAGE\s+\d+\s+OF\s+\d+", ln.stripped, re.IGNORECASE) or (first_heading_line is not None and ln.index > first_heading_line and ln.stripped.casefold() == lines[0].stripped.casefold()):
+            after_page_header = True
+            section_of[ln.index] = "heading"
+            continue
+        if after_page_header and ln.stripped in {head.stripped for head in lines[1:4]}:
+            section_of[ln.index] = "heading"
+            continue
+        after_page_header = False
+        if current == "skills" and ln.stripped.rstrip(":").lower() in {"languages", "cloud & ci", "cloud and ci", "security", "testing", "platforms", "tools", "frameworks"}:
+            section_of[ln.index] = "heading"
+            continue
         if h is not None:
             current = h
             if first_heading_line is None:
@@ -315,8 +338,10 @@ def parse_resume(original: str) -> ParseOutput:
         last = ln
         while True:
             nxt = lines[last.index + 1] if last.index + 1 < len(lines) else None
-            if (nxt is None or section_of[nxt.index] != "skills" or not nxt.stripped or is_bullet(nxt.text) or not nxt.stripped[:1].islower()
-                    or len(last.stripped) < 60 or last.stripped[-1] in ",;|:" or not re.search(r"[,;|]", last.stripped)):
+            acronym_wrap = bool(nxt and re.fullmatch(r"[A-Z][A-Za-z]+s", nxt.stripped) and re.search(r"\b[A-Z]{2,}$", last.stripped))
+            if (nxt is None or section_of[nxt.index] != "skills" or not nxt.stripped or is_bullet(nxt.text)
+                    or not (nxt.stripped[:1].islower() or acronym_wrap)
+                    or (len(last.stripped) < 60 and not acronym_wrap) or last.stripped[-1] in ",;|:/" or not re.search(r"[,;|]|\s/\s", last.stripped)):
                 break
             skill_consumed.add(nxt.index)
             last = nxt
@@ -326,11 +351,21 @@ def parse_resume(original: str) -> ParseOutput:
         if label:
             base += label.start("rest")
             body = label.group("rest")
-        items = split_items(body)
+        # Only spaced slashes are separators; CI/CD and TCP/IP remain one technology.
+        slash_body = re.sub(r"\s+/\s+", "|", body)
+        items = split_items(slash_body) if len(slash_body) == len(body) else split_items(body)
+        if len(slash_body) != len(body):
+            boundaries = [m.span() for m in re.finditer(r"\s+/\s+", body)]
+            items = []
+            cursor = 0
+            for a, b in boundaries + [(len(body), len(body))]:
+                for item, s, e in split_items(body[cursor:a]):
+                    items.append((item, cursor+s, cursor+e))
+                cursor = b
         if not label and len(items) == 1 and (len(items[0][0].split()) > 4 or len(items[0][0]) > 40):
             continue
         for item, s, e in items:
-            item_raw = item.rstrip(".").strip()  # may span a line wrap; the span keeps the raw text, the value collapses whitespace
+            item_raw = item.rstrip("./ ").strip()  # trailing delimiters are not part of a technology name
             item_clean = re.sub(r"\s+", " ", item_raw)
             if not item_clean or len(item_clean) > 40 or len(item_clean.split()) > 5 or re.fullmatch(r"[\d\W]+", item_clean):
                 continue
@@ -352,6 +387,16 @@ def parse_resume(original: str) -> ParseOutput:
         remainder = (ln.text[: m.start()] + " " + ln.text[m.end():]).strip(" ,|—–-()\t")
         parts = split_parts(remainder) if remainder else []
         start_pos, end_pos = ln.start, ln.end
+        if not parts and ln.index >= 2:
+            company_line, title_line = lines[ln.index-1], lines[ln.index-2]
+            if (section_of[company_line.index] == section_of[ln.index] == section_of[title_line.index]
+                    and not is_bullet(company_line.text) and not is_bullet(title_line.text)
+                    and 1 <= len(company_line.stripped.split()) <= 6 and not TITLE_RE.search(company_line.stripped)
+                    and TITLE_RE.search(title_line.stripped) and len(title_line.stripped) <= 80
+                    and not RANGE_RE.search(company_line.text) and not RANGE_RE.search(title_line.text)):
+                parts = [company_line.stripped, title_line.stripped]
+                start_pos = title_line.start
+                used_as_prev.update((company_line.index, title_line.index))
         if len(parts) < 2:
             prev = None
             for cand in reversed(lines[: ln.index]):
@@ -415,10 +460,17 @@ def parse_resume(original: str) -> ParseOutput:
         d = add("employment", value, start_pos, end_pos, attrs, notes, key=("employment", value.lower(), s_val))
         if d is None:
             continue
+        for attr in ("employer", "title"):
+            if attr in attrs:
+                m_attr = re.search(re.escape(attrs[attr]), text[start_pos:end_pos])
+                if m_attr:
+                    d.field_spans[attr] = (start_pos+m_attr.start(), start_pos+m_attr.end())
+        for attr, group in (("startDate", "s"), ("endDate", "e")):
+            d.field_spans[attr] = (ln.start+m.start(group), ln.start+m.end(group))
 
     # --- education --------------------------------------------------------------------------------------------------
     for ln in lines:
-        if section_of[ln.index] != "education" or not ln.stripped or is_bullet(ln.text):
+        if section_of[ln.index] not in ("education", "education_certifications") or not ln.stripped or is_bullet(ln.text):
             continue
         body = LATEX_SPACING.sub("", ln.stripped).rstrip()  # "[1pt]" is a typesetting artefact, not a placeholder
         if PLACEHOLDER.search(body):
@@ -426,16 +478,55 @@ def parse_resume(original: str) -> ParseOutput:
             continue
         if DEGREE_WORDS.search(body) or DEGREE_ABBR.search(body):
             lead = len(ln.text) - len(ln.text.lstrip())
-            add("education", body, ln.start + lead, ln.start + lead + len(body))
+            parts = [p.strip() for p in body.split("|")]
+            value = parts[0] if len(parts) > 1 else body
+            d = add("education", value, ln.start + lead, ln.start + lead + len(value))
+            if d and len(parts) > 1:
+                institution = parts[1]
+                if institution:
+                    d.attributes["institution"] = institution
+                    pos = ln.text.find(institution)
+                    d.field_spans["institution"] = (ln.start+pos, ln.start+pos+len(institution))
+                if len(parts) > 2:
+                    date = parse_date(parts[2])
+                    if isinstance(date, str):
+                        d.attributes["graduationDate"] = date
+                        pos = ln.text.find(parts[2])
+                        d.field_spans["graduationDate"] = (ln.start+pos, ln.start+pos+len(parts[2]))
+            elif d and ln.index + 1 < len(lines):
+                school = lines[ln.index + 1]
+                if (section_of[school.index] == section_of[ln.index] and
+                        re.search(r"\b(?:university|college|institute|school|academy)\b", school.stripped, re.IGNORECASE) and
+                        not DEGREE_WORDS.search(school.stripped) and not DEGREE_ABBR.search(school.stripped)):
+                    d.attributes["institution"] = school.stripped
+                    begin = school.start + len(school.text) - len(school.text.lstrip())
+                    d.field_spans["institution"] = (begin, begin+len(school.stripped))
+                    if school.index + 1 < len(lines):
+                        date_line = lines[school.index + 1]
+                        date = parse_date(date_line.stripped)
+                        if section_of[date_line.index] == section_of[ln.index] and isinstance(date, str):
+                            d.attributes["graduationDate"] = date
+                            begin = date_line.start + len(date_line.text) - len(date_line.text.lstrip())
+                            d.field_spans["graduationDate"] = (begin, begin+len(date_line.stripped))
 
     # --- certifications ---------------------------------------------------------------------------------------------
-    cert_lines = [ln for ln in lines if section_of[ln.index] == "certifications" and ln.stripped]
+    cert_lines = [ln for ln in lines if section_of[ln.index] in ("certifications", "education_certifications") and ln.stripped and not (DEGREE_WORDS.search(ln.stripped) or DEGREE_ABBR.search(ln.stripped))]
     consumed: set[int] = set()
     for pos, ln in enumerate(cert_lines):
         if ln.index in consumed:
             continue
+        # A following issuer/date line belongs to the preceding credential.
+        nxt = cert_lines[pos + 1] if pos + 1 < len(cert_lines) else None
+        metadata = None
+        if nxt is not None and nxt.index == ln.index + 1 and not is_bullet(nxt.text):
+            meta_parts = [p.strip() for p in nxt.stripped.split("|")]
+            if len(meta_parts) == 2 and isinstance(parse_date(meta_parts[1]), str):
+                metadata = (nxt, meta_parts)
+                consumed.add(nxt.index)
         body, off = strip_bullet(ln.text)
-        items = split_items(body, seps="•·|")
+        inline_parts = [p.strip() for p in body.split("|")]
+        inline_metadata = len(inline_parts) >= 3 and isinstance(parse_date(inline_parts[-1]), str)
+        items = split_items(body, seps="•·" if metadata or inline_metadata else "•·|")
         if not items:
             continue
         # A short capitalised line right after a full-width list line continues the last item ("...Cisco Networking" / "Basics").
@@ -454,29 +545,55 @@ def parse_resume(original: str) -> ParseOutput:
                 item = f"{item} {cont.stripped}"
                 end = cont.start + (len(cont.text) - len(cont.text.lstrip())) + len(cont.stripped)
                 note = "Joined across a line wrap (no hyphen in the source); verify the name."
-            name = re.split(r"\s+[—–-]\s+|\s*\|\s*|\s+\(|,\s+(?=issued|earned|expires|\d{4})", item, maxsplit=1)[0].strip()
+            name = re.split(r"\s+[—–]\s+|\s*\|\s*|\s+\(|,\s+(?=issued|earned|expires|\d{4})", item, maxsplit=1)[0].strip()
             if not name or len(name) > 100 or name.endswith(".") or len(name.split()) > 12:
                 continue
             if PLACEHOLDER.search(name):
                 _warn(warnings, nt, umap, "PLACEHOLDER_SKIPPED", "A certification name is a placeholder; not imported.", start, end)
                 continue
-            add("certification", name, start, start + len(name) if note is None else end, notes=note)
+            d = add("certification", name, start, start + len(name) if note is None else end, notes=note)
+            if d and metadata:
+                meta_ln, meta_parts = metadata
+                d.attributes["issuer"] = meta_parts[0]
+                d.attributes["certificationDate"] = parse_date(meta_parts[1])
+                for key, value in (("issuer", meta_parts[0]), ("certificationDate", meta_parts[1])):
+                    p = meta_ln.text.find(value)
+                    d.field_spans[key] = (meta_ln.start+p, meta_ln.start+p+len(value))
+            elif d and inline_metadata:
+                pipe_parts = [p.strip() for p in body.split("|")]
+                if len(pipe_parts) >= 3 and pipe_parts[0] == name and isinstance(parse_date(pipe_parts[2]), str):
+                    d.attributes["issuer"] = pipe_parts[1]
+                    d.attributes["certificationDate"] = parse_date(pipe_parts[2])
+                    for key, value in (("issuer", pipe_parts[1]), ("certificationDate", pipe_parts[2])):
+                        p = ln.text.find(value)
+                        d.field_spans[key] = (ln.start+p, ln.start+p+len(value))
 
     # --- projects ---------------------------------------------------------------------------------------------------
     last_project: _Draft | None = None
     prev_was_project = False
+    description_lines: list[Line] = []
+
+    def flush_description() -> None:
+        nonlocal description_lines
+        if last_project is not None and description_lines:
+            last_project.attributes["description"] = " ".join(x.stripped for x in description_lines)
+            last_project.field_spans["description"] = (description_lines[0].start, description_lines[-1].end)
+        description_lines = []
     for ln in lines:
         if section_of[ln.index] != "projects" or not ln.stripped:
             continue
         tech = TECH_LABEL.match(ln.text)
         if tech:
+            flush_description()
             if last_project is not None and "technologies" not in last_project.attributes:
                 techs = [i for i, _, _ in split_items(tech.group("rest")) if len(i) <= 40][:40]
                 if techs:
                     last_project.attributes["technologies"] = techs
+                    last_project.field_spans["technologies"] = (ln.start+tech.start("rest"), ln.start+tech.end("rest"))
             prev_was_project = False
             continue
         if is_bullet(ln.text):
+            flush_description()
             prev_was_project = False
             continue
         # A separator-delimited stack line right under a project title ("Python — Flask — SHAP •github.com/x/y") lists its technologies.
@@ -484,11 +601,20 @@ def parse_resume(original: str) -> ParseOutput:
         if (prev_was_project and last_project is not None and len(stack) >= 3 and all(len(i.split()) <= 4 and len(i) <= 40 for i in stack)
                 and "technologies" not in last_project.attributes):
             last_project.attributes["technologies"] = stack[:40]
+            last_project.field_spans["technologies"] = (ln.start, ln.end)
+            prev_was_project = False
+            continue
+        explicit_project_title = "|" in ln.stripped and not TECH_LABEL.match(ln.text)
+        if last_project is not None and not explicit_project_title and (description_lines or (prev_was_project and len(ln.stripped.split()) >= 7)):
+            description_lines.append(ln)
             prev_was_project = False
             continue
         if len(ln.stripped) > 100 or ln.stripped.endswith("."):
+            if last_project is not None:
+                description_lines.append(ln)
             prev_was_project = False
             continue
+        flush_description()
         name = re.split(r"\s+[—–-]\s+|\s*\|\s*|\s+\(", ln.stripped, maxsplit=1)[0].strip()
         name = TRAILING_DATE.sub("", name).strip(" ,")  # a trailing "Feb 2026" / "2026" is a date, not part of the name
         if not name or PLACEHOLDER.search(name) or len(name.split()) > 12:
@@ -500,6 +626,15 @@ def parse_resume(original: str) -> ParseOutput:
         prev_was_project = d is not None
         if d is not None:
             last_project = d
+            if explicit_project_title:
+                rest = ln.stripped.split("|", 1)[1].strip()
+                techs = [item for item, _, _ in split_items(rest) if len(item) <= 40]
+                if techs:
+                    d.attributes["technologies"] = techs
+                    start = ln.text.find(rest)
+                    d.field_spans["technologies"] = (ln.start+start, ln.start+start+len(rest))
+
+    flush_description()
 
     # --- warnings from whole-document scans -------------------------------------------------------------------------
     for label, pattern in SENSITIVE_PATTERNS:
@@ -528,6 +663,11 @@ def parse_resume(original: str) -> ParseOutput:
     for d in drafts:
         a = d.attributes
         oa, ob = nt.to_original(d.start, d.end)
+        if d.field_spans:
+            a["fieldSpans"] = {}
+            for key, (start, end) in d.field_spans.items():
+                fa, fb = nt.to_original(start, end)
+                a["fieldSpans"][key] = Span(start=umap.to_u16(fa), end=umap.to_u16(fb), quote=original[fa:fb])
         facts.append(
             ProposedFact(
                 kind=d.kind,  # type: ignore[arg-type]

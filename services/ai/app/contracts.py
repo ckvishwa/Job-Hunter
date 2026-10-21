@@ -31,6 +31,13 @@ class FactAttributes(Strict):
     current: bool | None = None
     employmentType: Literal["internship"] | None = None  # only on an explicit keyword; professional/academic is a reviewer choice
     technologies: list[str] | None = None
+    institution: str | None = None
+    graduationDate: str | None = None
+    issuer: str | None = None
+    certificationDate: str | None = None
+    description: str | None = None
+    # Exact UTF-16 evidence for attributes whose text is separate from the primary value.
+    fieldSpans: dict[str, Span] | None = None
 
 
 class ProposedFact(Strict):

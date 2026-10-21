@@ -58,6 +58,13 @@ export const factAttributesSchema = z
     experienceIds: z.array(idString).max(20).optional(),
     // project
     technologies: z.array(textValue).max(40).optional(),
+    institution: textValue.optional(),
+    graduationDate: yearMonth.optional(),
+    issuer: textValue.optional(),
+    certificationDate: yearMonth.optional(),
+    description: z.string().min(1).max(2000).optional(),
+    fieldSpans: z.record(z.enum(["employer", "title", "startDate", "endDate", "institution", "graduationDate", "issuer", "certificationDate", "technologies", "description"]),
+      z.object({ start: z.number().int().min(0), end: z.number().int().positive(), quote: z.string().min(1) }).strict()).optional(),
     // education / certification / clearance / authorization: free approved detail
     detail: z.string().max(300).optional(),
     // legal_name: the approved given/family split used for separate first-name and last-name form fields.

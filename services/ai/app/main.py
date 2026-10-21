@@ -83,7 +83,7 @@ def create_app(settings: Settings) -> FastAPI:
         except Exception as e:  # never echo file content
             log.error("extract failed: %s", type(e).__name__)
             return error(500, "INTERNAL_ERROR", "Extraction failed unexpectedly.")
-        warnings = list(parsed.warnings)
+        warnings = [Warning_(code="LAYOUT_AMBIGUOUS", message=f"PDF page {w.split('=')[-1]} has uncertain column order; review extracted text.") for w in doc.warnings] + list(parsed.warnings)
         if qwen.status == "UNAVAILABLE":
             warnings.append(Warning_(code="QWEN_FALLBACK_UNAVAILABLE", message=f"Optional model fallback was not usable ({qwen.detail})."))
         facts = sorted([*parsed.facts, *qwen.facts], key=lambda f: (f.span.start, f.span.end))

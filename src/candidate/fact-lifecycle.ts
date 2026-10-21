@@ -91,6 +91,11 @@ export function buildPendingFacts(
       drop("PROPOSAL_SPAN_MISMATCH", "span does not match the extracted text");
       continue;
     }
+    if (proposal.attributes.fieldSpans && Object.values(proposal.attributes.fieldSpans).some((s) =>
+      !(s.start < s.end && s.end <= response.text.length) || response.text.slice(s.start, s.end) !== s.quote)) {
+      drop("PROPOSAL_SPAN_MISMATCH", "attribute evidence does not match the extracted text");
+      continue;
+    }
     const built = toPendingFact(proposal, context.resumeReference);
     if (!built) {
       drop("PROPOSAL_INVALID", "failed validation");
@@ -122,6 +127,28 @@ function toPendingFact(proposal: ProposedFact, resumeReference: string): Omit<Ca
   if (a.technologies) {
     if (proposal.kind !== "project") return null;
     attributes.technologies = a.technologies;
+  }
+  if (a.institution || a.graduationDate) {
+    if (proposal.kind !== "education") return null;
+    if (a.institution) attributes.institution = a.institution;
+    if (a.graduationDate) attributes.graduationDate = a.graduationDate;
+  }
+  if (a.issuer || a.certificationDate) {
+    if (proposal.kind !== "certification") return null;
+    if (a.issuer) attributes.issuer = a.issuer;
+    if (a.certificationDate) attributes.certificationDate = a.certificationDate;
+  }
+  if (a.description) {
+    if (proposal.kind !== "project") return null;
+    attributes.description = a.description;
+  }
+  if (a.fieldSpans) {
+    const allowed = proposal.kind === "employment" ? ["employer", "title", "startDate", "endDate"]
+      : proposal.kind === "education" ? ["institution", "graduationDate"]
+      : proposal.kind === "certification" ? ["issuer", "certificationDate"]
+      : proposal.kind === "project" ? ["technologies", "description"] : [];
+    if (Object.keys(a.fieldSpans).some((field) => !allowed.includes(field))) return null;
+    attributes.fieldSpans = a.fieldSpans;
   }
   const sensitive = (SENSITIVE_FACT_KINDS as readonly string[]).includes(proposal.kind);
   const candidate = {

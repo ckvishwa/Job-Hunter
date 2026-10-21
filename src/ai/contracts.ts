@@ -12,6 +12,9 @@ export const PROPOSABLE_KINDS = ["skill", "employment", "project", "education", 
 export type ProposableKind = (typeof PROPOSABLE_KINDS)[number];
 
 const yearMonth = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
+const sourceSpanSchema = z.object({ start: z.number().int().min(0), end: z.number().int().min(1), quote: z.string().min(1) }).strict();
+const sourceFieldSchema = z.enum(["employer", "title", "startDate", "endDate", "institution", "graduationDate", "issuer", "certificationDate", "technologies", "description"]);
+export const fieldSpansSchema = z.record(sourceFieldSchema, sourceSpanSchema);
 
 export const proposedAttributesSchema = z
   .object({
@@ -22,6 +25,12 @@ export const proposedAttributesSchema = z
     current: z.boolean().nullish(),
     employmentType: z.literal("internship").nullish(),
     technologies: z.array(z.string().min(1).max(300)).max(40).nullish(),
+    institution: z.string().min(1).max(300).nullish(),
+    graduationDate: yearMonth.nullish(),
+    issuer: z.string().min(1).max(300).nullish(),
+    certificationDate: yearMonth.nullish(),
+    description: z.string().min(1).max(2000).nullish(),
+    fieldSpans: fieldSpansSchema.nullish(),
   })
   .strict();
 
@@ -30,7 +39,7 @@ export const proposedFactSchema = z
     kind: z.enum(PROPOSABLE_KINDS),
     value: z.string().min(1).max(300),
     attributes: proposedAttributesSchema,
-    span: z.object({ start: z.number().int().min(0), end: z.number().int().min(1), quote: z.string().min(1) }).strict(),
+    span: sourceSpanSchema,
     proposedBy: z.enum(["rules", "qwen"]),
     notes: z.string().max(300).nullish(),
   })

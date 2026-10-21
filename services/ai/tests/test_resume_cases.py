@@ -35,7 +35,9 @@ def post(client: TestClient, data: bytes, file_type: str, token: str = TOKEN):
 
 
 def normalized(attrs: dict) -> dict:
-    return {k: v for k, v in attrs.items() if v is not None}
+    # The hand-authored oracle predates additive field-level evidence. Compare
+    # semantic values here and validate every new span separately below.
+    return {k: v for k, v in attrs.items() if v is not None and k != "fieldSpans"}
 
 
 def test_there_are_at_least_ten_independent_cases_in_both_formats():
@@ -72,3 +74,5 @@ def test_case_matches_hand_authored_expectation(client: TestClient, case: dict):
         # The quote is exactly the text at the reported UTF-16 span (what JavaScript's String.slice will see).
         assert utf16_slice(body.text, fact.span.start, fact.span.end) == fact.span.quote
         assert 0 <= fact.span.start < fact.span.end <= len(body.text.encode("utf-16-le")) // 2
+        for evidence in (fact.attributes.fieldSpans or {}).values():
+            assert utf16_slice(body.text, evidence.start, evidence.end) == evidence.quote

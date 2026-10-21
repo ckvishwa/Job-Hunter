@@ -34,7 +34,7 @@ def values(text: str, kind: str) -> set[str]:
 
 
 def test_parser_identifies_itself_with_the_new_revision():
-    assert PARSER_REVISION == "resume-rules@2"
+    assert PARSER_REVISION == "resume-rules@3"
 
 
 def test_broken_words_are_rejoined_and_quotes_stay_verbatim():
@@ -107,7 +107,8 @@ def test_employment_splits_employer_title_and_dates_without_choosing_a_category(
     emp = {f.value: f for f in facts_of(EMPLOYMENT, "employment")}
     cognate = emp["Acme Systems — Security Operations Vulnerability Analyst Intern"]
     a = cognate.attributes.model_dump(exclude_none=True)
-    assert a == {"employer": "Acme Systems", "title": "Security Operations Vulnerability Analyst Intern", "startDate": "2022-09", "endDate": "2023-05"}
+    assert {k: v for k, v in a.items() if k != "fieldSpans"} == {"employer": "Acme Systems", "title": "Security Operations Vulnerability Analyst Intern", "startDate": "2022-09", "endDate": "2023-05"}
+    assert a["fieldSpans"]["title"]["quote"] == "Security Operations Vulnerability Analyst Intern"
     assert "employmentType" not in a  # "Intern" in a title never assigns a category
     assert "NOT assigned" in (cognate.notes or "") and "Verify the split" in (cognate.notes or "")
     assert EMPLOYMENT[cognate.span.start:cognate.span.end] == cognate.span.quote

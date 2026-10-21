@@ -134,7 +134,7 @@ def test_qwen_proposals_are_verified_against_the_text_and_marked_as_qwen():
     assert body["stats"]["qwenStatus"] == "USED" and body["stats"]["qwenDropped"] == 3
     for f in qwen_facts:
         assert body["text"][f["span"]["start"]:f["span"]["end"]] == f["span"]["quote"]
-    assert body["parserRevision"].startswith("resume-rules@2+qwen:")
+    assert body["parserRevision"].startswith("resume-rules@3+qwen:")
 
 
 @pytest.mark.parametrize("reply", ["not json", {"facts": "nope"}])
