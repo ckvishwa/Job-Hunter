@@ -1,6 +1,7 @@
 import type { JobPosting } from "../../adapters/types.js";
 import type { RoleConfig } from "../../types.js";
 import { evaluateRelevance } from "../../discovery/relevance.js";
+import { appendProvenance, listingProvenance } from "../../discovery/provenance.js";
 import { buildPlaceholder } from "../../discovery/resolve-phase.js";
 import type { JobSource, SourceDiscoveryOptions, SourceDiscoveryResult } from "../job-source.js";
 import { runCareerOpsScan, type CareerOpsRunResult } from "./careerops-runner.js";
@@ -44,6 +45,7 @@ export interface CareerOpsSourceOptions {
   roles: RoleConfig[];
   timeoutMs?: number;
   runScanFn?: typeof runCareerOpsScan;
+  provenancePath?: string;
 }
 
 export class CareerOpsSource implements JobSource {
@@ -93,7 +95,33 @@ export class CareerOpsSource implements JobSource {
         ? evaluation.matchedProfiles.filter((p) => options.profileIds!.includes(p))
         : evaluation.matchedProfiles;
 
-      if (!evaluation.matched || requestedMatches.length === 0) continue;
+      const selected = evaluation.matched && requestedMatches.length > 0;
+      if (this.opts.provenancePath) {
+        appendProvenance(this.opts.provenancePath, [listingProvenance({
+          capturedAt: new Date().toISOString(),
+          searchRunId: "careerops",
+          source: "careerops",
+          keyword: null,
+          searchLocation: null,
+          title: candidate.title,
+          employer: candidate.company,
+          location: candidate.location,
+          salary: candidate.salarySnippet,
+          resultUrl: candidate.resultUrl,
+          officialUrl: candidate.possibleOfficialUrl,
+          applicationUrl: null,
+          externalId: candidate.sourceJobId,
+          sourceDateText: candidate.postingAgeOrDate,
+          relevanceMatched: evaluation.matched,
+          matchedProfiles: evaluation.matchedProfiles,
+          relevanceReason: evaluation.relevanceReason,
+          disposition: selected ? "retained" : "filtered",
+          filterReason: selected ? null : "outside-the-requested-role-profiles",
+          descriptionText: candidate.descriptionSnippet,
+          descriptionComplete: false,
+        })]);
+      }
+      if (!selected) continue;
 
       candidate.matchedProfiles = requestedMatches;
       candidate.matchedKeywords = evaluation.matchedKeywords;

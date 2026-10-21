@@ -67,7 +67,7 @@ try {
   const jobs = new JobsRepo(pool);
   const chosen = config.companies.slice(0, maxBoards);
   const { runId } = await jobs.createRun(user.id, plan, chosen.map((c) => ({ boardKey: boardKeyOf(c), company: c.company, ats: c.ats, board: c.board })), limits);
-  const runner = new DiscoveryRunner({ repo: jobs, boards: () => config, delayMs, timeoutMs: 20_000, onEvent: (e) => { if (e.kind === "board-end") console.error(`[pilot] ${e.boardKey} -> ${e.status}${e.code ? ` ${e.code}` : ""}`); } });
+  const runner = new DiscoveryRunner({ repo: jobs, boards: () => config, delayMs, timeoutMs: 20_000, provenancePath: path.resolve("data/listing-provenance.jsonl"), onEvent: (e) => { if (e.kind === "board-end") console.error(`[pilot] ${e.boardKey} -> ${e.status}${e.code ? ` ${e.code}` : ""}`); } });
   runner.enqueue(runId);
   await runner.idle();
   const run = (await jobs.getRun(user.id, runId))!;

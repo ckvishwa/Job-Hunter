@@ -5,6 +5,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { BrowserContext, Page } from "playwright";
 import type { DiscoveredJobLite, DiscoveryContext, PortalDiscoveryAdapter } from "../../src/discovery/types.js";
 import { loadDiscoveredJobs } from "../../src/storage/jsonl-store.js";
+import { readProvenance } from "../../src/discovery/provenance.js";
 import { discoveredJob as canonicalJob, greenhousePayload, makeFetchRouter, writeRegistry } from "../helpers/canonical-fixtures.js";
 
 // Task 12 scope only: verify keyword/profile orchestration wiring against the real
@@ -481,6 +482,10 @@ describe("orchestrator relevance filtering + limit placement (Profile Relevance 
     expect(summary.relevantRetained).toBe(0);
     expect(summary.resolutionsAttempted).toBe(0);
     expect(loadDiscoveredJobs(paths.discoveredJobsPath)).toHaveLength(0);
+    const provenance = readProvenance(path.join(path.dirname(paths.discoveredJobsPath), "listing-provenance.jsonl"));
+    expect(provenance.records.map((record) => record.title).sort()).toEqual(["Account Executive, Emerging Enterprise", "Account Executive, Emerging Enterprise"]);
+    expect(provenance.records.every((record) => record.disposition === "filtered")).toBe(true);
+    expect(provenance.records.every((record) => record.postingDateStatus === "unknown")).toBe(true);
   });
 
   it("applies --limit after relevance filtering, not before -- every retained job is written to discoveredJobs.jsonl regardless of limit, but only `limit` many are resolved", async () => {

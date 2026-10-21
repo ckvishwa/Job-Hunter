@@ -55,7 +55,8 @@
     "jobs:import": "tsx src/jobs/import-cli.ts",
     "match:gold": "tsx src/match/gold-cli.ts",
     "match:jd-compare": "tsx src/match/jd-compare-cli.ts",
-    "ai:eval": "pwsh -NoProfile -File scripts/ai-eval.ps1"
+    "ai:eval": "pwsh -NoProfile -File scripts/ai-eval.ps1",
+    "m5:audit": "tsx scripts/m5-export.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.3",

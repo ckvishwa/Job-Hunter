@@ -94,7 +94,12 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   const jobsRepo = deps.jobsRepo ?? new JobsRepo(repo.pool);
   const boards = deps.boards ?? (() => loadBoardsConfig());
   const discovery = defaultLimits();
-  const runner = deps.runner ?? new DiscoveryRunner({ repo: jobsRepo, boards, delayMs: discovery.delayMs, ...(deps.runnerOptions ?? {}) });
+  const runner = deps.runner ?? new DiscoveryRunner({
+    repo: jobsRepo,
+    boards,
+    delayMs: discovery.delayMs,
+    ...(deps.runnerOptions ?? {}),
+  });
   const user = await repo.ensureUser(config.userHandle);
   await roles.seedCatalog(); // idempotent; never overwrites a role a person edited
   const profiles = new ProfileRepo(repo.pool);

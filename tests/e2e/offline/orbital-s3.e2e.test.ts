@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -36,6 +36,19 @@ const SHOTS = path.resolve("docs", "evidence", "orbital-screens");
 const ready = (await dbAvailable()) && pythonAvailable() && existsSync(ASTRO);
 const suite = ready ? describe : describe.skip;
 const WIDTHS = [1440, 768, 390, 360] as const;
+
+/** Capture away from the evidence path, then copy. A locked PNG must not fail a layout check that already passed. */
+async function saveShot(page: Page, name: string, fullPage = false): Promise<void> {
+  const dest = path.join(SHOTS, name);
+  const temp = path.join(os.tmpdir(), `orbital-${process.pid}-${name}`);
+  await page.screenshot({ path: temp, fullPage });
+  try {
+    copyFileSync(temp, dest);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "UNKNOWN" && code !== "EBUSY" && code !== "EPERM") throw error;
+  }
+}
 
 suite("Orbital app and S3 official discovery (headed Chrome)", () => {
   let service: AiService;
@@ -194,7 +207,7 @@ suite("Orbital app and S3 official discovery (headed Chrome)", () => {
       else expect((await context.request.get(web(href))).status(), href).toBe(200);
     }
     for (const label of ["How it works", "Career paths", "Log in", "Get started"]) await pw(page.locator("header.site-header").getByText(label).first()).toBeVisible();
-    await page.screenshot({ path: path.join(SHOTS, "landing-fastify-stopped.png") });
+    await saveShot(page, "landing-fastify-stopped.png");
     await page.close();
     await startApi();
   }, 240_000);
@@ -245,7 +258,7 @@ suite("Orbital app and S3 official discovery (headed Chrome)", () => {
     await pw(page.locator("#results-empty")).toContainText("No listings yet");
     await pw(page.locator("#start-run")).toBeVisible();
     expect(await page.locator("#start-run").isEnabled()).toBe(true);
-    await page.screenshot({ path: path.join(SHOTS, "jobs-before-run-1440.png"), fullPage: true });
+    await saveShot(page, "jobs-before-run-1440.png", true);
 
     // run it (slow boards, so progress is observable)
     replies = Object.fromEntries(Object.entries(DEFAULT_REPLIES).map(([k, v]) => [k, { ...(v as object), delayMs: 450 }]));
@@ -275,7 +288,7 @@ suite("Orbital app and S3 official discovery (headed Chrome)", () => {
     expect(await acme.locator('a[data-action="official"]').getAttribute("rel")).toBe("noopener noreferrer");
     const text = (await page.locator("#results").textContent()) ?? "";
     expect(text).not.toMatch(/\d+\s*%|\$\s*\d|you qualify|you are eligible|great match/i);
-    await page.screenshot({ path: path.join(SHOTS, "jobs-after-run-1440.png"), fullPage: true });
+    await saveShot(page, "jobs-after-run-1440.png", true);
 
     // filters (server-side)
     await page.selectOption("#f-band", "OUTSIDE");
@@ -330,7 +343,7 @@ suite("Orbital app and S3 official discovery (headed Chrome)", () => {
     await pw(page.locator("#gate-retry")).toBeVisible();
     await pw(page.locator("#app")).toBeHidden();
     await pw(page.locator('header a[href="/roles"]')).toBeVisible();
-    await page.screenshot({ path: path.join(SHOTS, "jobs-fastify-stopped-1440.png") });
+    await saveShot(page, "jobs-fastify-stopped-1440.png");
     await startApi();
     for (let attempt = 0; attempt < 4 && !(await page.locator("#app").isVisible()); attempt += 1) {
       await page.click("#gate-retry");
@@ -373,7 +386,7 @@ suite("Orbital app and S3 official discovery (headed Chrome)", () => {
         }
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
         expect(overflow, `${name} at ${width}px overflows by ${overflow}px`).toBeLessThanOrEqual(1);
-        await page.screenshot({ path: path.join(SHOTS, `${name}-${width}.png`), fullPage: width === 1440 || width === 390 });
+        await saveShot(page, `${name}-${width}.png`, width === 1440 || width === 390);
       }
     }
 

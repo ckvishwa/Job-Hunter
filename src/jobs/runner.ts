@@ -6,7 +6,9 @@ import {
   BoardError, boardApiUrl, fetchBoardPostings, loadBoardList, registryEntryFor, titleMatches, toPosting, type BoardCompany,
 } from "../pipeline/discovery/board-discoverer.js";
 import type { BoardRef, Counters, FailureInput, JobsRepo, PersistItem } from "../db/jobs-repo.js";
-import { bandStatus, excludedBySeniority, matchLocation, matchRoles, senioritySignal, statedYears, type DiscoveryPlan } from "./planner.js";
+import { bandStatus, excludedBySeniority, matchLocation, matchRoles, senioritySignal, statedYears, type DiscoveryPlan, type LocationMatch, type RoleMatch, type SenioritySignal } from "./planner.js";
+import { appendProvenance, listingProvenance } from "../discovery/provenance.js";
+import type { StageProfiler } from "../perf/stages.js";
 
 // S3 runner: drives the EXISTING official Greenhouse/Lever board reader (fetchBoardPostings), the EXISTING official-employer and
 // JD verification (stampResolution + evaluatePersistable) and stores the result in PostgreSQL. It never opens an application form,
@@ -48,6 +50,45 @@ export interface RunnerDeps {
   delayMs?: number;
   timeoutMs?: number;
   onEvent?: (e: RunnerEvent) => void;
+  /** Append-only capture of every fetched listing, including ones the candidate filter does not store. */
+  provenancePath?: string;
+  searchRunId?: string;
+  profiler?: StageProfiler;
+}
+
+export interface CandidateDisposition {
+  disposition: "selected" | "filtered";
+  filterReason: string | null;
+  roles: RoleMatch;
+  signal: SenioritySignal;
+  location: LocationMatch;
+  titleMatched: boolean;
+  seniorityExcluded: boolean;
+  locationExcluded: boolean;
+}
+
+/** Candidate search options stay here. A filtered listing is still reported by the caller; it is not deleted from provenance. */
+export function classifyCandidatePosting(
+  posting: { title: string; location: string | null },
+  plan: DiscoveryPlan,
+  excludeTitleKeywords: readonly string[],
+): CandidateDisposition {
+  if (excludeTitleKeywords.length > 0 && titleMatches(posting.title, [...excludeTitleKeywords]).length > 0) {
+    return { disposition: "filtered", filterReason: "excluded-title-keyword", roles: { roleSlugs: [], phrases: [] }, signal: "UNSPECIFIED", location: "UNSPECIFIED", titleMatched: false, seniorityExcluded: false, locationExcluded: false };
+  }
+  const roles = matchRoles(posting.title, plan);
+  if (roles.roleSlugs.length === 0) {
+    return { disposition: "filtered", filterReason: "not-a-selected-role", roles, signal: senioritySignal(posting.title), location: "UNSPECIFIED", titleMatched: false, seniorityExcluded: false, locationExcluded: false };
+  }
+  const signal = senioritySignal(posting.title);
+  if (excludedBySeniority(signal, plan)) {
+    return { disposition: "filtered", filterReason: "seniority-excluded", roles, signal, location: "UNSPECIFIED", titleMatched: true, seniorityExcluded: true, locationExcluded: false };
+  }
+  const location = matchLocation(posting.location, plan);
+  if (location === "NO_MATCH") {
+    return { disposition: "filtered", filterReason: "location-excluded", roles, signal, location, titleMatched: true, seniorityExcluded: false, locationExcluded: true };
+  }
+  return { disposition: "selected", filterReason: null, roles, signal, location, titleMatched: true, seniorityExcluded: false, locationExcluded: false };
 }
 
 const BLOCKED_RE = /HTTP (401|403|429)\b/;
@@ -157,29 +198,49 @@ export class DiscoveryRunner {
     const failures: FailureInput[] = [];
     const items: PersistItem[] = [];
     try {
+      const fetchStarted = performance.now();
       const postings = await fetchBoardPostings(company, this.deps.fetchImpl ?? fetch, this.deps.timeoutMs, signal);
+      this.deps.profiler?.record("source-discovery", performance.now() - fetchStarted);
       counters.fetched = postings.length;
       const nowIso = this.now().toISOString();
       const registryEntry = registryEntryFor(company);
       const exclude = config?.excludeTitleKeywords ?? [];
       const candidates: Array<{ p: (typeof postings)[number]; roles: ReturnType<typeof matchRoles>; signal: ReturnType<typeof senioritySignal>; location: Exclude<ReturnType<typeof matchLocation>, "NO_MATCH"> }> = [];
+      const seen: ReturnType<typeof listingProvenance>[] = [];
+      const normalizeStarted = performance.now();
       for (const p of postings) {
-        if (exclude.length > 0 && titleMatches(p.title, exclude).length > 0) continue;
-        const roles = matchRoles(p.title, plan);
-        if (roles.roleSlugs.length === 0) continue; // not a selected role: never stored, never shown
-        counters.titleMatched += 1;
-        const sig = senioritySignal(p.title);
-        if (excludedBySeniority(sig, plan)) {
-          counters.seniorityExcluded += 1;
-          continue;
-        }
-        const location = matchLocation(p.location, plan);
-        if (location === "NO_MATCH") {
-          counters.locationExcluded += 1;
-          continue;
-        }
-        candidates.push({ p, roles, signal: sig, location });
+        const decision = classifyCandidatePosting(p, plan, exclude);
+        if (decision.titleMatched) counters.titleMatched += 1;
+        if (decision.seniorityExcluded) counters.seniorityExcluded += 1;
+        if (decision.locationExcluded) counters.locationExcluded += 1;
+        seen.push(listingProvenance({
+          capturedAt: nowIso,
+          searchRunId: this.deps.searchRunId ?? runId,
+          source: company.ats,
+          keyword: null,
+          searchLocation: null,
+          title: p.title,
+          employer: company.company,
+          location: p.location,
+          salary: null,
+          resultUrl: p.url,
+          officialUrl: p.url,
+          applicationUrl: p.applyUrl,
+          externalId: p.externalId,
+          sourceDateText: p.postingDate,
+          relevanceMatched: decision.disposition === "selected",
+          matchedProfiles: decision.roles.roleSlugs,
+          relevanceReason: decision.filterReason ?? "selected-by-the-saved-search",
+          disposition: decision.disposition === "selected" ? "retained" : "filtered",
+          filterReason: decision.filterReason,
+          descriptionText: p.descriptionText,
+          descriptionComplete: p.descriptionText.trim().length > 0,
+        }));
+        if (decision.disposition !== "selected" || decision.location === "NO_MATCH") continue;
+        candidates.push({ p, roles: decision.roles, signal: decision.signal, location: decision.location });
       }
+      this.deps.profiler?.record("normalization", performance.now() - normalizeStarted);
+      if (this.deps.provenancePath) appendProvenance(this.deps.provenancePath, seen);
       for (const { p, roles, signal: sig, location } of candidates.slice(0, Math.min(limits.maxMatchedPerBoard, budget))) {
         const stamped: JobPosting = stampResolution(toPosting(company, p, roles.phrases, [], "", nowIso), {
           sourceKind: "board-api", observedUrl: boardApiUrl(company), observedAt: nowIso, finalUrl: p.url, extractionMethod: "ats-api",
@@ -213,7 +274,9 @@ export class DiscoveryRunner {
           },
         });
       }
+      const writeStarted = performance.now();
       const result = await repo.persistBoard(runId, ref.boardKey, counters, items, failures);
+      this.deps.profiler?.record("database-writes", performance.now() - writeStarted);
       this.emit({ kind: "board-end", runId, boardKey: ref.boardKey, status: result ? "OK" : "STOPPED" });
     } catch (error) {
       if (signal.aborted) return;

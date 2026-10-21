@@ -53,7 +53,7 @@ async function main(): Promise<number> {
       if (!keys.length) return fail(`--board <ats:board,...> is required with --live. Available: ${config.companies.map(boardKeyOf).join(", ")}`);
       console.error(`LIVE read-only refresh of ${keys.length} board(s) from the public ATS API. Nothing is submitted.`);
       const { runId } = await createLiveImportRun(ctx, keys);
-      const runner = new DiscoveryRunner({ repo: jobs, boards: () => config, delayMs: Number(values["delay-ms"]) });
+      const runner = new DiscoveryRunner({ repo: jobs, boards: () => config, delayMs: Number(values["delay-ms"]), provenancePath: path.resolve("data/listing-provenance.jsonl") });
       runner.enqueue(runId);
       await runner.idle();
       report = { mode: "live", runId, run: await jobs.getRun(user.id, runId) };

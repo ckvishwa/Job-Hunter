@@ -17,6 +17,12 @@ import { PostingResolver } from "../resolver/posting-resolver.js";
 import type { DiscoveredJobLite, DiscoveryContext } from "./types.js";
 import type { JobPosting } from "../adapters/types.js";
 import { evaluateRelevance } from "./relevance.js";
+import {
+  appendSearchRuns,
+  defaultObservationPaths,
+  searchRun,
+} from "./listing-observations.js";
+import { appendProvenance, listingProvenance } from "./provenance.js";
 import { runResolutionPhase, UNRESOLVED_PLACEHOLDER_PREFIX } from "./resolve-phase.js";
 import { buildSummary, type DiscoveryRunSummary, type RawDiscoveryCounters } from "./report.js";
 import { randomBytes } from "node:crypto";
@@ -118,6 +124,8 @@ export type DiscoverPaths = {
     // Typed rejection log (see src/domain/canonical-job.ts JobFailure). Defaults to
     // job-failures.jsonl next to the jobs store.
     failuresPath?: string;
+    // Every evaluated listing, including ones the candidate filter does not retain.
+    provenancePath?: string;
 };
 
 async function runDiscoverInner(
@@ -134,6 +142,7 @@ async function runDiscoverInner(
 
   const searchLocation = filters.location || "United States";
   const limit = filters.limit;
+  const provenancePath = paths.provenancePath ?? path.join(path.dirname(paths.discoveredJobsPath), "listing-provenance.jsonl");
 
   // Determine target sources: config/portals.yml-driven portals (config-driven, not
   // hardcoded -- an entry only runs if its portals.yml `enabled: true`) + company-careers +
@@ -261,6 +270,8 @@ async function runDiscoverInner(
     saveCheckpoints(paths.checkpointsPath, checkpoints);
   }
   const newlyDiscovered: DiscoveredJobLite[] = [];
+  const observationPaths = defaultObservationPaths(paths.discoveredJobsPath);
+  const searchRunId = randomBytes(8).toString("hex");
   // Checkpoints whose discovery finished this run. They are only marked completed after the
   // authoritative store write succeeded: if persisting fails, a rerun must rediscover those
   // listings instead of skipping jobs that were never saved.
@@ -289,6 +300,7 @@ async function runDiscoverInner(
 
           if (checkpoint.completed) {
             console.log(`[orchestrator] Checkpoint completed for ${source}::${keyword}::${searchLocation}. Skipping.`);
+            appendSearchRuns(observationPaths.searchRunsPath, [searchRun(searchRunId, source, keyword, searchLocation, 0, 0, 0, null, true, "checkpoint-completed")]);
             continue;
           }
 
@@ -296,6 +308,10 @@ async function runDiscoverInner(
           counters.keywordsSearched += 1;
 
           const sourceStage = events.stageStart(`source:${source}`);
+          const queryStarted = Date.now();
+          const discoveredBefore = counters.listingsDiscovered;
+          const retainedBefore = counters.relevantRetained;
+          let queryError: string | null = null;
           try {
             const adapter = resolveDiscoveryAdapter(source);
 
@@ -316,6 +332,7 @@ async function runDiscoverInner(
                 // which keyword search found it) is rejected here, not silently tagged with
                 // whatever profile happened to be searched at the time.
                 const retained: DiscoveredJobLite[] = [];
+                const seen: ReturnType<typeof listingProvenance>[] = [];
                 for (const job of jobs) {
                   counters.listingsEvaluated += 1;
                   const evaluation = evaluateRelevance(
@@ -331,10 +348,34 @@ async function runDiscoverInner(
                   const requestedMatches = filters.profileIds?.length
                     ? evaluation.matchedProfiles.filter((p) => filters.profileIds!.includes(p))
                     : evaluation.matchedProfiles;
+                  const selected = evaluation.matched && requestedMatches.length > 0;
+                  seen.push(listingProvenance({
+                    capturedAt: new Date().toISOString(),
+                    searchRunId,
+                    source: source,
+                    keyword,
+                    searchLocation,
+                    title: job.title,
+                    employer: job.company,
+                    location: job.location,
+                    salary: job.salarySnippet,
+                    resultUrl: job.resultUrl,
+                    officialUrl: job.possibleOfficialUrl,
+                    applicationUrl: null,
+                    externalId: job.sourceJobId,
+                    sourceDateText: job.postingAgeOrDate,
+                    relevanceMatched: evaluation.matched,
+                    matchedProfiles: evaluation.matchedProfiles,
+                    relevanceReason: evaluation.relevanceReason,
+                    disposition: selected ? "retained" : "filtered",
+                    filterReason: selected ? null : "outside-the-requested-role-profiles",
+                    descriptionText: job.descriptionSnippet,
+                    descriptionComplete: false,
+                  }));
 
-                  if (!evaluation.matched || requestedMatches.length === 0) {
+                  if (!selected) {
                     counters.discoveriesRejected += 1;
-                    continue; // Never store the full job for a rejected discovery.
+                    continue; // The candidate store stays role-filtered. The provenance file already has the listing.
                   }
 
                   // Primary = the first REQUESTED-and-matched profile (if --profile was given,
@@ -358,8 +399,8 @@ async function runDiscoverInner(
                   newlyDiscovered.push(job);
                 }
 
-                // Only retained (relevant) jobs are ever written to discoveredJobs.jsonl --
-                // rejected discoveries leave no trace beyond the rejection counter above.
+                // The candidate store stays filtered. The provenance file keeps every listing from this page.
+                appendProvenance(provenancePath, seen);
                 appendDiscoveredJobs(paths.discoveredJobsPath, retained);
                 // Fires once per portal page AND once per company in company-careers.ts --
                 // an honest, already-existing "processing unit" signal, not literally a
@@ -403,9 +444,22 @@ async function runDiscoverInner(
           } catch (err) {
             sourceStage.end("ERROR", errorCodeOf(err));
             sourceSuccess = false;
-            console.error(`[orchestrator] Failure on ${source} for keyword "${keyword}": ${(err as Error).message}`);
-            counters.errors.push({ source: `${source}::${keyword}`, message: (err as Error).message });
+            queryError = (err as Error).message;
+            console.error(`[orchestrator] Failure on ${source} for keyword "${keyword}": ${queryError}`);
+            counters.errors.push({ source: `${source}::${keyword}`, message: queryError });
           }
+          appendSearchRuns(observationPaths.searchRunsPath, [searchRun(
+            searchRunId,
+            source,
+            keyword,
+            searchLocation,
+            Date.now() - queryStarted,
+            counters.listingsDiscovered - discoveredBefore,
+            counters.relevantRetained - retainedBefore,
+            queryError,
+            false,
+            null,
+          )]);
         }
       }
 

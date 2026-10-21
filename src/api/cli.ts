@@ -1,3 +1,4 @@
+import path from "node:path";
 import { createAiClient } from "../ai/client.js";
 import { CandidateRepo } from "../db/candidate-repo.js";
 import { migrationsCurrent } from "../db/migrate.js";
@@ -24,7 +25,7 @@ const files = createFileStore(config.uploadDir);
 const ai = createAiClient({ baseUrl: config.aiBaseUrl, serviceToken: config.aiServiceToken, timeoutMs: config.aiTimeoutMs });
 const queue = new ExtractionQueue({ repo, ai, files, onEvent: (e) => console.log(JSON.stringify({ at: new Date().toISOString(), ...e })) });
 const jobsRepo = new JobsRepo(pool);
-const runner = new DiscoveryRunner({ repo: jobsRepo, boards: () => loadBoardsConfig(), delayMs: defaultLimits().delayMs, onEvent: (e) => console.log(JSON.stringify(e)) });
+const runner = new DiscoveryRunner({ repo: jobsRepo, boards: () => loadBoardsConfig(), delayMs: defaultLimits().delayMs, provenancePath: path.resolve("data/listing-provenance.jsonl"), onEvent: (e) => console.log(JSON.stringify(e)) });
 const app = await buildServer({ config, repo, files, queue, jobsRepo, runner });
 const recovered = await queue.recover();
 const resumedRuns = await runner.recover(); // discovery runs a previous process left active continue where they stopped
