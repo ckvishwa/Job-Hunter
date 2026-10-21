@@ -5,6 +5,7 @@ import {
   candidateFactSchema,
   factAttributesSchema,
   factContentDigest,
+  factDigestCompatible,
   parseCandidateProfile,
   profileDigest,
   type CandidateFact,
@@ -204,7 +205,7 @@ function soloProfile(fact: CandidateFact, today: string): CandidateProfile {
 }
 
 export function reviewFact(fact: CandidateFact, input: ReviewInput): ReviewOutcome {
-  if (factContentDigest(fact) !== input.expectedDigest) {
+  if (!factDigestCompatible(fact, input.expectedDigest)) {
     throw new FactRuleError("STALE_FACT", "The fact changed since it was loaded. Reload and review the current version.");
   }
   if (input.action === "reject") {
@@ -219,7 +220,7 @@ export function reviewFact(fact: CandidateFact, input: ReviewInput): ReviewOutco
     if (fact.sensitivity === "sensitive" && input.confirmSensitive !== true) {
       throw new FactRuleError("CONFIRMATION_REQUIRED", "Approving a sensitive fact needs explicit confirmation.");
     }
-    if (fact.approvalStatus === "approved" && fact.verification.contentDigest === input.expectedDigest) {
+    if (fact.approvalStatus === "approved" && fact.verification.contentDigest && factDigestCompatible(fact, fact.verification.contentDigest) && factDigestCompatible(fact, input.expectedDigest)) {
       return { fact, revisionAction: null, explicitConfirmation: false };
     }
     const next = applyFactReview(soloProfile(fact, input.today), { factId: fact.factId, action: "approve", reviewer: input.actor, reviewedAt: input.today });

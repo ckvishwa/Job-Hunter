@@ -9,7 +9,7 @@ import { closePersistentChrome, launchPersistentChrome } from "../../../src/brow
 import {
   buildResumeFixtures, dbAvailable, freePort, pythonAvailable, startAiService, startHarness, type AiService, type Harness,
 } from "../../helpers/s1-harness.js";
-import { ensureWebBuild, waitForHttp } from "../../helpers/web-build.js";
+import { ensureWebBuild, waitForPreview } from "../../helpers/web-build.js";
 
 // Offline browser E2E for S1 -> S2: headed Chrome (production launcher, temporary dedicated profile) drives the REAL Astro build ->
 // real Fastify API -> real Python extractor -> real PostgreSQL (throwaway database). A synthetic resume is uploaded, relevant facts
@@ -58,12 +58,12 @@ suite("S1 -> S2 UI workflow (headed Chrome)", () => {
     await h.app.listen({ host: "127.0.0.1", port: apiPort });
 
     await ensureWebBuild();
-    preview = spawn(process.execPath, [ASTRO, "preview", "--host", "127.0.0.1", "--port", String(webPort)], {
+    preview = spawn(process.execPath, [ASTRO, "preview", "--ignore-lock", "--host", "127.0.0.1", "--port", String(webPort)], {
       cwd: WEB_DIR, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, JH_API_URL: `http://127.0.0.1:${apiPort}` },
     });
     preview.stdout?.on("data", (d: Buffer) => previewLog.push(String(d)));
     preview.stderr?.on("data", (d: Buffer) => previewLog.push(String(d)));
-    await waitForHttp(`http://127.0.0.1:${webPort}/`, "The Astro preview server");
+    await waitForPreview(`http://127.0.0.1:${webPort}/`, preview, previewLog);
     profileDir = mkdtempSync(path.join(os.tmpdir(), "jh-s2-ui-profile-"));
     context = await launchPersistentChrome(profileDir, { headless: false });
     await context.route("**/*", (route) => {

@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import zipfile
+from pathlib import Path
 
 import httpx
 import pytest
@@ -45,6 +46,11 @@ def test_no_interactive_docs_exposed():
 
 def test_rejects_unknown_file_type():
     assert post(make_client(), b"x", file_type="exe").json()["error"]["code"] == "UNSUPPORTED_FILE_TYPE"
+
+
+def test_encrypted_pdf_is_password_protected_not_unreadable():
+    data = (Path(__file__).parent / "fixtures" / "encrypted-minimal.pdf").read_bytes()
+    assert post(make_client(), data).json()["error"]["code"] == "ENCRYPTED_PDF"
 
 
 def test_corrupt_files_are_typed_errors_not_500s():

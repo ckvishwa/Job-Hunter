@@ -274,8 +274,8 @@ export interface AiService {
   stop(): void;
 }
 
-export async function startAiService(token = "c".repeat(40)): Promise<AiService> {
-  const port = await freePort();
+export async function startAiService(token = "c".repeat(40), port = 0): Promise<AiService> {
+  if (!port) port = await freePort();
   const child: ChildProcess = spawn(PYTHON, ["run.py"], {
     cwd: AI_DIR, stdio: "ignore",
     env: { ...process.env, JH_AI_PORT: String(port), JH_AI_HOST: "127.0.0.1", JH_AI_SERVICE_TOKEN: token, JH_AI_QWEN_FALLBACK: "0" },

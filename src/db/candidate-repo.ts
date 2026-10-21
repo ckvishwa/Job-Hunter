@@ -87,11 +87,14 @@ export function rowToFact(r: FactDbRow): CandidateFact {
   });
 }
 
-const toFactView = (r: FactDbRow): FactView => ({
-  factId: r.fact_id, resumeVersionId: r.resume_version_id, kind: r.kind, value: r.value, polarity: r.polarity, attributes: r.attributes,
-  source: r.source, span: r.span, proposedBy: r.proposed_by, approvalStatus: r.approval_status, sensitivity: r.sensitivity,
-  verification: r.verification, contentDigest: r.content_digest, headRevision: r.head_revision, notes: r.notes,
-});
+const toFactView = (r: FactDbRow): FactView => {
+  const fact = rowToFact(r);
+  return {
+    factId: r.fact_id, resumeVersionId: r.resume_version_id, kind: r.kind, value: r.value, polarity: r.polarity, attributes: r.attributes,
+    source: r.source, span: r.span, proposedBy: r.proposed_by, approvalStatus: r.approval_status, sensitivity: r.sensitivity,
+    verification: r.verification, contentDigest: factContentDigest(fact), headRevision: r.head_revision, notes: r.notes,
+  };
+};
 
 const FACT_COLUMNS = `id, fact_id, resume_version_id, kind, value, polarity, attributes, source, span, proposed_by, approval_status,
   sensitivity, verification, content_digest, head_revision, notes`;

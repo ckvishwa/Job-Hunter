@@ -10,7 +10,7 @@ import {
   buildResumeFixtures, dbAvailable, freePort, getJson, login, postJson, pythonAvailable, startAiService, startHarness, upload, type AiService, type Harness,
 } from "../../helpers/s1-harness.js";
 import { BOARDS, DEFAULT_REPLIES, fakeBoardFetch, type BoardReply } from "../../helpers/s3-fixtures.js";
-import { ensureWebBuild, waitForHttp } from "../../helpers/web-build.js";
+import { ensureWebBuild, waitForPreview } from "../../helpers/web-build.js";
 
 // Browser acceptance for the Orbital app and S3: headed Chrome drives the REAL Astro build -> real Fastify API -> real Python extractor ->
 // real PostgreSQL (throwaway database) -> the real official-board reader and verification, with only the HTTP fetch to the public board
@@ -97,12 +97,12 @@ suite("Orbital app and S3 official discovery (headed Chrome)", () => {
     ai = createAiClient({ baseUrl: `http://127.0.0.1:${service.port}`, serviceToken: service.token, timeoutMs: 60_000 });
     await startApi();
     await ensureWebBuild();
-    preview = spawn(process.execPath, [ASTRO, "preview", "--host", "127.0.0.1", "--port", String(webPort)], {
+    preview = spawn(process.execPath, [ASTRO, "preview", "--ignore-lock", "--host", "127.0.0.1", "--port", String(webPort)], {
       cwd: WEB_DIR, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, JH_API_URL: `http://127.0.0.1:${apiPort}` },
     });
     preview.stdout?.on("data", (d: Buffer) => previewLog.push(String(d)));
     preview.stderr?.on("data", (d: Buffer) => previewLog.push(String(d)));
-    await waitForHttp(`http://127.0.0.1:${webPort}/`, "The Astro preview server");
+    await waitForPreview(`http://127.0.0.1:${webPort}/`, preview, previewLog);
     profileDir = mkdtempSync(path.join(os.tmpdir(), "jh-orb-profile-"));
     context = await launchPersistentChrome(profileDir, { headless: false });
     await context.route("**/*", (route) => {

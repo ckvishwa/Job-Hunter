@@ -11,7 +11,7 @@ import { createLiveImportRun } from "../../../src/jobs/import.js";
 import { DiscoveryRunner } from "../../../src/jobs/runner.js";
 import { BOARDS, fakeBoardFetch, ghBody, longJd } from "../../helpers/s3-fixtures.js";
 import { FakeAi, dbAvailable, freePort, startHarness, type Harness } from "../../helpers/s1-harness.js";
-import { ensureWebBuild, waitForHttp } from "../../helpers/web-build.js";
+import { ensureWebBuild, waitForPreview } from "../../helpers/web-build.js";
 
 // Offline browser E2E for the S4 matches page: headed Chrome (production launcher, temporary dedicated profile) -> real Astro build -> real Fastify API ->
 // real PostgreSQL (throwaway database). The stored posting comes from an IMPORT run answered by a fake board fetch; every non-loopback request is aborted
@@ -62,12 +62,12 @@ suite("S4 matches page (headed Chrome)", () => {
     await runner.idle();
 
     await ensureWebBuild();
-    preview = spawn(process.execPath, [ASTRO, "preview", "--host", "127.0.0.1", "--port", String(webPort)], {
+    preview = spawn(process.execPath, [ASTRO, "preview", "--ignore-lock", "--host", "127.0.0.1", "--port", String(webPort)], {
       cwd: WEB_DIR, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, JH_API_URL: `http://127.0.0.1:${apiPort}` },
     });
     preview.stdout?.on("data", (d: Buffer) => previewLog.push(String(d)));
     preview.stderr?.on("data", (d: Buffer) => previewLog.push(String(d)));
-    await waitForHttp(`http://127.0.0.1:${webPort}/`, "The Astro preview server");
+    await waitForPreview(`http://127.0.0.1:${webPort}/`, preview, previewLog);
     profileDir = mkdtempSync(path.join(os.tmpdir(), "jh-matches-ui-profile-"));
     context = await launchPersistentChrome(profileDir, { headless: false });
     await context.route("**/*", (route) => {

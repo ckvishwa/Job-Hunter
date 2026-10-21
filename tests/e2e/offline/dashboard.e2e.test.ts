@@ -10,7 +10,7 @@ import {
   buildResumeFixtures, dbAvailable, freePort, getJson, login, postJson, pythonAvailable, startAiService, startHarness, upload,
   type AiService, type Harness,
 } from "../../helpers/s1-harness.js";
-import { ensureWebBuild, waitForHttp } from "../../helpers/web-build.js";
+import { ensureWebBuild, waitForPreview } from "../../helpers/web-build.js";
 import { BOARDS, DEFAULT_REPLIES, fakeBoardFetch } from "../../helpers/s3-fixtures.js";
 import { readFileSync } from "node:fs";
 
@@ -87,12 +87,12 @@ suite("Home dashboard (headed Chrome)", () => {
     await startApi();
 
     await ensureWebBuild();
-    preview = spawn(process.execPath, [ASTRO, "preview", "--host", "127.0.0.1", "--port", String(webPort)], {
+    preview = spawn(process.execPath, [ASTRO, "preview", "--ignore-lock", "--host", "127.0.0.1", "--port", String(webPort)], {
       cwd: WEB_DIR, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, JH_API_URL: `http://127.0.0.1:${apiPort}` },
     });
     preview.stdout?.on("data", (d: Buffer) => previewLog.push(String(d)));
     preview.stderr?.on("data", (d: Buffer) => previewLog.push(String(d)));
-    await waitForHttp(`http://127.0.0.1:${webPort}/`, "The Astro preview server");
+    await waitForPreview(`http://127.0.0.1:${webPort}/`, preview, previewLog);
     profileDir = mkdtempSync(path.join(os.tmpdir(), "jh-dash-profile-"));
     context = await launchPersistentChrome(profileDir, { headless: false });
     await context.route("**/*", (route) => {

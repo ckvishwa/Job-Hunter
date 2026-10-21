@@ -102,6 +102,28 @@ def _ordered_pdf_page(page) -> tuple[str, str | None]:
     return "\n".join(part for part in parts if part), None
 
 
+def _password_protected(error: BaseException, password_type: type[BaseException]) -> bool:
+    """pdfplumber wraps PDFPasswordIncorrect inside PdfminerException instead of raising it directly."""
+    seen: set[int] = set()
+    stack: list[BaseException] = [error]
+    while stack:
+        current = stack.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        if isinstance(current, password_type):
+            return True
+        name = type(current).__name__
+        if "Password" in name or "Encrypt" in name:
+            return True
+        if current.__cause__ is not None:
+            stack.append(current.__cause__)
+        if current.__context__ is not None and current.__context__ is not current.__cause__:
+            stack.append(current.__context__)
+        stack.extend(arg for arg in current.args if isinstance(arg, BaseException))
+    return False
+
+
 def extract_pdf(data: bytes) -> ExtractedDocument:
     try:
         import pdfplumber
@@ -118,13 +140,10 @@ def extract_pdf(data: bytes) -> ExtractedDocument:
             page_count = len(pdf.pages)
     except ExtractError:
         raise
-    except PDFPasswordIncorrect as error:
-        raise ExtractError("ENCRYPTED_PDF", "The PDF is password protected.") from error
     except Exception as error:
-        name = type(error).__name__
-        if "Password" in name or "Encrypt" in name:
-            raise ExtractError("ENCRYPTED_PDF", "The PDF is encrypted or password protected.") from error
-        raise ExtractError("UNREADABLE_FILE", f"The PDF could not be read ({name}).") from error
+        if _password_protected(error, PDFPasswordIncorrect):
+            raise ExtractError("ENCRYPTED_PDF", "The PDF is password protected.") from error
+        raise ExtractError("UNREADABLE_FILE", f"The PDF could not be read ({type(error).__name__}).") from error
     if page_count == 0:
         raise ExtractError("UNREADABLE_FILE", "The PDF has no pages.")
     text = normalize_text("\n".join(pages))

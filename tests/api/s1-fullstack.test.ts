@@ -69,7 +69,10 @@ suite("S1 full stack (real Python service)", () => {
       expect(body.state).toBe("PROPOSED");
       const canon = (v: unknown): unknown => (Array.isArray(v) ? v.map(canon) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([k, x]) => [k, canon(x)])) : v);
       const key = (kind: string, value: string, attrs: unknown) => JSON.stringify([kind, value, canon(attrs)]);
-      const got = body.facts.map((f: any) => key(f.kind, f.value, f.attributes)).sort();
+      const got = body.facts.map((f: any) => {
+        const { fieldSpans: _evidence, ...semanticAttributes } = f.attributes;
+        return key(f.kind, f.value, semanticAttributes);
+      }).sort();
       const want = c.expected.facts!.map((f) => key(f.kind, f.value, expectedAttributes(f.attributes))).sort();
       expect(got).toEqual(want);
       expect(body.warnings.map((w: { code: string }) => w.code).sort()).toEqual([...(c.expected.warningCodes ?? [])].sort());
@@ -79,6 +82,9 @@ suite("S1 full stack (real Python service)", () => {
         expect(f.approvalStatus).toBe("pending");
         expect(f.verification.verifiedBy).toBeNull();
         expect(text.slice(f.span.start, f.span.end)).toBe(f.span.quote); // JS UTF-16 slice
+        for (const [field, evidence] of Object.entries(f.attributes.fieldSpans ?? {}) as Array<[string, { start: number; end: number; quote: string }]>) {
+          expect(text.slice(evidence.start, evidence.end), `${f.kind}.${field} field evidence`).toBe(evidence.quote);
+        }
         expect(["citizenship", "clearance", "work_authorization", "sponsorship_need"]).not.toContain(f.kind);
         if (["email", "phone", "legal_name"].includes(f.kind)) expect(f.sensitivity).toBe("sensitive");
         expect(f.attributes.employmentType === undefined || ["internship", "professional", "academic", "volunteer"].includes(f.attributes.employmentType)).toBe(true);
@@ -119,7 +125,7 @@ suite("S1 full stack (real Python service)", () => {
     const list = (await getJson(h, s, "/api/v1/resumes")).body.resumes as Array<{ resumeId: string; state: string }>;
     const target = list.find((r) => r.state === "PROPOSED")!;
     const facts = (await getJson(h, s, `/api/v1/resumes/${target.resumeId}/facts`)).body.facts as any[];
-    const skill = facts.find((f) => f.kind === "skill" || f.kind === "employment")!;
+    const skill = facts.find((f) => f.kind === "employment" && f.attributes.fieldSpans)!;
     const approved = await postJson(h, s, `/api/v1/resumes/${target.resumeId}/facts/review`, { factId: skill.factId, action: "approve", expectedDigest: skill.contentDigest });
     expect(approved.status).toBe(200);
     const restarted = await h.restart();

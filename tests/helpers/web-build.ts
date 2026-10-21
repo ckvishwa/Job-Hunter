@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import path from "node:path";
 
@@ -60,4 +60,28 @@ export async function waitForHttp(url: string, label: string, attempts = 150): P
     await new Promise((r) => setTimeout(r, 200));
   }
   throw new Error(`${label} did not become reachable at ${url}.`);
+}
+
+/**
+ * Waits for an Astro preview process. A process that exits is reported immediately with its log.
+ * If the process has already announced that it is listening, polling continues through the known
+ * Windows loopback stall. A process that never announces readiness still fails at 30 seconds.
+ */
+export async function waitForPreview(url: string, child: ChildProcess, log: string[]): Promise<void> {
+  const started = Date.now();
+  for (;;) {
+    if (child.exitCode !== null || child.signalCode) {
+      throw new Error(`The Astro preview server exited before ${url} answered.\n${log.join("").slice(-2000)}`);
+    }
+    const text = log.join("");
+    const announced = /Local\s+http|ready in/i.test(text);
+    try {
+      if ((await fetch(url)).ok) return;
+    } catch { /* not listening yet */ }
+    const limit = announced ? 60_000 : 30_000;
+    if (Date.now() - started > limit) {
+      throw new Error(`The Astro preview server did not become reachable at ${url} after ${limit}ms (announced=${announced}).\n${text.slice(-2000)}`);
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
 }

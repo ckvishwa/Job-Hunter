@@ -163,26 +163,44 @@ export function parseCandidateProfile(input: unknown): CandidateProfile {
 }
 
 /** Stable digest of everything a decision can depend on (facts, preferences, attestation), independent of key order. */
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => [k, canonical(v)]),
+    );
+  }
+  return value;
+}
+
 export function profileDigest(profile: CandidateProfile): string {
-  const canonical = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(canonical);
-    if (value && typeof value === "object") {
-      return Object.fromEntries(
-        Object.entries(value as Record<string, unknown>)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([k, v]) => [k, canonical(v)]),
-      );
-    }
-    return value;
-  };
   const material = { candidateId: profile.candidateId, facts: profile.facts, preferences: profile.preferences, employmentHistoryComplete: profile.employmentHistoryComplete };
   return createHash("sha256").update(JSON.stringify(canonical(material))).digest("hex");
 }
 
-/** Binds a new human approval to the exact claim and provenance reviewed. */
+function factMaterial(fact: CandidateFact): unknown {
+  return { kind: fact.kind, value: fact.value, polarity: fact.polarity, attributes: fact.attributes, source: fact.source, sensitivity: fact.sensitivity };
+}
+
+function sha256Json(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+/** Binds a new human approval to the exact claim and provenance reviewed. Key order is not part of the claim. */
 export function factContentDigest(fact: CandidateFact): string {
-  const material = { kind: fact.kind, value: fact.value, polarity: fact.polarity, attributes: fact.attributes, source: fact.source, sensitivity: fact.sensitivity };
-  return createHash("sha256").update(JSON.stringify(material)).digest("hex");
+  return sha256Json(canonical(factMaterial(fact)));
+}
+
+/**
+ * True when `expected` is the current canonical digest or the historical digest stored before
+ * canonicalization. Historical digests used `JSON.stringify` of the object as it was loaded.
+ * A change to a value, span, or evidence quote matches neither encoding.
+ */
+export function factDigestCompatible(fact: CandidateFact, expected: string): boolean {
+  const material = factMaterial(fact);
+  return expected === sha256Json(canonical(material)) || expected === sha256Json(material);
 }
 
 export type FactUsability = { usable: true } | { usable: false; reason: "PENDING" | "REJECTED" | "UNVERIFIED" | "EXPIRED" | "STALE_APPROVAL"; detail: string };
@@ -194,7 +212,7 @@ export function factUsability(fact: CandidateFact, asOf: string): FactUsability 
   if (!fact.verification.verifiedBy || !fact.verification.verifiedAt) {
     return { usable: false, reason: "UNVERIFIED", detail: `fact ${fact.factId} has no verifier or verification date` };
   }
-  if (fact.verification.contentDigest && fact.verification.contentDigest !== factContentDigest(fact)) {
+  if (fact.verification.contentDigest && !factDigestCompatible(fact, fact.verification.contentDigest)) {
     return { usable: false, reason: "STALE_APPROVAL", detail: `fact ${fact.factId} changed after approval` };
   }
   const until = fact.verification.validUntil;
