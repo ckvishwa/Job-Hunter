@@ -70,7 +70,7 @@ function dataRefs(root: string, from: string, text: string): string[] {
     if (!(DATA_EXT.test(norm) || DATA_DIRS.test(norm))) return;
     for (const base of [root, path.dirname(from)]) {
       const abs = path.resolve(base, norm);
-      if (abs.startsWith(root) && existsSync(abs) && statSync(abs).isFile()) out.add(abs);
+      if (abs.startsWith(root) && !rel(root, abs).startsWith("private-runtime/") && existsSync(abs) && statSync(abs).isFile()) out.add(abs);
     }
   };
   for (const m of text.matchAll(/["'`]([^"'`\n]{3,200})["'`]/g)) consider(m[1]!);

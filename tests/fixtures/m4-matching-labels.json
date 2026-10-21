@@ -1,0 +1,429 @@
+{
+  "schema": "m4-fictional-labels/1",
+  "authoredBeforePredictions": true,
+  "labelSource": "Explicit fictional scenario semantics; no engine predictions used",
+  "independentHumanReviewer": false,
+  "frozenAt": "2026-10-21T15:35:11.7767269Z",
+  "cases": [
+    {
+      "id": "sdet-01",
+      "role": "sdet",
+      "scenario": "supported",
+      "expected": "SHORTLIST",
+      "split": "development"
+    },
+    {
+      "id": "sdet-02",
+      "role": "sdet",
+      "scenario": "missing",
+      "expected": "REVIEW_REQUIRED",
+      "split": "development"
+    },
+    {
+      "id": "sdet-03",
+      "role": "sdet",
+      "scenario": "preferred",
+      "expected": "SHORTLIST",
+      "split": "development"
+    },
+    {
+      "id": "sdet-04",
+      "role": "sdet",
+      "scenario": "years_missing",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "sdet-05",
+      "role": "sdet",
+      "scenario": "auth_unknown",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "sdet-06",
+      "role": "sdet",
+      "scenario": "auth_lacks",
+      "expected": "REJECT",
+      "split": "heldout"
+    },
+    {
+      "id": "sdet-07",
+      "role": "sdet",
+      "scenario": "sponsorship_unknown",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "sdet-08",
+      "role": "sdet",
+      "scenario": "clearance_unknown",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "sdet-09",
+      "role": "sdet",
+      "scenario": "clearance_lacks",
+      "expected": "REJECT",
+      "split": "heldout"
+    },
+    {
+      "id": "sdet-10",
+      "role": "sdet",
+      "scenario": "stale",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "sdet-11",
+      "role": "sdet",
+      "scenario": "student",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "sdet-12",
+      "role": "sdet",
+      "scenario": "onsite_mismatch",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "sdet-13",
+      "role": "sdet",
+      "scenario": "conflicting_arrangement",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "sdet-14",
+      "role": "sdet",
+      "scenario": "instruction",
+      "expected": "SHORTLIST",
+      "split": "heldout"
+    },
+    {
+      "id": "sdet-15",
+      "role": "sdet",
+      "scenario": "duplicate_update",
+      "expected": "SHORTLIST",
+      "split": "heldout"
+    },
+    {
+      "id": "security-01",
+      "role": "security",
+      "scenario": "supported",
+      "expected": "SHORTLIST",
+      "split": "development"
+    },
+    {
+      "id": "security-02",
+      "role": "security",
+      "scenario": "missing",
+      "expected": "REVIEW_REQUIRED",
+      "split": "development"
+    },
+    {
+      "id": "security-03",
+      "role": "security",
+      "scenario": "preferred",
+      "expected": "SHORTLIST",
+      "split": "development"
+    },
+    {
+      "id": "security-04",
+      "role": "security",
+      "scenario": "years_missing",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "security-05",
+      "role": "security",
+      "scenario": "auth_unknown",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "security-06",
+      "role": "security",
+      "scenario": "auth_lacks",
+      "expected": "REJECT",
+      "split": "heldout"
+    },
+    {
+      "id": "security-07",
+      "role": "security",
+      "scenario": "sponsorship_unknown",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "security-08",
+      "role": "security",
+      "scenario": "clearance_unknown",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "security-09",
+      "role": "security",
+      "scenario": "clearance_lacks",
+      "expected": "REJECT",
+      "split": "heldout"
+    },
+    {
+      "id": "security-10",
+      "role": "security",
+      "scenario": "stale",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "security-11",
+      "role": "security",
+      "scenario": "student",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "security-12",
+      "role": "security",
+      "scenario": "onsite_mismatch",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "security-13",
+      "role": "security",
+      "scenario": "conflicting_arrangement",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "security-14",
+      "role": "security",
+      "scenario": "instruction",
+      "expected": "SHORTLIST",
+      "split": "heldout"
+    },
+    {
+      "id": "security-15",
+      "role": "security",
+      "scenario": "duplicate_update",
+      "expected": "SHORTLIST",
+      "split": "heldout"
+    },
+    {
+      "id": "cloud-01",
+      "role": "cloud",
+      "scenario": "supported",
+      "expected": "SHORTLIST",
+      "split": "development"
+    },
+    {
+      "id": "cloud-02",
+      "role": "cloud",
+      "scenario": "missing",
+      "expected": "REVIEW_REQUIRED",
+      "split": "development"
+    },
+    {
+      "id": "cloud-03",
+      "role": "cloud",
+      "scenario": "preferred",
+      "expected": "SHORTLIST",
+      "split": "development"
+    },
+    {
+      "id": "cloud-04",
+      "role": "cloud",
+      "scenario": "years_missing",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "cloud-05",
+      "role": "cloud",
+      "scenario": "auth_unknown",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "cloud-06",
+      "role": "cloud",
+      "scenario": "auth_lacks",
+      "expected": "REJECT",
+      "split": "heldout"
+    },
+    {
+      "id": "cloud-07",
+      "role": "cloud",
+      "scenario": "sponsorship_unknown",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "cloud-08",
+      "role": "cloud",
+      "scenario": "clearance_unknown",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "cloud-09",
+      "role": "cloud",
+      "scenario": "clearance_lacks",
+      "expected": "REJECT",
+      "split": "heldout"
+    },
+    {
+      "id": "cloud-10",
+      "role": "cloud",
+      "scenario": "stale",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "cloud-11",
+      "role": "cloud",
+      "scenario": "student",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "cloud-12",
+      "role": "cloud",
+      "scenario": "onsite_mismatch",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "cloud-13",
+      "role": "cloud",
+      "scenario": "conflicting_arrangement",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "cloud-14",
+      "role": "cloud",
+      "scenario": "instruction",
+      "expected": "SHORTLIST",
+      "split": "heldout"
+    },
+    {
+      "id": "cloud-15",
+      "role": "cloud",
+      "scenario": "duplicate_update",
+      "expected": "SHORTLIST",
+      "split": "heldout"
+    },
+    {
+      "id": "network-01",
+      "role": "network",
+      "scenario": "supported",
+      "expected": "SHORTLIST",
+      "split": "development"
+    },
+    {
+      "id": "network-02",
+      "role": "network",
+      "scenario": "missing",
+      "expected": "REVIEW_REQUIRED",
+      "split": "development"
+    },
+    {
+      "id": "network-03",
+      "role": "network",
+      "scenario": "preferred",
+      "expected": "SHORTLIST",
+      "split": "development"
+    },
+    {
+      "id": "network-04",
+      "role": "network",
+      "scenario": "years_missing",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "network-05",
+      "role": "network",
+      "scenario": "auth_unknown",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "network-06",
+      "role": "network",
+      "scenario": "auth_lacks",
+      "expected": "REJECT",
+      "split": "heldout"
+    },
+    {
+      "id": "network-07",
+      "role": "network",
+      "scenario": "sponsorship_unknown",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "network-08",
+      "role": "network",
+      "scenario": "clearance_unknown",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "network-09",
+      "role": "network",
+      "scenario": "clearance_lacks",
+      "expected": "REJECT",
+      "split": "heldout"
+    },
+    {
+      "id": "network-10",
+      "role": "network",
+      "scenario": "stale",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "network-11",
+      "role": "network",
+      "scenario": "student",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "network-12",
+      "role": "network",
+      "scenario": "onsite_mismatch",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "network-13",
+      "role": "network",
+      "scenario": "conflicting_arrangement",
+      "expected": "REVIEW_REQUIRED",
+      "split": "heldout"
+    },
+    {
+      "id": "network-14",
+      "role": "network",
+      "scenario": "instruction",
+      "expected": "SHORTLIST",
+      "split": "heldout"
+    },
+    {
+      "id": "network-15",
+      "role": "network",
+      "scenario": "duplicate_update",
+      "expected": "SHORTLIST",
+      "split": "heldout"
+    }
+  ]
+}

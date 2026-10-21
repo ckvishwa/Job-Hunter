@@ -6,7 +6,7 @@ import type { MatchStore } from "../match/store.js";
 // Same session, Origin and CSRF protection as every route (shared preHandler hook). Nothing here edits a candidate fact, scores a job, applies, or submits.
 
 export const MATCH_DISCLAIMER =
-  "This compares what the posting asks for with evidence you approved. It is not a score, a hiring prediction or an eligibility ruling. 'No supporting evidence' means no approved evidence was found, not that you lack the qualification. Nothing here applies to any job.";
+  "This compares what the posting asks for with evidence you approved. The evidence report is not a score. The M4 ranking score orders reviewed opportunities; it is not a hiring prediction. 'No supporting evidence' means no approved evidence was found, not that you lack the qualification. Nothing here applies to any job.";
 
 const uuid = z.string().uuid();
 const flagBody = z.object({ requirementId: z.string().trim().min(1).max(80), note: z.string().trim().min(3).max(1000) }).strict();
@@ -19,6 +19,7 @@ export interface MatchRouteDeps {
 
 export function registerMatchRoutes(app: FastifyInstance, { store, user, send }: MatchRouteDeps): void {
   app.get("/api/v1/matches", async () => ({ disclaimer: MATCH_DISCLAIMER, ...(await store.list(user.id, 100)) }));
+  app.get("/api/v1/shortlist", async () => ({ disclaimer: MATCH_DISCLAIMER, ...(await store.shortlist(user.id, 100)) }));
 
   app.get("/api/v1/jobs/:id/match", async (req, reply) => {
     const id = uuid.safeParse((req.params as { id: string }).id);

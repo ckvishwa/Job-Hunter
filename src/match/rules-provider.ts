@@ -13,7 +13,7 @@ import { Lexicon, lexicon as sharedLexicon, normalizeText, type TermHit } from "
 //   alternatives: explicit OR between listed terms only (any_of); a plain list is NOT alternatives
 //   conditions : citizenship, clearance, present work authorization and sponsorship are separate constraint types
 
-export const RULES_EXTRACTOR_REVISION = "rules-jd-extractor@1:jd-terms@1:source-inventory@7";
+export const RULES_EXTRACTOR_REVISION = "rules-jd-extractor@3:jd-terms@1:source-inventory@7";
 
 const WORD_NUMBERS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
 const YEARS = /(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten)(?:\s*(?:[-–—]|to)\s*(\d+(?:\.\d+)?))?\s*\+?\s+years?\b/i;
@@ -64,15 +64,16 @@ export class RulesJobSemanticProvider implements JobSemanticProvider {
     const inventory = inventorySource(raw);
     let groupSeq = 0;
     for (const item of inventory.items) {
-      if (!item.annotate || raw.slice(item.start, item.end) !== item.text) continue;
-      const level = item.section === "required" ? "required" : "preferred";
+      const qualificationsWithoutLevel = item.section === "unknown" && /^qualifications\s*:?(?:\s*)$/i.test(item.heading.trim());
+      if ((!item.annotate && !qualificationsWithoutLevel) || raw.slice(item.start, item.end) !== item.text) continue;
+      const level = qualificationsWithoutLevel ? "unknown" : item.section === "required" ? "required" : "preferred";
       this.fromItem(item, level, out, () => `g-${++groupSeq}`);
     }
     this.constraints(raw, out);
     return out;
   }
 
-  private fromItem(item: SourceItem, level: "required" | "preferred", out: Proposal, nextGroup: () => string): void {
+  private fromItem(item: SourceItem, level: "required" | "preferred" | "unknown", out: Proposal, nextGroup: () => string): void {
     const evidence = [{ quote: item.text, start: item.start, end: item.end }];
     const base = (n: number) => `r-${item.id}-${n}`.slice(0, 64);
     const years = yearsOf(item.text);
@@ -179,8 +180,9 @@ export class RulesJobSemanticProvider implements JobSemanticProvider {
     const clr = first(/\b(?:(?:ts\/sci|top secret|secret|public trust|security|active|current)\s+)*clearance\b/i);
     if (clr) {
       const sentence = sentenceOf(clr);
-      if (/\b(?:no|not)\b[^.]{0,30}\b(?:clearance|required|necessary)\b/i.test(sentence)) add("c-clearance", "clearance", "not_required", null, clr.index);
-      else if (/\b(?:must|required|need|obtain|hold|maintain|active|eligible to obtain)\b/i.test(sentence) && !/\b(?:preferred|a plus|desired|nice to have|bonus)\b/i.test(sentence)) add("c-clearance", "clearance", "required", null, clr.index);
+      const level = /\b(?:TS\/SCI|Top Secret|Public Trust|Secret|Confidential)\b/i.exec(sentence)?.[0] ?? null;
+      if (/\b(?:no|not)\b[^.]{0,30}\b(?:clearance|required|necessary)\b/i.test(sentence)) add("c-clearance", "clearance", "not_required", level, clr.index);
+      else if (/\b(?:must|required|need|obtain|hold|maintain|active|eligible to obtain)\b/i.test(sentence) && !/\b(?:preferred|a plus|desired|nice to have|bonus)\b/i.test(sentence)) add("c-clearance", "clearance", "required", level, clr.index);
     }
     const arrangement = first(/\b(?:this (?:role|position) is|role is|position is|(?:you|candidates|employees) (?:will|must|are expected to) (?:work|be))[^.\n]{0,60}?\b(fully remote|remote|hybrid|on-?site|in[- ]office)\b/i);
     if (arrangement) {

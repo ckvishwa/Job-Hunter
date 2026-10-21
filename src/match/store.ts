@@ -13,6 +13,7 @@ import { lexicon } from "./lexicon.js";
 import { REPORT_SCHEMA, runMatch, type MatchReport } from "./pipeline.js";
 import { RRF_K } from "./retrieval.js";
 import { RulesJobSemanticProvider } from "./rules-provider.js";
+import { DECISION_POLICY_VERSION, decideMatch, type MatchDecision } from "./intelligence.js";
 
 // Persisted, versioned matches for jobs in the authoritative S3 store (migration 0005). One live row per (user, job): the same inputs reuse it; any change to the JD revision,
 // the authorized evidence, the profile membership, an eligibility answer, the saved selection, or the extractor/policy/lexicon/retrieval settings is detected from a digest and
@@ -31,7 +32,7 @@ export interface StoreDeps {
 
 export const DEFAULT_ENCODER: EncoderIdentity = { modelId: "sentence-transformers/all-MiniLM-L6-v2", modelRevision: "1110a243fdf4706b3f48f1d95db1a4f5529b4d41", preprocess: PREPROCESS_REVISION };
 
-export type StaleReason = "JD_CHANGED" | "EVIDENCE_CHANGED" | "PROFILE_CHANGED" | "EXTRACTOR_CHANGED" | "POLICY_CHANGED";
+export type StaleReason = "JD_CHANGED" | "EVIDENCE_CHANGED" | "PROFILE_CHANGED" | "EXTRACTOR_CHANGED" | "POLICY_CHANGED" | "SOURCE_CHANGED";
 
 export interface StoredMatch {
   id: string;
@@ -42,6 +43,7 @@ export interface StoredMatch {
   inputDigest: string;
   versions: { profileId: string | null; profileRevisionNo: number | null; profileDigest: string | null; evidenceDigest: string; extractorRevision: string; policyVersion: string; lexiconVersion: string; retrieval: unknown };
   report: MatchReport;
+  decision: MatchDecision | null;
 }
 
 /** Freshness of a stored posting. "Last seen" is when an official read last returned it; a stored posting is never claimed to be open today. */
@@ -77,9 +79,11 @@ export class MatchStore {
     const components = {
       jd: posting.jdContentHash, extractor: provider.revision, evidence: corpus.version.evidenceDigest, eligibility, profile: corpus.version.profileId, members: corpus.version.authorizedResumeIds.slice().sort(),
       policy: MATCH_POLICY_VERSION, lexicon: `jd-terms@${lexicon().version}`, retrieval,
-      selection: selection ? sha(JSON.stringify([selection.workModes, selection.locations])) : null,
+      decision: DECISION_POLICY_VERSION, asOf: this.asOf(),
+      source: { observedAt: stored.observations[0]?.observedAt ?? null, liveConfirmed: stored.observations[0]?.verification?.liveConfirmed ?? null, finalUrl: stored.observations[0]?.finalUrl ?? null },
+      selection: selection ? sha(JSON.stringify([selection.roleSlugs, selection.targetFamilies, selection.workModes, selection.locations, selection.seniorityLevels, selection.searchBand])) : null,
     };
-    return { stored, posting, corpus, provider, components, retrieval, inputDigest: sha(JSON.stringify(components)), versions: { evidenceDigest: corpus.version.evidenceDigest, eligibility } };
+    return { stored, posting, corpus, provider, selection, components, retrieval, inputDigest: sha(JSON.stringify(components)), versions: { evidenceDigest: corpus.version.evidenceDigest, eligibility } };
   }
 
   private rowToMatch(r: Record<string, unknown>): StoredMatch {
@@ -89,6 +93,7 @@ export class MatchStore {
       versions: { profileId: (r.profile_id as string) ?? null, profileRevisionNo: (r.profile_revision_no as number) ?? null, profileDigest: (r.profile_digest as string) ?? null, evidenceDigest: r.evidence_digest as string,
         extractorRevision: r.extractor_revision as string, policyVersion: r.policy_version as string, lexiconVersion: r.lexicon_version as string, retrieval: r.retrieval_config },
       report: r.report as MatchReport,
+      decision: (r.decision as MatchDecision) ?? null,
     };
   }
 
@@ -113,7 +118,8 @@ export class MatchStore {
     if (m.versions.profileId !== inp.corpus.version.profileId || JSON.stringify([...storedMembers].sort()) !== JSON.stringify([...inp.corpus.version.authorizedResumeIds].sort())) out.push("PROFILE_CHANGED");
     else if (m.versions.evidenceDigest !== inp.corpus.version.evidenceDigest) out.push("EVIDENCE_CHANGED");
     if (m.versions.extractorRevision !== inp.provider.revision) out.push("EXTRACTOR_CHANGED");
-    if (m.versions.policyVersion !== MATCH_POLICY_VERSION || m.versions.lexiconVersion !== `jd-terms@${lexicon().version}`) out.push("POLICY_CHANGED");
+    if (m.versions.policyVersion !== MATCH_POLICY_VERSION || m.versions.lexiconVersion !== `jd-terms@${lexicon().version}` || !m.decision || m.decision.version !== DECISION_POLICY_VERSION) out.push("POLICY_CHANGED");
+    if (JSON.stringify(m.decision?.sourceVerification ?? null) !== JSON.stringify(inp.components.source)) out.push("SOURCE_CHANGED");
     return out.length ? out : ["EVIDENCE_CHANGED"]; // a digest difference with no named cause is an eligibility answer or a saved-selection change
   }
 
@@ -130,28 +136,46 @@ export class MatchStore {
       job: inp.posting, provider: inp.provider, corpus: inp.corpus, encoder: enc, encoderLabel: enc ? `${this.identity().modelId}@${this.identity().modelRevision}` : null, asOf: this.asOf(),
       selection: await this.selection(userId), cache,
     });
+    const chosenRoles = inp.selection?.roleSlugs ?? [];
+    const observedRoles = inp.stored.observations[0]?.matchedRoles ?? [];
+    const rolePreference = chosenRoles.length === 0 ? "UNKNOWN" : observedRoles.some((r) => chosenRoles.includes(r)) ? "MATCH" : "MISMATCH";
+    const chosenLocations = inp.selection?.locations.map((l) => l.value.trim().toLowerCase()).filter(Boolean) ?? [];
+    const statedLocation = inp.stored.location?.trim().toLowerCase() ?? "";
+    const locationCompatibility = chosenLocations.length === 0 || !statedLocation ? "UNKNOWN" : chosenLocations.some((l) => statedLocation === l || statedLocation.includes(l)) ? "MATCH" : "MISMATCH";
+    const sourceUnverified = inp.stored.observations[0]?.verification?.liveConfirmed === false;
+    const decision = decideMatch(report, { postingStatus: sourceUnverified ? "UNKNOWN" : postingFreshness(inp.stored.lastSeenAt).state, rolePreference, locationCompatibility });
+    decision.sourceVerification = inp.components.source as MatchDecision["sourceVerification"];
     await pruneEmbeddingCache(this.d.pool, userId, inp.corpus.version.profileId, inp.corpus.units, enc ? this.identity() : null);
+
+    // A review, profile change or JD revision during extraction must not be saved as the current decision.
+    const latestInputs = await this.inputs(userId, jobId);
+    if (!latestInputs || latestInputs.inputDigest !== inp.inputDigest) throw new Error("MATCH_INPUT_CHANGED: retry against the current JD and candidate profile");
 
     const reason = live ? (this.reasons(live, inp)[0] ?? "RECOMPUTED") : null;
     const client = await this.d.pool.connect();
     try {
       await client.query("BEGIN");
       await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`match:${userId}:${jobId}`]);
-      if (live) await client.query("UPDATE job_match_reports SET superseded_at=now(), superseded_reason=$2 WHERE id=$1 AND superseded_at IS NULL", [live.id, opts.force && live.inputDigest === inp.inputDigest ? "RECOMPUTED" : reason]);
+      const current = (await client.query("SELECT * FROM job_match_reports WHERE user_id=$1 AND job_id=$2 AND superseded_at IS NULL ORDER BY created_at DESC LIMIT 1", [userId, jobId])).rows[0];
+      if (current?.input_digest?.trim() === inp.inputDigest && !opts.force) {
+        await client.query("COMMIT");
+        return { match: this.rowToMatch(current), computed: false, superseded: null, embeddingCache: cache ? { hits: cache.hits, misses: cache.misses } : null };
+      }
+      if (current) await client.query("UPDATE job_match_reports SET superseded_at=now(), superseded_reason=$2 WHERE id=$1 AND superseded_at IS NULL", [current.id, opts.force && current.input_digest?.trim() === inp.inputDigest || reason === "SOURCE_CHANGED" ? "RECOMPUTED" : reason ?? "RECOMPUTED"]);
       // identical inputs seen before (for example after a revert) re-open that exact row instead of duplicating it
       const prior = await client.query("SELECT * FROM job_match_reports WHERE user_id=$1 AND job_id=$2 AND input_digest=$3", [userId, jobId, inp.inputDigest]);
       let row: Record<string, unknown>;
       if (prior.rows[0]) {
-        row = (await client.query("UPDATE job_match_reports SET superseded_at=NULL, superseded_reason=NULL, report=$2::jsonb, created_at=now(), status=$3 WHERE id=$1 RETURNING *", [prior.rows[0].id, JSON.stringify(report), report.status])).rows[0];
+        row = (await client.query("UPDATE job_match_reports SET superseded_at=NULL, superseded_reason=NULL, report=$2::jsonb, decision=$3::jsonb, created_at=now(), status=$4 WHERE id=$1 RETURNING *", [prior.rows[0].id, JSON.stringify(report), JSON.stringify(decision), report.status])).rows[0];
       } else {
         row = (await client.query(
-          `INSERT INTO job_match_reports (user_id, job_id, revision_id, jd_sha256, input_digest, status, profile_id, profile_revision_no, profile_digest, evidence_digest, extractor_revision, policy_version, lexicon_version, retrieval_config, report)
-           VALUES ($1,$2,(SELECT current_revision_id FROM jobs WHERE id=$2),$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb) RETURNING *`,
+          `INSERT INTO job_match_reports (user_id, job_id, revision_id, jd_sha256, input_digest, status, profile_id, profile_revision_no, profile_digest, evidence_digest, extractor_revision, policy_version, lexicon_version, retrieval_config, report, decision)
+           VALUES ($1,$2,(SELECT current_revision_id FROM jobs WHERE id=$2),$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15::jsonb) RETURNING *`,
           [userId, jobId, inp.posting.jdContentHash, inp.inputDigest, report.status, inp.corpus.version.profileId, inp.corpus.version.profileRevisionNo, inp.corpus.version.profileDigest, inp.corpus.version.evidenceDigest,
-            inp.provider.revision, MATCH_POLICY_VERSION, `jd-terms@${lexicon().version}`, JSON.stringify(inp.retrieval), JSON.stringify(report)])).rows[0];
+            inp.provider.revision, MATCH_POLICY_VERSION, `jd-terms@${lexicon().version}`, JSON.stringify(inp.retrieval), JSON.stringify(report), JSON.stringify(decision)])).rows[0];
       }
       await client.query("COMMIT");
-      return { match: this.rowToMatch(row), computed: true, superseded: live, embeddingCache: cache ? { hits: cache.hits, misses: cache.misses } : null };
+      return { match: this.rowToMatch(row), computed: true, superseded: current ? this.rowToMatch(current) : null, embeddingCache: cache ? { hits: cache.hits, misses: cache.misses } : null };
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;
@@ -166,15 +190,28 @@ export class MatchStore {
   }
 
   /** Jobs the user can see (their own S3 runs) with the state of their stored match. */
-  async list(userId: string, limit = 50) {
-    const jobs = await this.d.jobs.listJobs(userId, { limit });
+  async list(userId: string, limit = 50, offset = 0) {
+    const jobs = await this.d.jobs.listJobs(userId, { limit, offset });
     const out = [];
     for (const j of jobs.jobs) {
       const g = await this.get(userId, j.jobId);
       const summary = g?.match && g.match.report.status === "COMPLETE" ? { required: g.match.report.summary.required, preferred: g.match.report.summary.preferred, blockers: g.match.report.summary.criticalBlockers.length } : null;
-      out.push({ ...j, freshness: postingFreshness(j.lastSeenAt), match: g?.match ? { id: g.match.id, status: g.match.status, createdAt: g.match.createdAt, current: g.current, staleReasons: g.staleReasons, summary } : null });
+      out.push({ ...j, freshness: postingFreshness(j.lastSeenAt), match: g?.match ? { id: g.match.id, status: g.match.status, createdAt: g.match.createdAt, current: g.current, staleReasons: g.staleReasons, summary, decision: g.match.decision ? { outcome: g.match.decision.outcome, score: g.match.decision.ranking?.score ?? null } : null } : null });
     }
     return { total: jobs.total, jobs: out };
+  }
+
+  /** Only current, evidence-backed shortlists; an old profile/JD revision is never silently returned as current. */
+  async shortlist(userId: string, limit = 50) {
+    const eligible: Awaited<ReturnType<MatchStore["list"]>>["jobs"] = [];
+    let offset = 0;
+    for (;;) {
+      const page = await this.list(userId, 100, offset);
+      eligible.push(...page.jobs.filter((j) => j.match?.current && j.match.decision?.outcome === "SHORTLIST"));
+      offset += page.jobs.length;
+      if (page.jobs.length === 0 || offset >= page.total) break;
+    }
+    return { jobs: eligible.sort((a, b) => (b.match?.decision?.score ?? 0) - (a.match?.decision?.score ?? 0) || a.jobId.localeCompare(b.jobId)).slice(0, Math.max(1, Math.min(100, limit))) };
   }
 
   async flag(userId: string, reportId: string, requirementId: string, note: string): Promise<{ id: string } | null> {

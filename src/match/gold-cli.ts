@@ -12,7 +12,7 @@ import { buildEvidenceCorpus } from "./evidence.js";
 import { NOT_EVALUATED, SPLIT_SCHEMA, buildPool, freezeSplit, goldStatus, parseSplitName, validateGold, scoreRun, type SplitManifest, type SystemRun } from "./gold.js";
 import { loadStoredJobs } from "./jd-source.js";
 import { EvidenceIndex, queryFor } from "./retrieval.js";
-import { RulesJobSemanticProvider } from "./rules-provider.js";
+import { RULES_EXTRACTOR_REVISION, RulesJobSemanticProvider } from "./rules-provider.js";
 
 // npm run match:gold -- init  --jobs-file <jsonl> [--dir private-runtime/s4a-gold]      prepare the labelling sheet and FREEZE the split
 // npm run match:gold -- score --jobs-file <jsonl> --labels <file> --which development|heldOut [--encoder minilm|none]
@@ -120,7 +120,7 @@ async function main(): Promise<number> {
         run.retrieval.push({ itemKey: e.itemKey, requirementValue: e.requirementValue, methods: { lexical: factsOf(res.lexical), bm25: factsOf(res.bm25), semantic: factsOf(res.semantic), hybrid: factsOf(res.hybrid) } });
       }
     }
-    console.log(JSON.stringify({ status: "EVALUATED", which, labeledBy: gold.labeledBy, splitManifestSha256: split.manifestSha256, baseline: "rules-jd-extractor@1", metrics: scoreRun(gold, split[which], run) }, null, 2));
+    console.log(JSON.stringify({ status: "EVALUATED", which, labeledBy: gold.labeledBy, splitManifestSha256: split.manifestSha256, baseline: RULES_EXTRACTOR_REVISION, metrics: scoreRun(gold, split[which], run) }, null, 2));
     return 0;
   } finally {
     await dbPool.end().catch(() => undefined);

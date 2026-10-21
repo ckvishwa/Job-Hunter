@@ -1,5 +1,7 @@
 # S4A: evidence-grounded job matching (first vertical slice)
 
+M4 adds a separate persisted decision and ranking projection; see [M4-MATCHING.md](M4-MATCHING.md). This S4A evidence report remains status-only.
+
 ```
 official stored JD -> structured requirements -> authorized candidate facts -> retrieval -> requirement decisions -> explainable report
 ```

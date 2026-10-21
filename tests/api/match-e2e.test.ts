@@ -129,7 +129,7 @@ suite("S4A end to end (PostgreSQL)", { timeout: 60_000 }, () => {
     expect(by("MITRE ATT&CK").support[0]).toMatchObject({ category: "statement", resumeId: ids.real, strength: "demonstrated" });
     expect(report.conditions.map((c) => [c.type, c.result])).toEqual([["citizenship", "UNKNOWN"], ["clearance", "NOT_APPLICABLE"], ["work_authorization", "UNKNOWN"], ["sponsorship", "UNKNOWN"]]);
     expect(report.summary.criticalBlockers).toEqual([]);
-    expect(report.versions).toMatchObject({ policy: "match-policy@1", profile: { profileKind: "personal", authorizedResumeIds: [ids.real] }, jd: { extractor: expect.stringMatching(/^rules-jd-extractor@1/), jdSha256: expect.stringMatching(/^[0-9a-f]{64}$/) } });
+    expect(report.versions).toMatchObject({ policy: "match-policy@1", profile: { profileKind: "personal", authorizedResumeIds: [ids.real] }, jd: { extractor: expect.stringMatching(/^rules-jd-extractor@3/), jdSha256: expect.stringMatching(/^[0-9a-f]{64}$/) } });
     expect(report.scoring).toMatch(/^NONE/);
     expect(JSON.stringify(report)).not.toMatch(/"(?:matchScore|score|fit|probability|percent)"/i);
     const md = renderMatchMarkdown(report);

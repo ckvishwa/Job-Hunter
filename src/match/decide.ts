@@ -56,7 +56,7 @@ export interface GroupDecision { groupId: string; status: ReqStatus; memberIds: 
 
 export interface ConditionDecision {
   type: Condition["type"];
-  jd: { status: Condition["status"]; value: string | null; quote: string | null };
+  jd: { status: Condition["status"]; value: string | null; quote: string | null; start: number | null; end: number | null };
   candidateFactIds: string[];
   result: "SATISFIED" | "BLOCKER" | "UNKNOWN" | "NOT_APPLICABLE" | "ATTENTION";
   severity: "blocker" | "needs-candidate-answer" | "extraction-gap" | "info";
@@ -65,6 +65,7 @@ export interface ConditionDecision {
 
 const MANDATORY: ReadonlySet<string> = new Set(["required"]);
 const COUNTRY = /\b(?:u\.?s\.?a?|united states(?: of america)?)\b/i;
+const CLEARANCE_LEVEL = /\b(?:TS\/SCI|Top Secret|Public Trust|Secret|Confidential)\b/i;
 
 function lookupLead(retrieval: RetrievalResult | undefined, units: Map<string, EvidenceUnit>, limit = 3): RequirementDecision["retrievalLeads"] {
   if (!retrieval) return [];
@@ -251,7 +252,7 @@ export function decideConditions(analysis: JdAnalysis, eligibility: readonly Eli
   const of = (kind: EligibilityFact["kind"]): EligibilityFact[] => eligibility.filter((f) => f.kind === kind);
   for (const type of ["citizenship", "clearance", "work_authorization", "sponsorship"] as const) {
     const c = analysis.conditions[type];
-    const jd = { status: c.status, value: c.value, quote: c.quote?.quote ?? null };
+    const jd = { status: c.status, value: c.value, quote: c.quote?.quote ?? null, start: c.quote?.start ?? null, end: c.quote?.end ?? null };
     const kind: EligibilityFact["kind"] = type === "sponsorship" ? "sponsorship_need" : type;
     const facts = of(kind);
     const decide = (result: ConditionDecision["result"], severity: ConditionDecision["severity"], explanation: string, ids: string[] = facts.map((f) => f.factId)): void => void out.push({ type, jd, candidateFactIds: ids, result, severity, explanation });
@@ -274,7 +275,9 @@ export function decideConditions(analysis: JdAnalysis, eligibility: readonly Eli
       continue;
     }
     const want = c.value ?? "";
-    const matching = facts.filter((f) => (type === "clearance" ? true : COUNTRY.test(want) ? COUNTRY.test(f.value) : normalizeText(f.value).includes(normalizeText(want))));
+    const matching = facts.filter((f) => (type === "clearance"
+      ? Boolean(CLEARANCE_LEVEL.exec(want)?.[0] && normalizeText(CLEARANCE_LEVEL.exec(f.value)?.[0] ?? "") === normalizeText(CLEARANCE_LEVEL.exec(want)?.[0] ?? ""))
+      : COUNTRY.test(want) ? COUNTRY.test(f.value) : normalizeText(f.value).includes(normalizeText(want))));
     const has = matching.filter((f) => f.polarity === "has");
     const lacks = matching.filter((f) => f.polarity === "lacks");
     const label = type === "work_authorization" ? "present work authorization" : type;

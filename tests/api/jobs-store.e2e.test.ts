@@ -93,7 +93,8 @@ suite("persisted jobs and versioned matches", { timeout: 60_000 }, () => {
     jd1001 = longJd("Requirements: 3+ years of experience with Splunk and Python. Must be a US citizen.");
     await liveImport();
     const stale = await store.get(userId, id);
-    expect(stale).toMatchObject({ current: false, staleReasons: ["JD_CHANGED"] });
+    expect(stale?.current).toBe(false);
+    expect(stale?.staleReasons).toContain("JD_CHANGED");
     const next = await store.compute(userId, id);
     expect(next).toMatchObject({ computed: true });
     expect(next!.superseded!.id).toBe(first!.match.id);

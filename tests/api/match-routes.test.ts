@@ -47,7 +47,7 @@ suite("match API", { timeout: 60_000 }, () => {
 
   it("lists stored postings with no match yet, then computes, then reuses", async () => {
     const before = (await get("/api/v1/matches")).json();
-    expect(before.disclaimer).toMatch(/not a score/i);
+    expect(before.disclaimer).toMatch(/not a hiring prediction/i);
     expect(before.jobs[0]).toMatchObject({ jobId, match: null });
     expect((await get(`/api/v1/jobs/${jobId}/match`)).json()).toMatchObject({ match: null, current: false });
 
@@ -55,14 +55,17 @@ suite("match API", { timeout: 60_000 }, () => {
     expect(first.statusCode).toBe(201);
     const m = first.json();
     expect(m).toMatchObject({ computed: true, match: { status: "COMPLETE" } });
-    // no score of any kind anywhere in the payload
-    expect(JSON.stringify(m)).not.toMatch(/"(?:score|percent|probability|rank(?:ing)?Score|matchScore)"/i);
+    // The S4 evidence report still has no numeric score; M4's separate ordering heuristic is explicitly labeled.
+    expect(JSON.stringify(m.match.report)).not.toMatch(/"(?:score|percent|probability|rank(?:ing)?Score|matchScore)"/i);
+    expect(m.match.decision).toMatchObject({ outcome: "REVIEW_REQUIRED", hardReject: false });
+    expect(m.match.decision.ranking.normalization).toMatch(/not a hiring probability/i);
     const second = await post(`/api/v1/jobs/${jobId}/match`, {});
     expect(second.statusCode).toBe(200);
     expect(second.json()).toMatchObject({ computed: false, match: { id: m.match.id } });
 
     const list = (await get("/api/v1/matches")).json();
     expect(list.jobs[0].match).toMatchObject({ id: m.match.id, current: true });
+    expect((await get("/api/v1/shortlist")).json().jobs).toEqual([]);
     const eligibility = (m.match.report.conditions as Array<{ type: string }>).map((c) => c.type);
     expect(eligibility.length).toBeGreaterThan(0);
   });

@@ -4,6 +4,8 @@ import { decideConditions, decideRequirements, rollupItems } from "../../src/mat
 import type { EligibilityFact, EvidenceCorpus, EvidenceUnit } from "../../src/match/evidence.js";
 import { Lexicon } from "../../src/match/lexicon.js";
 import { RulesJobSemanticProvider } from "../../src/match/rules-provider.js";
+import { runMatch } from "../../src/match/pipeline.js";
+import { decideMatch } from "../../src/match/intelligence.js";
 import { EvidenceIndex, queryFor, rrf, type RetrievalResult } from "../../src/match/retrieval.js";
 import { parseCanonicalJob } from "../../src/semantic/parse-job.js";
 import type { CandidateFact } from "../../src/domain/candidate-profile.js";
@@ -19,12 +21,17 @@ async function analyze(text: string, over: Record<string, unknown> = {}) {
 }
 
 describe("deterministic JD extraction (AI off baseline)", () => {
+  it("preserves unqualified Qualifications items as unknown rather than silently dropping them or making them mandatory", async () => {
+    const { analysis } = await analyze("About the role\nSupport production networks.\n\nQualifications:\nPython.\nWireshark.\n\nBenefits:\nHealth coverage.");
+    expect(analysis.requirements.find((r) => r.value === "Python")).toMatchObject({ level: "unknown", effectiveLevel: "unknown" });
+    expect(analysis.requirements.find((r) => r.value === "Wireshark")).toMatchObject({ level: "unknown" });
+  });
   it("passes the unchanged production validator: every quote is an exact slice of the JD, ids unique, groups well-formed", async () => {
     const { job, structured } = await analyze(SYNTHETIC_JD);
     for (const r of structured.requirements) for (const e of r.evidence) expect(job.descriptionText.slice(e.start, e.end)).toBe(e.quote);
     expect(new Set(structured.requirements.map((r) => r.id)).size).toBe(structured.requirements.length);
     expect(structured.parserVersion).toBe("structured-job-validator@1");
-    expect(structured.providerRevision).toMatch(/^rules-jd-extractor@1/);
+    expect(structured.providerRevision).toMatch(/^rules-jd-extractor@3/);
   });
 
   it("takes required vs preferred from the section the item sits in", async () => {
@@ -129,6 +136,17 @@ function corpusOf(facts: CandidateFact[], eligibility: EligibilityFact[] = [], e
     version: { profileId: "p", profileKind: "personal", profileRevisionNo: 1, profileDigest: "x", evidenceDigest: "y", factCount: facts.length, authorizedResumeIds: ["res-1"], confirmedEmploymentReferences: 0 },
   };
 }
+
+describe("unmodeled eligibility warnings", () => {
+  it("keeps an explicit residency restriction in review even when the technical skill is supported", async () => {
+    const jd = "About the role\nJoin our SOC team.\n\nMinimum Qualifications\n- Familiarity with Splunk.\n\nAdditional notes\nWe can only accept applications from persons with UK residency (at least five years).";
+    const report = await runMatch({ job: makeJob(jd), provider: new RulesJobSemanticProvider(), corpus: corpusOf([fact({ factId: "f-splunk", kind: "skill", value: "Splunk" })]), asOf: "2026-10-21" });
+    expect(report.status).toBe("COMPLETE");
+    if (report.status !== "COMPLETE") return;
+    expect(report.extraction.analysisWarnings).toContain("OTHER_ELIGIBILITY_UNCLASSIFIED:RESIDENCY");
+    expect(decideMatch(report).outcome).toBe("REVIEW_REQUIRED");
+  });
+});
 
 async function decide(jd: string, corpus: EvidenceCorpus, asOf = "2026-10-11") {
   const { analysis } = await analyze(jd);
@@ -264,6 +282,15 @@ describe("eligibility conditions", () => {
     const out = decideConditions(analysis, [{ factId: "c", kind: "citizenship", value: "U.S. citizen", polarity: "lacks" }]);
     expect(out.find((c) => c.type === "citizenship")).toMatchObject({ result: "BLOCKER", severity: "blocker" });
     expect(out.filter((c) => c.severity === "blocker")).toHaveLength(1);
+  });
+
+  it("does not turn a lack of a different clearance level into a hard rejection", async () => {
+    const { analysis } = await analyze("Minimum Qualifications\n- Python.\n\nAdditional notes\nCandidates must hold an active Secret clearance.");
+    expect(analysis.conditions.clearance.value).toBe("Secret");
+    const other = decideConditions(analysis, [{ factId: "public-trust", kind: "clearance", value: "Public Trust", polarity: "lacks" }]);
+    expect(other.find((c) => c.type === "clearance")).toMatchObject({ result: "UNKNOWN", severity: "needs-candidate-answer" });
+    const exact = decideConditions(analysis, [{ factId: "secret", kind: "clearance", value: "Secret", polarity: "lacks" }]);
+    expect(exact.find((c) => c.type === "clearance")).toMatchObject({ result: "BLOCKER", candidateFactIds: ["secret"] });
   });
 });
 

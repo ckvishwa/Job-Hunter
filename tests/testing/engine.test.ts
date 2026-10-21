@@ -214,6 +214,13 @@ describe("crash recovery", () => {
 });
 
 describe("full regression gate", () => {
+  it("ignores generated runtime receipts named in test source when verifying a full run", async () => {
+    write("tests/runtime.test.ts", 'import { readFileSync } from "node:fs"; readFileSync("private-runtime/test-cache/current-run.json");');
+    const full = await engine().run("full");
+    expect(full.fullGate.state).toBe("PASS_CURRENT");
+    expect(full.executedNow.units).toBe(8);
+  });
+
   it("test:full ignores receipts, and its gate is PASS_CURRENT only for the exact tree it passed on", async () => {
     await engine().run("changed");
     calls = { vitest: [], python: 0, typecheck: 0 };

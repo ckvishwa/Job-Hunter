@@ -66,6 +66,18 @@ export async function runMatch(input: {
   }
   const structured = parsed.structured;
   const analysis = analyzeJd(input.job, structured);
+  // Explicit eligibility text outside the four modeled sensitive conditions remains a review warning.
+  // A JD is untrusted data: these phrases never change policy or candidate facts.
+  if (/\b(?:must be (?:a )?(?:current(?:ly enrolled)?|enrolled) student|only (?:current |enrolled )?students (?:may|can) apply|currently enrolled (?:in|at))\b/i.test(input.job.descriptionText))
+    analysis.warnings.push("STUDENT_ONLY_ELIGIBILITY_UNRESOLVED");
+  if (/\bfully remote\b/i.test(input.job.descriptionText) && /\b(?:must|required to) (?:work|be) (?:on[- ]?site|in[- ]?office)\b/i.test(input.job.descriptionText))
+    analysis.warnings.push("CONFLICTING_WORK_ARRANGEMENT");
+  if (/\b(?:do not|does not|will not|no) (?:offer |provide )?(?:visa )?sponsor(?:ship)?\b/i.test(input.job.descriptionText) && /\b(?:visa )?sponsorship (?:is )?(?:available|offered|provided)\b/i.test(input.job.descriptionText))
+    analysis.warnings.push("CONFLICTING_SPONSORSHIP_STATEMENTS");
+  if (/\b(?:only accept applications from persons with|must have|requires?)\b[^.\n]{0,120}\b(?:residency|residence|resident)\b|\breserved post\b/i.test(input.job.descriptionText))
+    analysis.warnings.push("OTHER_ELIGIBILITY_UNCLASSIFIED:RESIDENCY");
+  if (/\b(?:national security vetting|export control|ITAR)\b/i.test(input.job.descriptionText))
+    analysis.warnings.push("OTHER_ELIGIBILITY_UNCLASSIFIED:SECURITY_OR_EXPORT");
 
   const index = new EvidenceIndex(input.corpus.units, input.encoder ?? null, input.cache ?? null);
   await index.prepare();
