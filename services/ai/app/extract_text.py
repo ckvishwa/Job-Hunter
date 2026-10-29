@@ -124,20 +124,78 @@ def _password_protected(error: BaseException, password_type: type[BaseException]
     return False
 
 
-def extract_pdf(data: bytes) -> ExtractedDocument:
+@dataclass(frozen=True)
+class PlacedWord:
+    """One extracted word with its box, in PDF points, `top` measured from the page top."""
+
+    text: str
+    x0: float
+    top: float
+    x1: float
+    bottom: float
+
+
+@dataclass(frozen=True)
+class PageLayout:
+    """Geometry of one page, for callers that must judge reading order (e.g. two columns)."""
+
+    width: float
+    height: float
+    #: Every extracted word with its box, in the order pdfplumber reports them.
+    words: tuple[PlacedWord, ...]
+    image_count: int
+
+    @property
+    def word_x(self) -> tuple[tuple[float, float], ...]:
+        """Horizontal extents only, for callers that need nothing else."""
+        return tuple((word.x0, word.x1) for word in self.words)
+
+
+def _read_pdf(data: bytes, *, ordered: bool, with_layout: bool) -> tuple[list[str], int, list[PageLayout], tuple[str, ...]]:
+    """Open the PDF once and read every page; the only place that maps PDF failures to typed errors.
+
+    ordered=True reads a clear two-column body top-to-bottom (the HTTP service's `extract_pdf`).
+    ordered=False keeps pdfplumber's own order, which the local intake pipeline reflows itself and
+    needs to line up with the word boxes returned by with_layout.
+    """
     try:
         import pdfplumber
         from pdfminer.pdfdocument import PDFPasswordIncorrect
     except Exception as error:  # pragma: no cover - environment problem, not a file problem
         raise ExtractError("EXTRACTOR_UNAVAILABLE", f"PDF library unavailable: {type(error).__name__}") from error
+    layout: list[PageLayout] = []
+    layout_warnings: tuple[str, ...] = ()
     try:
         with pdfplumber.open(io.BytesIO(data)) as pdf:
             if len(pdf.pages) > MAX_PAGES:
                 raise ExtractError("TOO_MANY_PAGES", f"The PDF has {len(pdf.pages)} pages; the limit is {MAX_PAGES}.")
-            ordered = [_ordered_pdf_page(page) for page in pdf.pages]
-            pages = [part for part, _ in ordered]
-            layout_warnings = tuple(f"{warning}:page={i+1}" for i, (_, warning) in enumerate(ordered) if warning)
+            if ordered:
+                read = [_ordered_pdf_page(page) for page in pdf.pages]
+                pages = [part for part, _ in read]
+                layout_warnings = tuple(f"{warning}:page={i+1}" for i, (_, warning) in enumerate(read) if warning)
+            else:
+                pages = [(page.extract_text(x_tolerance=PDF_X_TOLERANCE) or "") for page in pdf.pages]
             page_count = len(pdf.pages)
+            if with_layout:
+                for page in pdf.pages:
+                    words = page.extract_words(x_tolerance=PDF_X_TOLERANCE) or []
+                    layout.append(
+                        PageLayout(
+                            width=float(page.width),
+                            height=float(page.height),
+                            words=tuple(
+                                PlacedWord(
+                                    text=str(w["text"]),
+                                    x0=float(w["x0"]),
+                                    top=float(w["top"]),
+                                    x1=float(w["x1"]),
+                                    bottom=float(w["bottom"]),
+                                )
+                                for w in words
+                            ),
+                            image_count=len(page.images or []),
+                        )
+                    )
     except ExtractError:
         raise
     except Exception as error:
@@ -146,10 +204,24 @@ def extract_pdf(data: bytes) -> ExtractedDocument:
         raise ExtractError("UNREADABLE_FILE", f"The PDF could not be read ({type(error).__name__}).") from error
     if page_count == 0:
         raise ExtractError("UNREADABLE_FILE", "The PDF has no pages.")
+    return pages, page_count, layout, layout_warnings
+
+
+def pdf_page_texts(data: bytes, *, with_layout: bool = False) -> tuple[list[str], int, list[PageLayout]]:
+    """Per-page text as pdfplumber reports it (reading order not re-sorted), before joining and normalization.
+
+    Lets a caller keep page boundaries and word geometry without opening the PDF a second time or
+    reimplementing the failure mapping. The typed failures and the x-tolerance are the service's own.
+    """
+    pages, page_count, layout, _ = _read_pdf(data, ordered=False, with_layout=with_layout)
+    return pages, page_count, layout
+
+
+def extract_pdf(data: bytes) -> ExtractedDocument:
+    pages, page_count, _, layout_warnings = _read_pdf(data, ordered=True, with_layout=False)
     text = normalize_text("\n".join(pages))
     _check_has_text(text)
     return ExtractedDocument(text=text, page_count=page_count, warnings=layout_warnings)
-
 
 def _paragraph_text(p: ET.Element) -> str:
     out: list[str] = []

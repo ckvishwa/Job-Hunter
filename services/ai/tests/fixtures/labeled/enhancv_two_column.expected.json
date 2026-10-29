@@ -1,0 +1,24 @@
+{
+  "_labeling": "Manually labeled by reading the rendered PDF pages (2 pages, 2-column Enhancv template). Source spelling and capitalization preserved, including 'Stanford Unversity' and 'Senior Full stack Developer'. Years have no months. Email is a hyperlink label with no visible address, so email is null.",
+  "docId": "enhancv_two_column",
+  "name": "MARCUS HALL",
+  "email": null,
+  "phone": "(555)-010-0100",
+  "skills": [
+    "HTML", "CSS", "JS", "Angular", "React", "Vue", "Redux", "TypeScript", "Backbone", "Bootstrap",
+    "Python", "NumPy", "SciPy", "Scikit-learn", "Keras", "Eli5", "TensorFlow", "MySQL", "NodeJS", "Redis", "AWS", "MongoDB", "Spark", "HTTP/2",
+    "JUnit", "NUnit", "PyUnit", "TestCafe", "Mocha", "Jest", "Scrum", "Agile", "GIT", "Azure DevOps"
+  ],
+  "experience": [
+    { "employer": "Boyle", "title": "Senior Full stack Developer", "start": "2023", "end": "2025" },
+    { "employer": "Lauzon", "title": "Full Stack Developer", "start": "2019", "end": "2023" },
+    { "employer": "Keeling Group", "title": "Solution Architect", "start": "2015", "end": "2019" }
+  ],
+  "education": [
+    { "degree": "M.S. in Computer Science", "institution": "Stanford Unversity" }
+  ],
+  "certifications": [],
+  "projects": [
+    { "name": "OpenFlow based Firewall" }
+  ]
+}
