@@ -7,7 +7,7 @@ This amendment intentionally avoids repeated headed Chrome tests during draft-PR
 | Draft PR opened / synchronized | required | SKIPPED | Fast-only; never Gate A green |
 | Draft PR marked Ready for review | required | required | Full CI gate only when all pass |
 | Ready PR synchronized | required | required | Full recheck for changed SHA |
-| Push to `careerops-integration` or `main` | required | required | Full regression |
+| Push to `careerops-integration`, `main` or `recovery/**` | required | required | Full regression |
 | Manual `workflow_dispatch` | required | required | On-demand full regression |
 
 ### Commands
@@ -39,3 +39,9 @@ Runtime (wall clock, GitHub): before, every PR push ran the full suite: run 3863
 
 The probe PR #13 was a throwaway; nothing from it was merged. A green gate on a draft remains fast-only evidence.
 
+### JH-REPO-001 R6.3 changes (2026-10-29)
+- **Fast tier** (every push; also the only tier on draft PRs): in addition to typecheck, build, `ci:isolation -- static`, `ci:private-tree` and `test:fast`, the static job now runs `node scripts/check-markdown-links.mjs` (broken links, core references, and every doc under `docs/` reachable from `docs/INDEX.md`) and `python3 scripts/sync_progress.py --check` (locked PRD checksum and ledger).
+- **Full tier** (ready PRs, pushes, manual runs): the Linux job now has a PostgreSQL 17.6 service container with CI-only credentials, writes a gitignored `infra/.env`, applies the migrations to the empty database (`npm run db:migrate`), builds an isolated ML interpreter from `services/ml/requirements.lock` outside the checkout (`JH_ML_PYTHON`), and then runs the whole suite under Xvfb in headed Chrome. The DB-backed suites therefore run in CI instead of skipping. The Windows job has no service containers, so DB suites still skip there.
+- **Offline guarantee** is unchanged: the browser tests route every non-loopback request to an abort and count it; the workflow has no secrets.
+- **Decision (headed E2E, OWNER MAY VETO):** keep the existing real headed Chrome on both a Linux runner (`xvfb-run`) and Windows, rather than a local-only gate. A headless CI run does not satisfy the headed gate, and neither platform is headless here. `CI gate` stays the single required status check.
+- Draft PRs still get the fast tier only; marking ready runs the full tier.

@@ -10,7 +10,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     branches: [careerops-integration, main]
   push:
-    branches: [careerops-integration, main]
+    branches: [careerops-integration, main, 'recovery/**']
   workflow_dispatch:
 
 # Least privilege: read-only token for every job. `pull_request` (never `pull_request_target`) is used, so a
@@ -53,6 +53,10 @@ jobs:
         run: npm run build
       - name: Tests do not read private candidate data (static)
         run: npm run ci:isolation -- static
+      - name: Markdown links resolve and every doc is reachable from docs/INDEX.md
+        run: node scripts/check-markdown-links.mjs
+      - name: Locked PRD checksum and progress ledger in sync
+        run: python3 scripts/sync_progress.py --check
 
 
   # Fast browser-free feedback for drafts and ready pull requests.
@@ -82,10 +86,30 @@ jobs:
         run: npm run ci:isolation -- after
 
   test-linux:
-    name: Full tests (Linux, headed Chrome under Xvfb)
+    name: Full tests (Linux, PostgreSQL, headed Chrome under Xvfb)
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      # CI-only throwaway database credentials; the service container lives and dies with this job.
+      JH_PG_USER: jobhunter
+      JH_PG_DB: jobhunter
+      JH_PG_PASSWORD: ci-${{ github.run_id }}-pg
+      JH_PG_PORT: '5432'
+    services:
+      postgres:
+        image: postgres:17.6-bookworm
+        env:
+          POSTGRES_USER: jobhunter
+          POSTGRES_DB: jobhunter
+          POSTGRES_PASSWORD: ci-${{ github.run_id }}-pg
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jobhunter -d jobhunter"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
     steps:
       - name: Checkout (clean, no credentials persisted)
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -100,6 +124,16 @@ jobs:
         run: npm ci
       - name: Install web (Astro) dependencies; tests/web and the UI e2e import web/ (Astro tsconfig)
         run: npm ci --prefix web
+      - name: Database settings for the DB-backed suites (gitignored infra/.env, CI-only values)
+        run: |
+          printf 'JH_PG_USER=%s\nJH_PG_PASSWORD=%s\nJH_PG_DB=%s\nJH_PG_PORT=%s\nJH_API_ACCESS_TOKEN=%s\nJH_SESSION_SECRET=%s\nJH_AI_SERVICE_TOKEN=%s\n' "$JH_PG_USER" "$JH_PG_PASSWORD" "$JH_PG_DB" "$JH_PG_PORT" "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" > infra/.env
+      - name: Isolated ML interpreter outside the checkout (pinned requirements)
+        run: |
+          python3 -m venv "$RUNNER_TEMP/ml-venv"
+          "$RUNNER_TEMP/ml-venv/bin/python" -m pip install --disable-pip-version-check -q -r services/ml/requirements.lock
+          echo "JH_ML_PYTHON=$RUNNER_TEMP/ml-venv/bin/python" >> "$GITHUB_ENV"
+      - name: Apply database migrations to an empty database
+        run: npm run db:migrate
       - name: Checkout holds no private data
         run: npm run ci:isolation -- before
       - name: Install browsers (Playwright-pinned Chromium and Google Chrome for the headed channel) and Xvfb
