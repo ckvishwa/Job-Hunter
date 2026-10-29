@@ -151,3 +151,5 @@ The PRD is the **product baseline** and `PROGRESS_LEDGER.json` is the **executio
 | `tests/api/s3-api.test.ts` | Keep both if distinct | Merge cases; delete only exact duplicates. |
 | `tests/match/extract-and-decide.test.ts` | Follows engine | Union of both sides' added cases (auto-merged). |
 | `tests/testing/engine.test.ts` | Keep both if distinct | Same as `s3-api`. |
+
+**Amendment A1 (R2.4, 2026-10-29, OWNER MAY VETO).** After the merge three test assertions changed with reasons: (1) tests/api/match-routes.test.ts: the score guard covers the whole payload except the labeled `decision.ranking` object (FR-0435), and the disclaimer check is now `/not a hiring prediction/`; (2) tests/api/jobs-store.e2e.test.ts: `staleReasons` uses `toContain("JD_CHANGED")` because `SOURCE_CHANGED` is also valid; (3) tests/testing/engine.test.ts: PCC's first-run case is replaced by M5.1's cold-cache refusal (`test:full` is the explicit full run; `test:changed` exits 3 when it ran nothing). The M4 migration rename is also handled in code: `aliasRenamedMigrations` in src/db/migrate.ts re-keys a recorded `0006_m4_decision_intelligence` row, so the manual UPDATE is not required.

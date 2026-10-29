@@ -107,6 +107,31 @@ function checksumMatches(
 }
 
 /**
+ * Migrations renamed after they may already have been applied (ADR-0005): new version -> old version.
+ * The SQL is unchanged, so the recorded checksum still matches.
+ */
+export const RENAMED_MIGRATIONS: Readonly<Record<string, string>> = {
+  "0012_m4_decision_intelligence": "0006_m4_decision_intelligence",
+};
+
+/**
+ * Re-key `recorded` in place so each renamed migration is found under its new version.
+ * Returns the [oldVersion, newVersion] pairs that were re-keyed, so the caller can update the table.
+ */
+export function aliasRenamedMigrations(recorded: Map<string, string>): Array<[string, string]> {
+  const moved: Array<[string, string]> = [];
+  for (const [to, from] of Object.entries(RENAMED_MIGRATIONS)) {
+    const checksum = recorded.get(from);
+    if (checksum !== undefined && !recorded.has(to)) {
+      recorded.delete(from);
+      recorded.set(to, checksum);
+      moved.push([from, to]);
+    }
+  }
+  return moved;
+}
+
+/**
  * Apply pending migrations.
  *
  * Existing migrations are validated before pending ones execute.
@@ -151,6 +176,15 @@ export async function migrate(
         row.checksum,
       ]),
     );
+
+    // A database that recorded a renamed migration under its old name keeps it
+    // applied: re-key the row (checksum unchanged) instead of re-running the SQL.
+    for (const [from, to] of aliasRenamedMigrations(recorded)) {
+      await client.query(
+        "UPDATE schema_migrations SET version = $1 WHERE version = $2",
+        [to, from],
+      );
+    }
 
     // Validate all previously applied local migrations before
     // executing any pending migration.
@@ -231,6 +265,7 @@ export async function migrationsCurrent(
     const recorded = new Map(
       rows.map((row) => [row.version, row.checksum]),
     );
+    aliasRenamedMigrations(recorded);
 
     return migrations.every((migration) => {
       const prior = recorded.get(migration.version);

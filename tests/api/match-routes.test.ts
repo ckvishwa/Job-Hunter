@@ -57,6 +57,9 @@ suite("match API", { timeout: 60_000 }, () => {
     expect(m).toMatchObject({ computed: true, match: { status: "COMPLETE" } });
     // The S4 evidence report still has no numeric score; M4's separate ordering heuristic is explicitly labeled.
     expect(JSON.stringify(m.match.report)).not.toMatch(/"(?:score|percent|probability|rank(?:ing)?Score|matchScore)"/i);
+    // Whole payload except the separately labeled M4 ranking object (PRD FR-0435): no score, percent or probability anywhere else.
+    const { ranking: _labeledRanking, ...decisionWithoutRanking } = m.match.decision;
+    expect(JSON.stringify({ ...m, match: { ...m.match, decision: decisionWithoutRanking } })).not.toMatch(/"(?:score|percent|probability|rank(?:ing)?Score|matchScore)"/i);
     expect(m.match.decision).toMatchObject({ outcome: "REVIEW_REQUIRED", hardReject: false });
     expect(m.match.decision.ranking.normalization).toMatch(/not a hiring probability/i);
     const second = await post(`/api/v1/jobs/${jobId}/match`, {});

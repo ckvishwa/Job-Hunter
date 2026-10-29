@@ -6,7 +6,7 @@ import {
   BoardError, boardApiUrl, fetchBoardPostings, loadBoardList, registryEntryFor, toPosting, type BoardCompany,
 } from "../pipeline/discovery/board-discoverer.js";
 import type { BoardRef, Counters, FailureInput, JobsRepo, PersistItem } from "../db/jobs-repo.js";
-import { bandStatus, excludedBySeniority, matchLocation, matchRoles, screenPosting, senioritySignal, statedYears, type DiscoveryPlan, type LocationMatch, type RoleMatch, type SenioritySignal } from "./planner.js";
+import { bandStatus, matchLocation, matchRoles, screenPosting, senioritySignal, statedYears, type DiscoveryPlan, type LocationMatch, type RoleMatch, type SenioritySignal } from "./planner.js";
 import { appendProvenance, listingProvenance } from "../discovery/provenance.js";
 import type { StageProfiler } from "../perf/stages.js";
 

@@ -11,9 +11,11 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const ctx = buildContext(root);
 const engine = new TestEngine({ ctx, executors: realExecutors(ctx, (s) => console.error(`  ${s}`)), batchSize: Number(values.batch), log: (s) => console.error(`  ${s}`) });
 
+/** A refused cold-cache selection ran nothing: that is not a pass. */
+const exitCodeOf = (s: Summary): number => (s.failed.length ? 1 : s.pending.length || (s.executedNow.units === 0 && s.reused.units === 0 && /refused/.test(s.selectionReason)) ? 3 : 0);
 const secs = (ms: number): string => `${(ms / 1000).toFixed(1)}s`;
 function print(s: Summary): number {
-  if (values.json) { console.log(JSON.stringify(s, null, 2)); return s.failed.length ? 1 : s.pending.length ? 3 : 0; }
+  if (values.json) { console.log(JSON.stringify(s, null, 2)); return exitCodeOf(s); }
   console.log(`\ntest:${s.mode}  ${s.runId ?? ""}  (${secs(s.durationMs)} wall)`);
   console.log(`  executed NOW : ${s.executedNow.units} unit(s), ${s.executedNow.tests} test(s)${s.executedNow.files.length ? `  [${s.executedNow.files.slice(0, 8).join(", ")}${s.executedNow.files.length > 8 ? ", ..." : ""}]` : ""}`);
   console.log(`  REUSED       : ${s.reused.units} unit(s), ${s.reused.tests} test(s) from verified receipts (identical fingerprint, passed; NOT executed in this run)`);
@@ -22,7 +24,7 @@ function print(s: Summary): number {
   console.log(`  skipped      : ${s.skipped.length}   pending: ${s.pending.length}${s.pending.slice(0, 6).map((p) => `\n      ${p}`).join("")}`);
   console.log(`  selection    : ${s.selectionReason}`);
   console.log(`  full regression gate: ${s.fullGate.state}. ${s.fullGate.detail}${s.fullGate.tests !== undefined ? ` (${s.fullGate.tests} tests, ${s.fullGate.units} units, run ${s.fullGate.runId}, ${s.fullGate.finishedAt})` : ""}`);
-  return s.failed.length ? 1 : s.pending.length ? 3 : 0;
+  return exitCodeOf(s);
 }
 
 async function main(): Promise<number> {
