@@ -72,6 +72,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Private-path guard (no candidate data, secrets, weights or file over 5 MB in the committed tree)
+        run: npm run ci:private-tree
       - name: Check isolation before tests
         run: npm run ci:isolation -- before
       - name: Run deterministic tests without launching Chrome

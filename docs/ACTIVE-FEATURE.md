@@ -1,6 +1,6 @@
 # Active AIM: JH-REPO-001 (repository consolidation)
 
-**Locked AIM:** Consolidate six worktrees and eleven local branches into one verified `main` with a mechanical privacy boundary, one documented structure and enforced CI, without losing any existing work, then resume JH-MATCH-001 on the integrated baseline. The runbook, task order and status board are in [the runbook](aim/JH-REPO-001.md); redacted per-task evidence is under [docs/evidence/repo-consolidation](evidence/repo-consolidation/R2.1.md).
+**Locked AIM:** Consolidate six worktrees and eleven local branches into one verified `main` with a mechanical privacy boundary, one documented structure and enforced CI, without losing any existing work, then resume JH-MATCH-001 on the integrated baseline. The runbook, task order and status board are in [the runbook](aim/JH-REPO-001.md); redacted per-task evidence is under [docs/evidence/repo-consolidation](evidence/repo-consolidation/README.md).
 
 **Status:** IN_PROGRESS on branch `recovery/jh-integrated-baseline`. Phase 0 (freeze and preserve) and Phase 1 (decide the trunk) are done; Phase 2 (reconcile histories) is under way. Nothing has been pushed. Decisions: [ADR-0005](DECISIONS.md).
 

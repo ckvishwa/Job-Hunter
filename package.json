@@ -36,6 +36,7 @@
     "ci:audit": "tsx src/ci/audit-gate.ts",
     "ci:isolation": "tsx src/ci/private-isolation.ts",
     "ci:private-staged": "tsx src/ci/private-staged.ts",
+    "ci:private-tree": "tsx src/ci/private-staged.ts --tree",
     "db:migrate": "tsx src/db/migrate-cli.ts",
     "roles:seed": "tsx src/db/roles-seed-cli.ts",
     "api": "tsx src/api/cli.ts",

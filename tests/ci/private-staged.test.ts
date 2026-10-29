@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { classifyStagedPath, main, report, scanStaged } from "../../src/ci/private-staged.js";
+import { MAX_BLOB_BYTES, classifyStagedPath, main, report, scanStaged, scanTree, sizeFindings } from "../../src/ci/private-staged.js";
 
 // The integration tests build a throwaway repository in a temporary directory. They never
 // read, stage or inspect anything in this checkout. private-isolation: allow
@@ -126,5 +126,67 @@ describe("against a real index", () => {
     execFileSync("git", ["rm", "-q", "--", "PROFILES/old.pdf"], { cwd: root, encoding: "utf-8" });
     // Removing private data from the tree must not be blocked.
     expect(main(root, () => {})).toBe(0);
+  });
+});
+
+describe("JH-REPO-001 R4.3 rules", () => {
+  const codes = (file: string) => classifyStagedPath(file, false).map((f) => `${f.severity}:${f.rule}`);
+
+  it("blocks a resume-named document outside a fixtures directory but not inside one", () => {
+    expect(codes("tests/tmp/resume-test.pdf")).toContain("BLOCK:resume-named document outside a fixtures directory");
+    expect(codes("docs/My CV.docx")).toContain("BLOCK:resume-named document outside a fixtures directory");
+    expect(codes("services/ai/tests/fixtures/resume_sample.pdf")).not.toContain("BLOCK:resume-named document outside a fixtures directory");
+  });
+
+  it("blocks env files, key material, databases, model weights and browser profiles, but allows .env.example", () => {
+    expect(codes("infra/.env").some((c) => c.startsWith("BLOCK"))).toBe(true);
+    expect(codes(".env.local").some((c) => c.startsWith("BLOCK"))).toBe(true);
+    expect(codes("infra/.env.example")).toEqual([]);
+    for (const p of ["certs/server.pem", "id.key", "data/app.sqlite", "x.db", "backup.dump", "m/model.safetensors", "m/model.gguf", "m/model.onnx", ".chrome-profile/Default/Cookies", "JobHunterPrivate/a.txt", "User Data/x"]) {
+      expect(codes(p).some((c) => c.startsWith("BLOCK")), p).toBe(true);
+    }
+  });
+
+  it("keeps the tracked role profile notes (profiles/*.md) out of the candidate-directory rule", () => {
+    expect(codes("profiles/sdet.md")).toEqual([]);
+  });
+
+  it("blocks any file over 5 MB and passes one at the limit", () => {
+    expect(sizeFindings([{ path: "big.bin", size: MAX_BLOB_BYTES + 1 }]).map((f) => f.severity)).toEqual(["BLOCK"]);
+    expect(sizeFindings([{ path: "ok.bin", size: MAX_BLOB_BYTES }])).toEqual([]);
+  });
+});
+
+describe("tree mode and staged size in a throwaway repository", () => {
+  function repo(): string {
+    const dir = mkdtempSync(path.join(tmpdir(), "jh-guard-"));
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["config", "user.email", "t@example.test"], { cwd: dir });
+    execFileSync("git", ["config", "user.name", "t"], { cwd: dir });
+    return dir;
+  }
+
+  it("blocks a staged resume-named pdf and an oversize staged file, then passes once they are unstaged", () => {
+    const dir = repo();
+    mkdirSync(path.join(dir, "tests", "tmp"), { recursive: true });
+    writeFileSync(path.join(dir, "tests", "tmp", "resume-test.pdf"), "%PDF-1.4\n");
+    writeFileSync(path.join(dir, "big.dat"), Buffer.alloc(MAX_BLOB_BYTES + 1));
+    execFileSync("git", ["add", "--", "tests/tmp/resume-test.pdf", "big.dat"], { cwd: dir });
+    const lines: string[] = [];
+    expect(main(dir, (l) => lines.push(l))).toBe(1);
+    expect(lines.join("\n")).toContain("tests/tmp/resume-test.pdf");
+    expect(lines.join("\n")).toContain("big.dat");
+    execFileSync("git", ["rm", "-q", "--cached", "--", "tests/tmp/resume-test.pdf", "big.dat"], { cwd: dir });
+    expect(main(dir, () => undefined)).toBe(0);
+  });
+
+  it("tree mode applies the same rules to committed files", () => {
+    const dir = repo();
+    writeFileSync(path.join(dir, "model.safetensors"), "x");
+    writeFileSync(path.join(dir, "README.md"), "# ok\n");
+    execFileSync("git", ["add", "--", "model.safetensors", "README.md"], { cwd: dir });
+    execFileSync("git", ["commit", "-q", "-m", "t"], { cwd: dir });
+    expect(scanTree(dir).map((f) => f.path)).toEqual(["model.safetensors"]);
+    expect(scanStaged(dir)).toEqual([]);
   });
 });

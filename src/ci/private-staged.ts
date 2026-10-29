@@ -25,14 +25,30 @@ export interface StagedFinding {
 }
 
 const BLOCK_RULES: Array<{ rule: string; re: RegExp }> = [
-  { rule: "candidate profile directory", re: /(^|\/)(HIGH_CONFIDENT|PROFILES)(\/|$)/i },
+  { rule: "candidate profile directory", re: /(^|\/)(HIGH_CONFIDENT|PROFILES)(\/|$)/ },
   { rule: "resume corpus directory", re: /(^|\/)(data\/Resumes|resumes|generated-resumes)(\/)/i },
   { rule: "private runtime directory", re: /(^|\/)private-runtime(\/)/ },
   { rule: "extraction draft or manifest", re: /(^|\/)[^/]*\.(draft|intake)\.json$|(^|\/)intake-manifest\.json$/i },
   { rule: "candidate fact file", re: /(^|\/)(pending-facts|candidate-profile\.reviewed|canonical-resume-registry|candidate-answer-observations)[^/]*\.json$/i },
   { rule: "document in a candidate-shaped directory", re: /(^|\/)[^/]*(profile|resume|candidate|\bcv\b)[^/]*\/[^/]+\.(pdf|docx|doc|rtf|odt)$/i },
   { rule: "intake salt", re: /(^|\/)\.intake-salt$/ },
+  { rule: "resume-named document outside a fixtures directory", re: /^(?!.*\/fixtures\/)(?:.*\/)?[^/]*(?:resume|\bcv\b)[^/]*\.(?:pdf|docx|doc|rtf|odt)$/i },
+  { rule: "environment file (only .env.example may be tracked)", re: /(^|\/)\.env(\.(?!example$)[^/]+)?$/ },
+  { rule: "key or certificate material", re: /\.(?:pem|key|p12|pfx)$/i },
+  { rule: "database or dump file", re: /\.(?:sqlite3?|db|dump)$/i },
+  { rule: "model weights", re: /\.(?:safetensors|gguf|onnx)$/i },
+  { rule: "browser profile or private-root directory", re: /(^|\/)(?:JobHunterPrivate|\.?chrome-profile[^/]*|User Data)(\/)/i },
 ];
+
+/** Largest blob that may be committed (JH-REPO-001 R4.3). */
+export const MAX_BLOB_BYTES = 5 * 1024 * 1024;
+
+/** BLOCK finding for each entry over the size cap. Pure, so the rule is testable without Git. */
+export function sizeFindings(entries: ReadonlyArray<{ path: string; size: number }>): StagedFinding[] {
+  return entries
+    .filter((e) => e.size > MAX_BLOB_BYTES)
+    .map((e) => ({ path: e.path.replace(/\\/g, "/"), rule: `file over ${MAX_BLOB_BYTES / (1024 * 1024)} MB (${e.size} bytes)`, severity: "BLOCK" as const }));
+}
 
 const WARN_RULES: Array<{ rule: string; re: RegExp }> = [
   { rule: "document format that can carry personal data", re: /\.(pdf|docx|doc|rtf|odt)$/i },
@@ -74,10 +90,33 @@ export function ignoredAmong(root: string, paths: readonly string[]): Set<string
   }
 }
 
+function stagedSizes(root: string, paths: readonly string[]): Array<{ path: string; size: number }> {
+  return paths.map((path) => {
+    try {
+      return { path, size: Number(git(root, ["cat-file", "-s", `:${path}`]).trim()) };
+    } catch {
+      return { path, size: 0 };
+    }
+  });
+}
+
 export function scanStaged(root: string): StagedFinding[] {
   const paths = stagedPaths(root);
   const ignored = ignoredAmong(root, paths);
-  return paths.flatMap((file) => classifyStagedPath(file, ignored.has(file)));
+  return [...paths.flatMap((file) => classifyStagedPath(file, ignored.has(file))), ...sizeFindings(stagedSizes(root, paths))];
+}
+
+/** Every file in the HEAD tree, for CI: the same rules, applied to what is committed rather than what is staged. */
+export function scanTree(root: string): StagedFinding[] {
+  const entries = git(root, ["ls-tree", "-r", "-l", "-z", "HEAD"])
+    .split("\0")
+    .filter(Boolean)
+    .map((line) => {
+      const tab = line.indexOf("\t");
+      const size = Number(line.slice(0, tab).trim().split(/\s+/)[3]);
+      return { path: line.slice(tab + 1), size: Number.isFinite(size) ? size : 0 };
+    });
+  return [...entries.flatMap((e) => classifyStagedPath(e.path, false)), ...sizeFindings(entries)];
 }
 
 export function report(findings: readonly StagedFinding[], log: (line: string) => void): number {
@@ -96,9 +135,9 @@ export function report(findings: readonly StagedFinding[], log: (line: string) =
   return 0;
 }
 
-export function main(root = process.cwd(), log: (line: string) => void = console.log): number {
-  return report(scanStaged(root), log);
+export function main(root = process.cwd(), log: (line: string) => void = console.log, mode: "staged" | "tree" = "staged"): number {
+  return report(mode === "tree" ? scanTree(root) : scanStaged(root), log);
 }
 
 const isMainModule = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
-if (isMainModule) process.exitCode = main();
+if (isMainModule) process.exitCode = main(process.cwd(), console.log, process.argv.includes("--tree") ? "tree" : "staged");

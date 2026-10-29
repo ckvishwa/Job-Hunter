@@ -8,7 +8,7 @@ Start with the [locked AIM and active checkpoint](ACTIVE-FEATURE.md). This index
 4. **Code → tests → UI:** [API match integration tests](../tests/api/match-e2e.test.ts) and [route tests](../tests/api/match-routes.test.ts) → [matching page](../web/src/pages/matches.astro) → [offline browser test](../tests/e2e/offline/matches-ui.e2e.test.ts). Unit coverage: [gold-set tests](../tests/match/gold.test.ts) and [decision-intelligence tests](../tests/match/decision-intelligence.test.ts).
 5. **UI → release gate:** [PRD acceptance gates](PRD.md), [CI tiers](sdlc/CI-TIERS.md), [QA sign-off](qa/QA_SIGNOFF.md), [Gate A evidence](qa/GATE_A_REPORT.md), and [PR checklist](../.github/pull_request_template.md). A passing local documentation check is not feature or release acceptance.
 
-Repository consolidation (JH-REPO-001): [runbook and status board](aim/JH-REPO-001.md) and [per-task evidence](evidence/repo-consolidation/R2.1.md).
+Repository consolidation (JH-REPO-001): [runbook and status board](aim/JH-REPO-001.md) and [per-task evidence](evidence/repo-consolidation/README.md).
 
 All other documents: [documentation catalog](CATALOG.md).
 
