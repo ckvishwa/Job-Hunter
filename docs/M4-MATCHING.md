@@ -1,6 +1,6 @@
 # M4 job matching and decision intelligence
 
-M4 adds a decision projection beside the S4 evidence report. The S4 report still contains requirement statuses, exact JD quotations and candidate fact references without a numeric score. The M4 projection is persisted in `job_match_reports.decision` by migration `0006_m4_decision_intelligence` and returned with the existing authenticated match API. `GET /api/v1/shortlist` returns only current `SHORTLIST` rows, ordered by ranking score. The API never submits an application.
+M4 adds a decision projection beside the S4 evidence report. The S4 report still contains requirement statuses, exact JD quotations and candidate fact references without a numeric score. The M4 projection is persisted in `job_match_reports.decision` by migration `0012_m4_decision_intelligence` and returned with the existing authenticated match API. `GET /api/v1/shortlist` returns only current `SHORTLIST` rows, ordered by ranking score. The API never submits an application.
 
 ## Decision rules
 

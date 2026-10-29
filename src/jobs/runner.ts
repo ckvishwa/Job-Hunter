@@ -3,10 +3,10 @@ import path from "node:path";
 import type { JobPosting } from "../adapters/types.js";
 import { buildJobFailure, evaluatePersistable, stampResolution, type JobFailureCode } from "../domain/canonical-job.js";
 import {
-  BoardError, boardApiUrl, fetchBoardPostings, loadBoardList, registryEntryFor, titleMatches, toPosting, type BoardCompany,
+  BoardError, boardApiUrl, fetchBoardPostings, loadBoardList, registryEntryFor, toPosting, type BoardCompany,
 } from "../pipeline/discovery/board-discoverer.js";
 import type { BoardRef, Counters, FailureInput, JobsRepo, PersistItem } from "../db/jobs-repo.js";
-import { bandStatus, excludedBySeniority, matchLocation, matchRoles, senioritySignal, statedYears, type DiscoveryPlan, type LocationMatch, type RoleMatch, type SenioritySignal } from "./planner.js";
+import { bandStatus, excludedBySeniority, matchLocation, matchRoles, screenPosting, senioritySignal, statedYears, type DiscoveryPlan, type LocationMatch, type RoleMatch, type SenioritySignal } from "./planner.js";
 import { appendProvenance, listingProvenance } from "../discovery/provenance.js";
 import type { StageProfiler } from "../perf/stages.js";
 
@@ -67,28 +67,34 @@ export interface CandidateDisposition {
   locationExcluded: boolean;
 }
 
-/** Candidate search options stay here. A filtered listing is still reported by the caller; it is not deleted from provenance. */
+/**
+ * Candidate search options stay here. A filtered listing is still reported by the caller; it is not deleted from provenance.
+ * The decision is screenPosting's (selected-role title phrase, then description evidence for that same role, then seniority, then
+ * location); this wrapper keeps the disposition shape the provenance writer and the M5.1 stage tests rely on.
+ */
 export function classifyCandidatePosting(
-  posting: { title: string; location: string | null },
+  posting: { title: string; location: string | null; description?: string | null },
   plan: DiscoveryPlan,
   excludeTitleKeywords: readonly string[],
 ): CandidateDisposition {
-  if (excludeTitleKeywords.length > 0 && titleMatches(posting.title, [...excludeTitleKeywords]).length > 0) {
-    return { disposition: "filtered", filterReason: "excluded-title-keyword", roles: { roleSlugs: [], phrases: [] }, signal: "UNSPECIFIED", location: "UNSPECIFIED", titleMatched: false, seniorityExcluded: false, locationExcluded: false };
-  }
-  const roles = matchRoles(posting.title, plan);
-  if (roles.roleSlugs.length === 0) {
-    return { disposition: "filtered", filterReason: "not-a-selected-role", roles, signal: senioritySignal(posting.title), location: "UNSPECIFIED", titleMatched: false, seniorityExcluded: false, locationExcluded: false };
+  const none: RoleMatch = { roleSlugs: [], phrases: [] };
+  const screen = screenPosting({ title: posting.title, description: posting.description, location: posting.location, excludeTitleKeywords: [...excludeTitleKeywords], plan });
+  if (screen.gate === "EXCLUDED_KEYWORD") {
+    return { disposition: "filtered", filterReason: "excluded-title-keyword", roles: none, signal: "UNSPECIFIED", location: "UNSPECIFIED", titleMatched: false, seniorityExcluded: false, locationExcluded: false };
   }
   const signal = senioritySignal(posting.title);
-  if (excludedBySeniority(signal, plan)) {
-    return { disposition: "filtered", filterReason: "seniority-excluded", roles, signal, location: "UNSPECIFIED", titleMatched: true, seniorityExcluded: true, locationExcluded: false };
+  if (screen.gate === "NO_ROLE") {
+    return { disposition: "filtered", filterReason: "not-a-selected-role", roles: none, signal, location: "UNSPECIFIED", titleMatched: false, seniorityExcluded: false, locationExcluded: false };
   }
-  const location = matchLocation(posting.location, plan);
-  if (location === "NO_MATCH") {
-    return { disposition: "filtered", filterReason: "location-excluded", roles, signal, location, titleMatched: true, seniorityExcluded: false, locationExcluded: true };
+  const titleMatched = screen.basis === "title";
+  const titleRoles = titleMatched ? matchRoles(posting.title, plan) : none;
+  if (screen.gate === "SENIORITY") {
+    return { disposition: "filtered", filterReason: "seniority-excluded", roles: titleRoles, signal, location: "UNSPECIFIED", titleMatched, seniorityExcluded: true, locationExcluded: false };
   }
-  return { disposition: "selected", filterReason: null, roles, signal, location, titleMatched: true, seniorityExcluded: false, locationExcluded: false };
+  if (screen.gate === "LOCATION") {
+    return { disposition: "filtered", filterReason: "location-excluded", roles: titleRoles, signal, location: "NO_MATCH", titleMatched, seniorityExcluded: false, locationExcluded: true };
+  }
+  return { disposition: "selected", filterReason: null, roles: { roleSlugs: screen.roleSlugs, phrases: screen.phrases }, signal, location: screen.location, titleMatched, seniorityExcluded: false, locationExcluded: false };
 }
 
 const BLOCKED_RE = /HTTP (401|403|429)\b/;
@@ -209,7 +215,7 @@ export class DiscoveryRunner {
       const seen: ReturnType<typeof listingProvenance>[] = [];
       const normalizeStarted = performance.now();
       for (const p of postings) {
-        const decision = classifyCandidatePosting(p, plan, exclude);
+        const decision = classifyCandidatePosting({ title: p.title, location: p.location, description: p.descriptionText }, plan, exclude);
         if (decision.titleMatched) counters.titleMatched += 1;
         if (decision.seniorityExcluded) counters.seniorityExcluded += 1;
         if (decision.locationExcluded) counters.locationExcluded += 1;

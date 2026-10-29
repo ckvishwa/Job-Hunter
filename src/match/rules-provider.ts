@@ -13,7 +13,16 @@ import { Lexicon, lexicon as sharedLexicon, normalizeText, type TermHit } from "
 //   alternatives: explicit OR between listed terms only (any_of); a plain list is NOT alternatives
 //   conditions : citizenship, clearance, present work authorization and sponsorship are separate constraint types
 
-export const RULES_EXTRACTOR_REVISION = "rules-jd-extractor@3:jd-terms@1:source-inventory@7";
+export const RULES_EXTRACTOR_REVISION = "rules-jd-extractor@3:jd-terms@1:source-inventory@8";
+
+/** Evidence quotes must stay inside the structured-job validator's limit and remain an exact JD slice. */
+const MAX_EVIDENCE_QUOTE = 2000;
+
+function fitSpan(raw: string, start: number, end: number): { start: number; end: number; quote: string } {
+  if (end - start <= MAX_EVIDENCE_QUOTE) return { start, end, quote: raw.slice(start, end) };
+  const boundedEnd = start + MAX_EVIDENCE_QUOTE;
+  return { start, end: boundedEnd, quote: raw.slice(start, boundedEnd) };
+}
 
 const WORD_NUMBERS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
 const YEARS = /(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten)(?:\s*(?:[-–—]|to)\s*(\d+(?:\.\d+)?))?\s*\+?\s+years?\b/i;
@@ -74,7 +83,7 @@ export class RulesJobSemanticProvider implements JobSemanticProvider {
   }
 
   private fromItem(item: SourceItem, level: "required" | "preferred" | "unknown", out: Proposal, nextGroup: () => string): void {
-    const evidence = [{ quote: item.text, start: item.start, end: item.end }];
+    const evidence = [fitSpan(item.text, 0, item.text.length)].map((span) => ({ quote: span.quote, start: item.start + span.start, end: item.start + span.end }));
     const base = (n: number) => `r-${item.id}-${n}`.slice(0, 64);
     const years = yearsOf(item.text);
     if (years) {
@@ -150,7 +159,8 @@ export class RulesJobSemanticProvider implements JobSemanticProvider {
     const add = (id: string, type: string, status: string, value: string | null, index: number): void => {
       const s = sentenceAround(raw, index);
       if (s && !out.constraints.some((c) => c.type === type && ["clearance", "sponsorship", "citizenship", "work_authorization"].includes(type))) {
-        out.constraints.push({ id, type, status, value, evidence: [{ quote: s.quote, start: s.start, end: s.end }] });
+        const span = fitSpan(raw, s.start, s.end);
+        out.constraints.push({ id, type, status, value, evidence: [{ quote: span.quote, start: span.start, end: span.end }] });
       }
     };
     const first = (re: RegExp): RegExpExecArray | null => re.exec(raw);

@@ -131,3 +131,9 @@ decide `SDLC-T06` (run browser/DB files serially) and have the owner look at the
 - **What changed:** the smart-test runner (`src/testing/exec.ts`) now records the suite-level message and keeps the raw `*.failures.json`, so a recurrence is diagnosable.
 - **Cause: unknown.** Not classified as environmental without evidence. If it recurs, read the recorded message in `private-runtime/test-cache/logs/` first.
 - **What to do:** rerun the file alone. If it fails alone, treat it as real.
+
+## 2026-10-14 — tests/ml/llm-db.test.ts synthetic experiment count
+Observed 5 rows against an assertion requiring >5; a diagnostic rerun with fresh UUIDs passed. Second-pass and QC selection hashes include generated posting IDs, so the fixture does not guarantee >5 eligible residual rows after human-review exclusions. Replaced the arbitrary minimum with nonempty plus the existing per-row train-side, no-human-label, confidence, binary-class and unique-text assertions. No production filters were relaxed. Both outcomes are recorded in docs/ml/ML-UPGRADE-LOOP.md.
+
+## 2026-10-14 — five serialized full runs, no green gate (details: docs/testing/V01-REGRESSION-RECOVERY.md)
+Different DB/browser tests failed in each run (s3-api x2, s1-api, review-db suite setup, matches-ui 5 s timeout x2, s1-ui "Uploading..." stuck 15 s); every one passes alone. The bare-Node loopback probe (no project code) still shows 3.1% ETIMEDOUT and stalls up to 4.5 s today. Two real tooling/test defects found and fixed (runner gate self-invalidation via `private-runtime/test-cache/current-run.json`; stale migration list). Cause of the individual full-run failures is a supported hypothesis (loopback stalls), not proven; no timeout was changed.

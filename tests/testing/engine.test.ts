@@ -121,6 +121,16 @@ describe("TEST-EFFICIENCY: change-aware execution with verified reuse", () => {
     expect(executedFiles()).toEqual(["tests/b.test.ts", "tests/dyn.test.ts"]);
   });
 
+  it("runtime state under private-runtime is not a data dependency (the runner's own checkpoint would otherwise invalidate the runner's own test forever)", async () => {
+    write("private-runtime/test-cache/current-run.json", '{"n":1}');
+    write("tests/rt.test.ts", 'import { readFileSync } from "node:fs";\nreadFileSync("private-runtime/test-cache/current-run.json");');
+    await engine().run("changed");
+    calls = { vitest: [], python: 0, typecheck: 0 };
+    write("private-runtime/test-cache/current-run.json", '{"n":2}');
+    await engine().run("changed");
+    expect(executedFiles()).not.toContain("tests/rt.test.ts");
+  });
+
   it("a database migration invalidates database tests only; package lock and config changes invalidate everything", async () => {
     await engine().run("full");
     calls = { vitest: [], python: 0, typecheck: 0 };

@@ -1,0 +1,6 @@
+# Versions verified in the installed Python 3.12 environment on 2026-10-14.
+scikit-learn==1.9.1
+numpy==2.5.3
+scipy==1.18.1
+pandas==3.0.6
+joblib==1.6.0

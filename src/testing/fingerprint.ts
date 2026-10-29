@@ -68,8 +68,11 @@ function dataRefs(root: string, from: string, text: string): string[] {
   const consider = (candidate: string): void => {
     const norm = candidate.replace(/\\/g, "/");
     if (!(DATA_EXT.test(norm) || DATA_DIRS.test(norm))) return;
+    // private-runtime holds mutable run state (this runner's own checkpoint, caches, logs). It is never a test input, and counting it would
+    // change a unit's fingerprint every time the runner writes it, so the full gate could never pass.
     for (const base of [root, path.dirname(from)]) {
       const abs = path.resolve(base, norm);
+      if (path.relative(root, abs).split(path.sep)[0] === "private-runtime") continue;
       if (abs.startsWith(root) && !rel(root, abs).startsWith("private-runtime/") && existsSync(abs) && statSync(abs).isFile()) out.add(abs);
     }
   };
@@ -110,7 +113,7 @@ export function classComponents(ctx: Context, cls: DepClass): string {
   const { root } = ctx;
   switch (cls) {
     case "db": return treeHash(root, ["db"], (n) => n.endsWith(".sql"));
-    case "python": return treeHash(root, ["services/ai"], (n) => /\.(?:py|txt|json|ini)$/.test(n));
+    case "python": return treeHash(root, ["services/ai", "services/ml"], (n) => /\.(?:py|txt|json|ini|in|lock)$/.test(n));
     case "browser": return `chrome ${ctx.chromeVersion ?? "unknown"}; ${treeHash(root, ["src/browser"], (n) => n.endsWith(".ts"))}`;
     case "web": return treeHash(root, ["web/src", "web/public"], () => true) + hashFile(path.join(root, "web/package.json")) + hashFile(path.join(root, "web/astro.config.mjs"));
     case "tree": return treeHash(root, ["src", "tests", "config", "docs", "db", "scripts", "profiles"], (n) => !n.endsWith(".png"));
@@ -119,7 +122,7 @@ export function classComponents(ctx: Context, cls: DepClass): string {
 
 const CLASS_SIGNS: Array<[DepClass, RegExp]> = [
   ["db", /startHarness|dbAvailable|pgSettingsFromEnv|createPool|migrate\(|db[\\/"']+migrations/],
-  ["python", /services[\\/"', ]+ai|pythonAvailable|AI_DIR|\.venv/],
+  ["python", /services[\\/"', ]+ai|pythonAvailable|AI_DIR|ML_SERVICE_DIR|defaultPython|\.venv/],
   ["browser", /from "playwright"|launchPersistentChrome|launchManagedChrome|chromium|channel:\s*"chrome"/],
   ["web", /ensureWebBuild|web[\\/"']+dist|astro/i],
   ["tree", /readdirSync|walk\(|globSync|process\.cwd\(\)\)\s*\)\.toEqual/],
@@ -182,7 +185,7 @@ export const closureHashes = (root: string, closure: string[]): Record<string, s
 export function treeFingerprint(ctx: Context): string {
   resetFileHashCache(); // always from the bytes on disk now
   const files = [
-    ...["src", "tests", "config", "db", "services/ai", "scripts", "web/src"].flatMap((d) => walkFiles(path.join(ctx.root, d), (n) => !/\.(?:png|jpg|pyc)$/.test(n))),
+    ...["src", "tests", "config", "db", "services/ai", "services/ml", "scripts", "web/src"].flatMap((d) => walkFiles(path.join(ctx.root, d), (n) => !/\.(?:png|jpg|pyc)$/.test(n))),
     ...["package.json", "package-lock.json", "vitest.config.ts", "tsconfig.json"].map((f) => path.join(ctx.root, f)),
   ];
   return sha([...files.map((f) => `${rel(ctx.root, f)}:${hashFile(f)}`), `node ${ctx.nodeVersion}`, `vitest ${ctx.vitestVersion}`].join("\n"));

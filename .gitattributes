@@ -1,0 +1,4 @@
+docs/PRD.md -text
+
+# Markdown uses two trailing spaces for hard line breaks (PRD and docs from the project-command-center line).
+*.md whitespace=-trailing-space,-blank-at-eof

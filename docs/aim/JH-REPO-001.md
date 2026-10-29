@@ -579,12 +579,12 @@ Rows are in execution order; an agent takes the first `Ready` row, and sets the 
 | 6 | R1.2 Commit and slice map | R0.4 | none | Done |
 | 7 | R1.3 ADR: trunk and merge direction | R1.1, R1.2 | Choose option | Done |
 | 8 | R2.1 Integration worktree and baseline | R1.3 | Worktree, branch, local commits | Done |
-| 9 | R2.2 Merge and resolve overlaps | R2.1 | covered by R2.1 | Ready |
-| 10 | R2.3 Gates on merge, then commit | R2.2 | covered by R2.1 | Not started |
-| 11 | R4.1 History scan | R2.3 | Review hits | Not started |
+| 9 | R2.2 Merge and resolve overlaps | R2.1 | covered by R2.1 | Done |
+| 10 | R2.3 Gates on merge, then commit | R2.2 | covered by R2.1 | Done (link check deferred to R2.6) |
+| 11 | R4.1 History scan | R2.3 | Review hits | Ready |
 | 12 | R4.2 Rewrite or clear | R4.1 | Rewrite plan if hits | Not started |
-| 13 | R2.4 Area review of the merge | R2.3 | none | Not started |
-| 14 | R2.5 Classify all dirty work | R2.3 | Classification table | Not started |
+| 13 | R2.4 Area review of the merge | R2.3 | none | Ready |
+| 14 | R2.5 Classify all dirty work | R2.3 | Classification table | Ready |
 | 15 | R2.6 Index repair | R2.5 | covered by R2.1 | Not started |
 | 16 | R3.1 Structure map | R2.6 | Move list | Not started |
 | 17 | R3.2 Execute moves | R3.1 | covered by R2.1 | Not started |

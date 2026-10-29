@@ -6,7 +6,7 @@ import type { DiscoveryPlan } from "../../src/jobs/planner.js";
 const plan: DiscoveryPlan = {
   selectionRevisionNo: 1,
   catalogVersion: 1,
-  roles: [{ roleSlug: "soc-analyst", title: "SOC Analyst", phrases: ["soc analyst"] }],
+  roles: [{ roleSlug: "soc-analyst", title: "SOC Analyst", phrases: ["soc analyst"], minCoreMatches: 1, evidence: [] }],
   locations: [],
   workModes: [],
   seniorityLevels: [],

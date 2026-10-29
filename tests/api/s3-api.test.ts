@@ -262,7 +262,7 @@ suite("S3 official discovery API (PostgreSQL)", { timeout: 30_000 }, () => {
       replies = Object.fromEntries(Object.entries(DEFAULT_REPLIES).map(([k, v]) => [k, { ...(v as object), delayMs: 400 }]));
       const [a, b] = await Promise.all([startRun(1), startRun(1)]);
       const codes = [a.status, b.status].sort();
-      expect(codes).toEqual([202, 409]);
+      expect(codes, `bodies: ${JSON.stringify([a.body, b.body]).slice(0, 600)}`).toEqual([202, 409]);
       const loser = a.status === 409 ? a : b;
       const winner = a.status === 202 ? a : b;
       expect(loser.body.error.code).toBe("RUN_IN_PROGRESS");
@@ -352,8 +352,8 @@ suite("S3 migration 0003 and its rollback", { timeout: 60_000 }, () => {
     const pool = createPool(pgSettingsFromEnv(process.env, dbName), { max: 2, connectTimeoutMs: 30_000 });
     try {
       const first = await migrate(pool);
-      expect(first.applied).toEqual(["0001_s1_candidate", "0002_s2_roles", "0003_s3_discovery", "0004_profile_boundary", "0005_s4b_matching", "0006_m4_decision_intelligence"]);
-      expect((await migrate(pool)).alreadyApplied).toHaveLength(6); // idempotent
+      expect(first.applied).toEqual(["0001_s1_candidate", "0002_s2_roles", "0003_s3_discovery", "0004_profile_boundary", "0005_s4b_matching", "0006_ml_engine", "0007_ml_pairs_registry", "0008_llm_labels", "0009_llm_reject_ledger", "0010_ml_evidence_integrity", "0011_ml_final_eval_claims", "0012_m4_decision_intelligence"]);
+      expect((await migrate(pool)).alreadyApplied).toHaveLength(12); // idempotent
       const tables = async () => (await pool.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY 1")).rows.map((r) => r.table_name as string);
       const s3Tables = ["discovery_failures", "discovery_run_boards", "discovery_runs", "job_observations", "job_revisions", "jobs"];
       expect(await tables()).toEqual(expect.arrayContaining(s3Tables));
@@ -361,15 +361,15 @@ suite("S3 migration 0003 and its rollback", { timeout: 60_000 }, () => {
       await pool.query("INSERT INTO users (handle) VALUES ('rollback-check')");
       const before = Number((await pool.query("SELECT count(*) AS n FROM users")).rows[0].n);
 
-      // Rollback runs newest first: 0006 projects decisions onto 0005 reports; 0005 references S3 job tables.
-      for (const file of ["0006_m4_decision_intelligence.down.sql", "0005_s4b_matching.down.sql", "0003_s3_discovery.down.sql"]) await pool.query(readFileSync(path.resolve("db", "migrations", "down", file), "utf8"));
+      // Rollback runs newest first: 0012 projects decisions onto 0005 reports; 0005 references S3 job tables.
+      for (const file of ["0012_m4_decision_intelligence.down.sql", "0005_s4b_matching.down.sql", "0003_s3_discovery.down.sql"]) await pool.query(readFileSync(path.resolve("db", "migrations", "down", file), "utf8"));
       const after = await tables();
       for (const t of s3Tables) expect(after).not.toContain(t);
       expect(after).toEqual(expect.arrayContaining(["users", "candidate_facts", "role_catalog", "search_preferences"])); // S1/S2 intact
       expect(Number((await pool.query("SELECT count(*) AS n FROM users")).rows[0].n)).toBe(before);
-      expect((await pool.query("SELECT version FROM schema_migrations ORDER BY 1")).rows.map((r) => r.version)).toEqual(["0001_s1_candidate", "0002_s2_roles", "0004_profile_boundary"]);
+      expect((await pool.query("SELECT version FROM schema_migrations ORDER BY 1")).rows.map((r) => r.version)).toEqual(["0001_s1_candidate", "0002_s2_roles", "0004_profile_boundary", "0006_ml_engine", "0007_ml_pairs_registry", "0008_llm_labels", "0009_llm_reject_ledger", "0010_ml_evidence_integrity", "0011_ml_final_eval_claims"]);
 
-      expect((await migrate(pool)).applied).toEqual(["0003_s3_discovery", "0005_s4b_matching", "0006_m4_decision_intelligence"]); // forward again in dependency order
+      expect((await migrate(pool)).applied).toEqual(["0003_s3_discovery", "0005_s4b_matching", "0012_m4_decision_intelligence"]); // forward again in dependency order
       expect(await tables()).toEqual(expect.arrayContaining(s3Tables));
     } finally {
       await pool.end().catch(() => undefined);

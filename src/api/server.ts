@@ -16,6 +16,10 @@ import { LocalTransformerEncoder } from "../nlu/local-transformer.js";
 import { JOBS_ERROR_STATUS, JobsRuleError, PLAN_ERROR_STATUS, PlanError, defaultLimits, registerJobsRoutes } from "./jobs-routes.js";
 import { RoleRuleError, type RoleRuleCode } from "../roles/errors.js";
 import { registerRoleRoutes } from "./roles-routes.js";
+import { registerProjectRoutes } from "./project-routes.js";
+import { createProjectSources } from "../project/sources.js";
+import type { ProjectOptions } from "../project/views.js";
+import { fileURLToPath } from "node:url";
 import { SESSION_COOKIE, createLoginLimiter, createSessionCodec, safeEqual } from "./auth.js";
 import type { ApiConfig } from "./config.js";
 import type { ExtractionQueue } from "./extraction.js";
@@ -41,6 +45,8 @@ export interface ApiDeps {
   /** Test seam: inject fetch/delay/clock into the default runner. */
   runnerOptions?: Partial<Pick<RunnerDeps, "fetchImpl" | "delayMs" | "timeoutMs" | "now" | "onEvent">>;
   discoveryLimits?: { maxBoards: number; maxCandidates: number; maxMatchedPerBoard: number };
+  /** Project dashboard sources. Default: the docs of this repository checkout (read-only). Test seam: a temporary root. */
+  project?: ProjectOptions;
   now?: () => Date;
 }
 
@@ -295,6 +301,9 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   // Deterministic baseline by default; JH_MATCH_ENCODER=minilm adds the local MiniLM ranker (no network at match time once the model is cached).
   const matchStore = new MatchStore({ pool: repo.pool, candidates: repo, jobs: jobsRepo, encoder: process.env.JH_MATCH_ENCODER === "minilm" ? () => new LocalTransformerEncoder() : null });
   registerMatchRoutes(app, { store: matchStore, user, send });
+
+  // --- Project command center (read-only, internal engineering view) ---------------------------------------------------------
+  registerProjectRoutes(app, { project: deps.project ?? { sources: createProjectSources(fileURLToPath(new URL("../../", import.meta.url))) }, send });
 
   return app;
 }
