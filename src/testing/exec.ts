@@ -22,6 +22,12 @@ export function buildContext(root: string): Context {
   };
 }
 
+/** Pytest runs with services/ai as cwd, so manifest paths must be relative to that directory. */
+export function pythonTarget(file: string): string {
+  if (file === "python:services/ai") return ".";
+  return file.replace(/^python:services\/ai\//, "");
+}
+
 function run(cmd: string, args: string[], cwd: string, logFile: string, env: NodeJS.ProcessEnv = process.env): Promise<number | null> {
   mkdirSync(path.dirname(logFile), { recursive: true });
   return new Promise((resolve) => {
@@ -77,7 +83,7 @@ export function realExecutors(ctx: Context, log: (s: string) => void = () => und
       }
       for (const file of files) {
         const started = Date.now();
-        const target = file === "python:services/ai" ? "." : file.replace(/^python:/, "");
+        const target = pythonTarget(file);
         const logFile = path.join(cache, "logs", `pytest-${process.pid}-${Buffer.from(file).toString("hex").slice(0, 12)}.log`);
         const code = await run(py, ["-m", "pytest", "-q", "-p", "no:cacheprovider", target], path.join(ctx.root, "services", "ai"), logFile);
         const text = existsSync(logFile) ? readFileSync(logFile, "utf8") : "";
