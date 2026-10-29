@@ -595,10 +595,10 @@ Rows are in execution order; an agent takes the first `Ready` row, and sets the 
 | 22 | R6.2 Run DB-backed suites | R6.1 | covered by R6.1 | Done |
 | 23 | R7.1 Positive-evidence E2E | R6.2 | covered by R6.1 | Done |
 | 24 | R7.2 Duplicate-sentence rendering | R7.1 | Fix or accept | Done (Option A) |
-| 25 | R6.3 CI tiers | R6.2, R4.2, R4.3 | CI files, first push | Ready (HARD GATE: push) |
-| 26 | R6.4 Protect `main` | R6.3 | Apply settings | Not started |
-| 27 | R6.5 Ownership and conventions | R6.4 | Approve files | Not started |
-| 28 | R7.3 Final gates and draft PR | R7.2, R6.5, R4.4 | Push, draft PR | Not started |
+| 25 | R6.3 CI tiers | R6.2, R4.2, R4.3 | CI files, first push | Done |
+| 26 | R6.4 Protect `main` | R6.3 | Apply settings | Done (already in place) |
+| 27 | R6.5 Ownership and conventions | R6.4 | Approve files | Done |
+| 28 | R7.3 Final gates and draft PR | R7.2, R6.5, R4.4 | Push, draft PR | Ready (R4.4 excluded by owner: follow-up PR) |
 | 29 | R7.4 Owner acceptance and merge | R7.3 | Merge, JH-MATCH-001 acceptance | Not started |
 | 30 | R5.1 Archive tags | R7.4 | Tag list | Not started |
 | 31 | R5.2 Reachability proof | R5.1 | none | Not started |
