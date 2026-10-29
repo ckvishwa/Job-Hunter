@@ -15,7 +15,7 @@ evidence a promotion decision would need.
 ## Layout
 
 ```
-ml/resume-layoutlmv3/
+services/resume-layoutlmv3/
 ├── data/
 │   ├── raw_pdfs/          # source PDFs (gitignored — private candidate data)
 │   ├── annotations/       # labelled JSON, one file per document (gitignored)
@@ -39,7 +39,7 @@ own subproject.
 ## Install
 
 ```bash
-cd ml/resume-layoutlmv3
+cd services/resume-layoutlmv3
 pip install -r requirements.txt            # pick a torch wheel first if you need CUDA
 python -m pytest tests -q                  # 22 tests, no model download
 ```
@@ -49,7 +49,7 @@ scanned page is hit — parsing searchable PDFs never loads it. If PaddleOCR is
 not installed, native parsing still works and a scan raises a clear
 `ParserError`.
 
-All commands below run from `ml/resume-layoutlmv3/`.
+All commands below run from `services/resume-layoutlmv3/`.
 
 ## 1. Parse
 
