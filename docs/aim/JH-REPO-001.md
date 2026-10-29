@@ -584,8 +584,8 @@ Rows are in execution order; an agent takes the first `Ready` row, and sets the 
 | 11 | R4.1 History scan | R2.3 | Review hits | Done |
 | 12 | R4.2 Rewrite or clear | R4.1 | Rewrite plan if hits | Done |
 | 13 | R2.4 Area review of the merge | R2.3 | none | Ready |
-| 14 | R2.5 Classify all dirty work | R2.3 | Classification table | Ready |
-| 15 | R2.6 Index repair | R2.5 | covered by R2.1 | Not started |
+| 14 | R2.5 Classify all dirty work | R2.3 | Classification table | Done |
+| 15 | R2.6 Index repair | R2.5 | covered by R2.1 | Ready |
 | 16 | R3.1 Structure map | R2.6 | Move list | Not started |
 | 17 | R3.2 Execute moves | R3.1 | covered by R2.1 | Not started |
 | 18 | R3.3 Single sources of truth | R3.2 | Merged `CLAUDE.md` | Not started |
