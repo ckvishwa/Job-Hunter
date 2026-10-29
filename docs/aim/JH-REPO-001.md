@@ -592,8 +592,8 @@ Rows are in execution order; an agent takes the first `Ready` row, and sets the 
 | 19 | R4.3 One ignore file and guard | R3.3 | covered by R2.1 | Done (hook install parked) |
 | 20 | R4.4 Canonical evidence screenshots | R2.5 | Pick variants | Waiting on owner (contact sheet built) |
 | 21 | R6.1 One-command dev stack | R3.3 | Start Docker | Done |
-| 22 | R6.2 Run DB-backed suites | R6.1 | covered by R6.1 | Ready |
-| 23 | R7.1 Positive-evidence E2E | R6.2 | covered by R6.1 | Not started |
+| 22 | R6.2 Run DB-backed suites | R6.1 | covered by R6.1 | Done |
+| 23 | R7.1 Positive-evidence E2E | R6.2 | covered by R6.1 | Ready |
 | 24 | R7.2 Duplicate-sentence rendering | R7.1 | Fix or accept | Not started |
 | 25 | R6.3 CI tiers | R6.2, R4.2, R4.3 | CI files, first push | Not started |
 | 26 | R6.4 Protect `main` | R6.3 | Apply settings | Not started |

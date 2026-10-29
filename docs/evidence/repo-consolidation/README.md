@@ -16,4 +16,5 @@ One summary per runbook task; private detail (inventories, row-level classificat
 - [R4.3](R4.3.md)
 - [R4.4](R4.4.md)
 - [R6.1](R6.1.md)
+- [R6.2](R6.2.md)
 - [README](README.md)
