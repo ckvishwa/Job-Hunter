@@ -150,3 +150,13 @@ Migration `db/migrations/0003_s3_discovery.sql` is additive (no S1/S2 table is a
 Discovery reads only the employer boards you list. Copy `config/company-boards.example.json` to `config/company-boards.json` (gitignored) or point `JH_BOARDS_FILE` at your list. Each entry is `{ "company", "ats": "greenhouse" | "lever", "board": "<token from the employer's board URL>" }`; add `"corporateDomain"` when the employer's Greenhouse listings are served from its own domain, otherwise those postings are rejected as `UNOFFICIAL_HOST`. Limits (env): `JH_DISCOVERY_MAX_BOARDS` (25), `JH_DISCOVERY_MAX_CANDIDATES` (50), `JH_DISCOVERY_MAX_PER_BOARD` (50), `JH_DISCOVERY_DELAY_MS` (400).
 
 Bounded real-source pilot (throwaway database, synthetic selection, GET only): `npm run s3:pilot -- --boards <file> --max-boards 12 --max-candidates 50 [--open-filters]`.
+
+## One-command stack (JH-REPO-001 R6.1)
+
+```powershell
+npm run dev:stack         # PostgreSQL (Docker) -> migrations -> AI service -> API -> UI; each step waits for a health check
+npm run dev:stack:status  # service, port, pid, health
+npm run dev:stack:stop    # stop API, AI and UI; add `-StopDb` via `pwsh scripts/dev-stack.ps1 stop -StopDb` to stop PostgreSQL too
+```
+
+A second, separate database stack (for example an integration checkout next to another one) needs no code change: set `JH_COMPOSE_PROJECT`, `JH_PG_CONTAINER`, `JH_PG_VOLUME` and a free `JH_PG_PORT` in that checkout's own `infra/.env`. Defaults keep the original container `jobhunter-s1-pg` and volume `jobhunter_s1_pgdata`. `infra/.env` is gitignored (`git check-ignore infra/.env`); only `infra/.env.example` is committed.

@@ -44,6 +44,7 @@ $apiPort = [int](Cfg 'JH_API_PORT' '8787')
 $aiPort = [int](Cfg 'JH_AI_PORT' '8765')
 $webPort = [int](Cfg 'JH_WEB_PORT' '4321')
 $pgPort = [int](Cfg 'JH_PG_PORT' '55440')
+$pgContainer = Cfg 'JH_PG_CONTAINER' 'jobhunter-s1-pg'
 # The UI proxy target and the API's trusted browser origins must follow the ports actually chosen. Hard-coded defaults only match
 # the stock ports, which is how a changed port silently breaks every /api call.
 [Environment]::SetEnvironmentVariable('JH_API_URL', "http://127.0.0.1:$apiPort")
@@ -90,11 +91,11 @@ function Start-Postgres {
   if ($LASTEXITCODE -ne 0) { Fail 'docker compose up failed.' }
   $deadline = (Get-Date).AddSeconds(90)
   do {
-    $health = (& docker inspect jobhunter-s1-pg --format '{{.State.Health.Status}}' 2>$null)
+    $health = (& docker inspect $pgContainer --format '{{.State.Health.Status}}' 2>$null)
     if ($health -eq 'healthy') { break }
     Start-Sleep -Seconds 2
   } while ((Get-Date) -lt $deadline)
-  if ($health -ne 'healthy') { Fail "PostgreSQL container is '$health', not healthy after 90s. Run: docker logs jobhunter-s1-pg" }
+  if ($health -ne 'healthy') { Fail "PostgreSQL container is '$health', not healthy after 90s. Run: docker logs $pgContainer" }
   Write-Host "      PostgreSQL healthy on 127.0.0.1:$pgPort"
 }
 
@@ -126,7 +127,7 @@ function Start-Service($svc, [string]$file, [string[]]$arguments, [string]$workd
 
 function Show-Status {
   $state = Read-State
-  $pg = (& docker inspect jobhunter-s1-pg --format '{{.State.Health.Status}}' 2>$null)
+  $pg = (& docker inspect $pgContainer --format '{{.State.Health.Status}}' 2>$null)
   '{0,-8} {1,-6} {2,-8} {3}' -f 'service', 'port', 'pid', 'health'
   '{0,-8} {1,-6} {2,-8} {3}' -f 'postgres', $pgPort, '(docker)', $(if ($pg) { $pg } else { 'not running' })
   foreach ($svc in $services) {

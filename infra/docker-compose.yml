@@ -1,12 +1,12 @@
 # Dedicated PostgreSQL for Job Hunter S1 (candidate workflow). Do not point other projects at it.
 # Usage (from repo root):  docker compose -f infra/docker-compose.yml --env-file infra/.env up -d
-name: jobhunter-s1
+name: ${JH_COMPOSE_PROJECT:-jobhunter-s1}
 
 services:
   db:
     # Pinned minor version and digest (PostgreSQL 17 is a supported major). Upgrade deliberately, never via "latest".
     image: postgres:17.6-bookworm@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3
-    container_name: jobhunter-s1-pg
+    container_name: ${JH_PG_CONTAINER:-jobhunter-s1-pg}
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${JH_PG_USER:?set JH_PG_USER in infra/.env}
@@ -26,4 +26,4 @@ services:
 
 volumes:
   jobhunter_s1_pgdata:
-    name: jobhunter_s1_pgdata
+    name: ${JH_PG_VOLUME:-jobhunter_s1_pgdata}
