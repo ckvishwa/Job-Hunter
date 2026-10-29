@@ -33,6 +33,8 @@ function pw(locator: Locator) {
 const WEB_DIR = path.resolve("web");
 const ASTRO = path.join(WEB_DIR, "node_modules", "astro", "bin", "astro.mjs");
 const ready = (await dbAvailable()) && existsSync(ASTRO);
+// CI sets JH_REQUIRE_DB_E2E=1 where PostgreSQL and the web build exist: a missing prerequisite must fail there, not skip silently.
+if (process.env.JH_REQUIRE_DB_E2E === "1" && !ready) throw new Error("JH_REQUIRE_DB_E2E=1 but PostgreSQL (infra/.env) or the Astro install is missing: the matches UI suites cannot run.");
 const suite = ready ? describe : describe.skip;
 
 suite("S4 matches page (headed Chrome)", () => {

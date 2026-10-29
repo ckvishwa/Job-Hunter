@@ -179,12 +179,9 @@ export async function migrate(
 
     // A database that recorded a renamed migration under its old name keeps it
     // applied: re-key the row (checksum unchanged) instead of re-running the SQL.
-    for (const [from, to] of aliasRenamedMigrations(recorded)) {
-      await client.query(
-        "UPDATE schema_migrations SET version = $1 WHERE version = $2",
-        [to, from],
-      );
-    }
+    // The map is re-keyed in memory first, so the checksum validation below sees the renamed file; the table is
+    // only updated after that validation passes, and in one transaction.
+    const moved = aliasRenamedMigrations(recorded);
 
     // Validate all previously applied local migrations before
     // executing any pending migration.
@@ -196,6 +193,22 @@ export async function migrate(
         !checksumMatches(prior, migration)
       ) {
         throw new MigrationChecksumError(migration.version);
+      }
+    }
+
+    if (moved.length) {
+      try {
+        await client.query("BEGIN");
+        for (const [from, to] of moved) {
+          await client.query(
+            "UPDATE schema_migrations SET version = $1 WHERE version = $2",
+            [to, from],
+          );
+        }
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
       }
     }
 

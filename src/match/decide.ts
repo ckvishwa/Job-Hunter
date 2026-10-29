@@ -241,16 +241,25 @@ export function rollupItems(decisions: RequirementDecision[]): Array<{ start: nu
     const live = members.filter((m) => m.applicable && !m.groupId);
     const grouped = members.filter((m) => m.groupId);
     if (members.length < 2) continue;
-    const basis = live.length ? live : grouped;
-    if (!live.length) {
-      // Only alternatives ("A or B"): one supported branch satisfies the sentence, as the alternative group itself decides.
-      const best: ReqStatus = grouped.some((m) => m.status === "SUPPORTED") ? "SUPPORTED" : grouped.some((m) => m.status === "PARTIAL") ? "PARTIAL" : grouped.every((m) => m.status === "UNSUPPORTED") ? "UNSUPPORTED" : "UNKNOWN";
-      const supported = grouped.filter((m) => m.status === "SUPPORTED").map((m) => m.value);
-      out.push({ start, end: members[0]!.jd.end, quote: members[0]!.jd.quote, level: members[0]!.effectiveLevel, status: best, memberIds: members.map((m) => m.requirementId), note: supported.length ? `At least one alternative is supported (${supported.join(", ")}).` : `No alternative is fully supported (${grouped.length} listed).` });
+    // Nothing applicable and nothing alternative (for example every member negated): the sentence makes no claim to roll up.
+    if (!live.length && !grouped.length) continue;
+    // "tools like SIEM, EDR" is stored as a group too, but its terms are examples, not alternatives: report the fraction, as before.
+    if (!live.length && /\b(?:such as|like|e\.g\.,?|including|for example)\b/i.test(members[0]!.jd.quote)) {
+      const s: ReqStatus = grouped.every((m) => m.status === "SUPPORTED") ? "SUPPORTED" : grouped.some((m) => m.status === "SUPPORTED" || m.status === "PARTIAL") ? "PARTIAL" : grouped.every((m) => m.status === "UNSUPPORTED") ? "UNSUPPORTED" : "UNKNOWN";
+      out.push({ start, end: members[0]!.jd.end, quote: members[0]!.jd.quote, level: members[0]!.effectiveLevel, status: s, memberIds: members.map((m) => m.requirementId), note: `${grouped.filter((m) => m.status === "SUPPORTED").length} of ${grouped.length} listed terms supported` });
       continue;
     }
-    const status: ReqStatus = basis.every((m) => m.status === "SUPPORTED") ? "SUPPORTED" : basis.some((m) => m.status === "SUPPORTED" || m.status === "PARTIAL") ? "PARTIAL" : basis.every((m) => m.status === "UNSUPPORTED") ? "UNSUPPORTED" : "UNKNOWN";
-    out.push({ start, end: members[0]!.jd.end, quote: members[0]!.jd.quote, level: members[0]!.effectiveLevel, status, memberIds: members.map((m) => m.requirementId), note: `${basis.filter((m) => m.status === "SUPPORTED").length} of ${basis.length} listed terms supported` });
+    // Each alternative group counts once: one supported branch satisfies that group, as the group's own decision does. Every
+    // ungrouped member and every group must be satisfied for the sentence to be SUPPORTED, so "A and (B or C)" needs A and one of B, C.
+    const groups = new Map<string, RequirementDecision[]>();
+    for (const m of grouped) groups.set(m.groupId!, [...(groups.get(m.groupId!) ?? []), m]);
+    const best = (ms: RequirementDecision[]): ReqStatus => (ms.some((m) => m.status === "SUPPORTED") ? "SUPPORTED" : ms.some((m) => m.status === "PARTIAL") ? "PARTIAL" : ms.every((m) => m.status === "UNSUPPORTED") ? "UNSUPPORTED" : "UNKNOWN");
+    const parts: ReqStatus[] = [...live.map((m) => m.status), ...[...groups.values()].map(best)];
+    const status: ReqStatus = parts.every((s) => s === "SUPPORTED") ? "SUPPORTED" : parts.some((s) => s === "SUPPORTED" || s === "PARTIAL") ? "PARTIAL" : parts.every((s) => s === "UNSUPPORTED") ? "UNSUPPORTED" : "UNKNOWN";
+    const note = groups.size && !live.length
+      ? (status === "SUPPORTED" ? `At least one alternative is supported in each group (${grouped.filter((m) => m.status === "SUPPORTED").map((m) => m.value).join(", ")}).` : `No alternative is fully supported (${grouped.length} listed).`)
+      : `${parts.filter((s) => s === "SUPPORTED").length} of ${parts.length} listed ${groups.size ? "parts" : "terms"} supported`;
+    out.push({ start, end: members[0]!.jd.end, quote: members[0]!.jd.quote, level: members[0]!.effectiveLevel, status, memberIds: members.map((m) => m.requirementId), note });
   }
   return out;
 }

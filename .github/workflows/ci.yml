@@ -78,7 +78,7 @@ jobs:
         run: npm ci
       - name: Install web (Astro) dependencies; tests/web import web/ (Astro tsconfig)
         run: npm ci --prefix web
-      - name: Private-path guard (no candidate data, secrets, weights or file over 5 MB in the committed tree)
+      - name: Private-path guard (path-based only, covering candidate-data directories, secrets, weights, files over 5 MB in the committed tree; it does not read file contents)
         run: npm run ci:private-tree
       - name: Check isolation before tests
         run: npm run ci:isolation -- before
@@ -98,9 +98,10 @@ jobs:
       JH_PG_DB: jobhunter
       JH_PG_PASSWORD: ci-${{ github.run_id }}-pg
       JH_PG_PORT: '5432'
+      JH_REQUIRE_DB_E2E: '1'
     services:
       postgres:
-        image: postgres:17.6-bookworm
+        image: postgres:17.6-bookworm@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3
         env:
           POSTGRES_USER: jobhunter
           POSTGRES_DB: jobhunter

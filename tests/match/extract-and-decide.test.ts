@@ -411,3 +411,28 @@ describe("mixed AND/OR sentences and required vs preferred (gate-2 negative case
     expect(res.decisions.filter((d) => d.effectiveLevel === "required").every((d) => d.status !== "SUPPORTED")).toBe(true);
   });
 });
+
+describe("rollup never overstates (independent review of the PR)", () => {
+  const d = (id: string, status: "SUPPORTED" | "PARTIAL" | "UNSUPPORTED" | "UNKNOWN", over: Record<string, unknown> = {}) =>
+    ({ requirementId: id, value: id, status, applicable: true, groupId: null, effectiveLevel: "required", jd: { start: 10, end: 60, quote: "Python and (Selenium or Playwright)." }, ...over }) as never;
+
+  it("\"A and (B or C)\" with A supported and no alternative supported is PARTIAL, not SUPPORTED", () => {
+    const [roll] = rollupItems([d("python", "SUPPORTED"), d("selenium", "UNSUPPORTED", { groupId: "g-1" }), d("playwright", "UNSUPPORTED", { groupId: "g-1" })]);
+    expect(roll!.status).toBe("PARTIAL");
+  });
+
+  it("\"A and (B or C)\" is SUPPORTED only when A and one alternative are supported", () => {
+    expect(rollupItems([d("python", "SUPPORTED"), d("selenium", "UNSUPPORTED", { groupId: "g-1" }), d("playwright", "SUPPORTED", { groupId: "g-1" })])[0]!.status).toBe("SUPPORTED");
+    expect(rollupItems([d("python", "UNSUPPORTED"), d("selenium", "UNSUPPORTED", { groupId: "g-1" }), d("playwright", "SUPPORTED", { groupId: "g-1" })])[0]!.status).toBe("PARTIAL");
+  });
+
+  it("two groups in one sentence need a supported member in each: \"(A or B) and (C or D)\"", () => {
+    const base = [d("a", "SUPPORTED", { groupId: "g-1" }), d("b", "UNSUPPORTED", { groupId: "g-1" })];
+    expect(rollupItems([...base, d("c", "UNSUPPORTED", { groupId: "g-2" }), d("e", "UNSUPPORTED", { groupId: "g-2" })])[0]!.status).toBe("PARTIAL");
+    expect(rollupItems([...base, d("c", "SUPPORTED", { groupId: "g-2" }), d("e", "UNSUPPORTED", { groupId: "g-2" })])[0]!.status).toBe("SUPPORTED");
+  });
+
+  it("a sentence whose members are all inapplicable (negated) produces no rollup and no claim", () => {
+    expect(rollupItems([d("a", "UNSUPPORTED", { applicable: false }), d("b", "UNSUPPORTED", { applicable: false })])).toEqual([]);
+  });
+});

@@ -183,8 +183,10 @@ async function main(): Promise<void> {
       const stored = await jobsRepo.getJob(user.id, row.id);
       if (!stored) { errors.push(`Candidate-scoped job retrieval failed for ${row.ats}:${row.board}:${row.requisition_id}`); continue; }
       const report = await runMatch({ job: postingFromStoredJob(stored), provider, corpus: candidateEvidence, asOf: new Date().toISOString().slice(0, 10), selection: null });
-      const matchDecision = decideMatch(report, { postingStatus: fresh ? "RECENT" : "UNKNOWN", rolePreference: "MATCH", locationCompatibility: "UNKNOWN" });
-      const decision = matchDecision.hardReject ? "FAIL" : !fresh || matchDecision.outcome !== "SHORTLIST" ? "NEEDS_VERIFICATION" : "PASS";
+      // Role and location are not assumed: the role preference is unknown here, and PASS needs a checked US location.
+      const loc = locationVerdict({ location: row.location });
+      const matchDecision = decideMatch(report, { postingStatus: fresh ? "RECENT" : "UNKNOWN", rolePreference: "UNKNOWN", locationCompatibility: loc === "US" ? "MATCH" : loc === "NON_US" ? "MISMATCH" : "UNKNOWN" });
+      const decision = matchDecision.hardReject ? "FAIL" : !fresh || loc !== "US" || matchDecision.outcome !== "SHORTLIST" ? "NEEDS_VERIFICATION" : "PASS";
       const profileEligibilityEvidence = candidateEvidence.eligibility.length
         ? candidateEvidence.eligibility.map((fact) => `Approved ${fact.kind} fact reference: ${fact.factId}`)
         : ["No approved candidate eligibility attestation is present in the scoped profile; verify manually."];

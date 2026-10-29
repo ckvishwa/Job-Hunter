@@ -52,7 +52,7 @@
       "severity": "high",
       "reason": "Vite development-server advisory (GHSA-587h-7wmj-h5pm). Vite is a transitive dependency of vitest; no Vite dev server is started by vitest run, and the web app is built with Astro and previewed on loopback only.",
       "owner": "repository owner",
-      "remediation": "Resolved by the vitest major upgrade (SDLC-T08), which also clears the vitest, tinypool and esbuild entries.",
+      "remediation": "Planned, not yet done: the vitest major upgrade (SDLC-T08) clears this and the vitest, tinypool and esbuild advisories; the lockfile still pins vitest 2.x and vite 5.x. Revisit before the expiry.",
       "expires": "2026-11-13"
     }
   ]
