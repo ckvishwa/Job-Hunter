@@ -89,10 +89,118 @@ export function readDocxParagraphs(bytes: Buffer): string[] {
 // Pending-fact extraction
 // ---------------------------------------------------------------------------
 
+/** A date as precise as the document was: a year-only date never carries a month. */
+export interface EmploymentDate {
+  precision: "year" | "month" | "present";
+  value: string | null;
+}
+
+export interface EvidenceSpan {
+  /** UTF-16 code units into the document's canonical extracted text. */
+  start: number;
+  end: number;
+  quote: string;
+}
+
+/**
+ * One employment entry proposed by the deterministic resume parser
+ * (`services/ai/app/parse_markdown.py`), which groups an entry spread over several lines and
+ * decides which side is the title from its keywords. Every field quotes the document.
+ */
+export interface EmploymentCandidate {
+  employer: string;
+  title: string;
+  start: EmploymentDate;
+  end: EmploymentDate;
+  evidence: EvidenceSpan;
+  employerEvidence: EvidenceSpan;
+  titleEvidence: EvidenceSpan;
+  confidence: "high" | "medium" | "low";
+  /** Why the reader should check this record, in the parser's own words. Empty when there is nothing to flag. */
+  ambiguity: string[];
+  page: number | null;
+}
+
+/** An entry the parser would not import. Reported so a refusal is visible, not missing. */
+export interface RefusedEmployment {
+  code: string;
+  message: string;
+  start: number | null;
+  end: number | null;
+  page: number | null;
+}
+
+export interface SkillCandidate {
+  value: string;
+  /** The parser's normalized spelling where it knows one. Never a substitute for the source text. */
+  canonical: string | null;
+  /** The group label printed above or beside the item, when the document had one. */
+  category: string | null;
+  evidence: EvidenceSpan;
+  confidence: "high" | "medium" | "low";
+  ambiguity: string[];
+  page: number | null;
+}
+
+export interface EducationCandidate {
+  degree: string;
+  institution: string | null;
+  graduation: EmploymentDate | null;
+  evidence: EvidenceSpan;
+  institutionEvidence: EvidenceSpan | null;
+  confidence: "high" | "medium" | "low";
+  ambiguity: string[];
+  page: number | null;
+}
+
+export interface CertificationCandidate {
+  name: string;
+  evidence: EvidenceSpan;
+  confidence: "high" | "medium" | "low";
+  ambiguity: string[];
+  page: number | null;
+}
+
+export interface ProjectCandidate {
+  name: string;
+  description: string | null;
+  technologies: string[];
+  url: string | null;
+  start: EmploymentDate | null;
+  end: EmploymentDate | null;
+  evidence: EvidenceSpan;
+  confidence: "high" | "medium" | "low";
+  ambiguity: string[];
+  page: number | null;
+}
+
+/** Everything the deterministic parser proposes for one document, plus what it refused. */
+export interface ResumeReading {
+  parserRevision: string;
+  employment: EmploymentCandidate[];
+  skills: SkillCandidate[];
+  education: EducationCandidate[];
+  certifications: CertificationCandidate[];
+  projects: ProjectCandidate[];
+  refused: RefusedEmployment[];
+}
+
 export interface ResumeDocument {
-  /** File name only (never a directory path). */
+  /** File name, or a pseudonymous document id for a privately extracted document. Never a directory path. */
   name: string;
   paragraphs: string[];
+  /**
+   * What the deterministic parser read from this document's text. When present it replaces the
+   * line rules below for this document: those read the owner's own resume template, and running
+   * both would import the same value twice over, once per set of rules.
+   */
+  reading?: ResumeReading;
+  /**
+   * Where paragraph `i` sits in the source document: page index and the UTF-16 span of the
+   * canonical extracted text. Supplied by PDF intake; a .docx has neither, and its facts keep
+   * the paragraph-number locator they have always had.
+   */
+  provenance?: ReadonlyArray<{ page: number | null; start: number; end: number }>;
 }
 
 export interface ImportIssue {
@@ -120,9 +228,214 @@ function parseMonthYear(text: string): string | null | "invalid" {
   return m && month ? `${m[2]}-${month}` : "invalid";
 }
 
+/** "Month YYYY" exactly as a resume prints it; no other date shape is accepted. */
+const MONTH_YEAR = "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\.? \\d{4}";
+/** "<Employer> — <Title> <Month YYYY> – <Month YYYY|Present>" on one line, which is how a PDF extracts it. */
+const EMPLOYMENT_WITH_DATES = new RegExp(`^(.+?) [—-] (.+?) (${MONTH_YEAR}) [–-] (Present|Current|Now|${MONTH_YEAR})$`, "i");
+
 const isHeading = (line: string): boolean => /^[A-Z][A-Z &/-]{2,}$/.test(line.trim());
 const hasPlaceholder = (line: string): boolean => /\[[^\]]+\]/.test(line);
 const slugify = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "x";
+
+type AddFact = (draft: {
+  kind: CandidateFact["kind"];
+  value: string;
+  attributes?: CandidateFact["attributes"];
+  dedupeKey: string;
+  file: string;
+  paragraph: number;
+  locator?: string;
+  notes?: string;
+}) => void;
+
+/** The YYYY-MM the profile schema accepts, or undefined for any less precise date. */
+const monthValue = (date: EmploymentDate): string | undefined => (date.precision === "month" && date.value ? date.value : undefined);
+
+const printedDate = (date: EmploymentDate): string => (date.precision === "present" ? "present" : (date.value ?? "not stated"));
+
+/**
+ * Turn the parser's employment reading into pending facts.
+ *
+ * Dates are carried only at the precision the document stated. A year-only range cannot be
+ * written as the YYYY-MM the profile schema requires, so no month is invented: the dates are
+ * recorded verbatim in `detail` for the reviewer and the date attributes stay unset, which
+ * keeps the fact out of any years-of-experience calculation until a person fills them in.
+ */
+function addEmploymentFromReading(doc: ResumeDocument, reading: ResumeReading, add: AddFact, issues: ImportIssue[]): void {
+  const where = (page: number | null, start: number | null, end: number | null): string =>
+    `${page === null ? "page unknown" : `page ${page + 1}`}, chars ${start ?? "?"}-${end ?? "?"}`;
+
+  for (const refused of reading.refused) {
+    // The parser considered this entry and would not import it. Saying so is the point.
+    issues.push({
+      file: doc.name,
+      paragraph: null,
+      message: `employment entry not imported (${refused.code}) at ${where(refused.page, refused.start, refused.end)}: ${refused.message}`,
+    });
+  }
+
+  for (const candidate of reading.employment) {
+    const start = monthValue(candidate.start);
+    const end = monthValue(candidate.end);
+    if (start && end && end < start) {
+      // The parser compares years only, so an inverted range inside one year reaches here.
+      // The profile schema would reject it and fail the whole import, so it stops at this fact.
+      issues.push({
+        file: doc.name,
+        paragraph: null,
+        message: `employment "${candidate.employer} — ${candidate.title}" is dated ${start} to ${end}, which ends before it starts; not imported, and neither date was altered`,
+      });
+      continue;
+    }
+
+    if (!start) {
+      // An employment fact must carry a YYYY-MM start (candidate-profile.ts), and the document
+      // stated only a year. Inventing a month is the one thing that must not happen, so the
+      // entry is reported with its dates verbatim and a person decides what the month is.
+      issues.push({
+        file: doc.name,
+        paragraph: null,
+        message:
+          `employment "${candidate.employer} — ${candidate.title}" at ${where(candidate.page, candidate.evidence.start, candidate.evidence.end)} ` +
+          `is dated ${printedDate(candidate.start)} to ${printedDate(candidate.end)}, which the document gives to the year only; ` +
+          "a pending employment fact needs a start month, so it was not imported and no month was invented",
+      });
+      continue;
+    }
+
+    const attributes: CandidateFact["attributes"] = { employer: candidate.employer, title: candidate.title, startDate: start };
+    if (candidate.end.precision === "present") attributes.endDate = null;
+    else if (end) attributes.endDate = end;
+    else {
+      // A year-only end with a month start: the end stays unset rather than rounded to a month.
+      attributes.detail = `End date as printed: ${printedDate(candidate.end)} (year precision; no month is recorded)`.slice(0, 300);
+    }
+
+    const notes = [
+      `Grouped by ${reading.parserRevision} from the document's own lines; employer, title and dates are quoted from it.`,
+      ...candidate.ambiguity,
+      candidate.confidence === "high" ? "" : `Parser confidence ${candidate.confidence}: check the employer and title are the right way round.`,
+      candidate.end.precision === "year" ? "The end date is year-precision in the document and is not stored as a month; add it when approving if the document supports it." : "",
+      "roleTags not set: role-years requirements cannot use this job until the candidate approves what it counts as.",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    add({
+      kind: "employment",
+      value: `${candidate.employer} — ${candidate.title}`,
+      attributes,
+      dedupeKey: `${candidate.employer.toLowerCase()}|${candidate.start.value ?? candidate.start.precision}`,
+      file: doc.name,
+      paragraph: 0,
+      locator: where(candidate.page, candidate.evidence.start, candidate.evidence.end),
+      notes: notes.slice(0, 500),
+    });
+  }
+}
+
+/** `page N, chars A-B`, or the chars alone when the record could not be attributed to a page. */
+const locatorFor = (page: number | null, span: EvidenceSpan): string =>
+  `${page === null ? "page unknown" : `page ${page + 1}`}, chars ${span.start}-${span.end}`;
+
+const printedGraduation = (date: EmploymentDate | null): string | null =>
+  date === null ? null : date.precision === "present" ? "present" : date.value;
+
+/** The parser's doubt, carried into the fact rather than dropped. */
+function readingNotes(parserRevision: string, confidence: string, ambiguity: string[], extra: string[] = []): string {
+  return [
+    `Read by ${parserRevision} from the document's own text; the value is quoted from it.`,
+    ...ambiguity,
+    confidence === "high" ? "" : `Parser confidence ${confidence}: check this against the page before approving.`,
+    ...extra,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 500);
+}
+
+/**
+ * Every category the parser read, as pending facts.
+ *
+ * Each kind keeps only what the document stated. A skill carries the group label it was printed
+ * under, not a proficiency; an education fact carries the institution and graduation as printed,
+ * and nothing is derived when they are absent; a project carries the technologies the document
+ * listed, and an empty list stays empty. Years of experience are never computed here.
+ */
+function addFactsFromReading(doc: ResumeDocument, reading: ResumeReading, add: AddFact, issues: ImportIssue[]): void {
+  addEmploymentFromReading(doc, reading, add, issues);
+
+  for (const skill of reading.skills) {
+    add({
+      kind: "skill",
+      value: skill.value,
+      dedupeKey: skill.value.toLowerCase(),
+      file: doc.name,
+      paragraph: 0,
+      locator: locatorFor(skill.page, skill.evidence),
+      notes: readingNotes(reading.parserRevision, skill.confidence, skill.ambiguity, [
+        skill.category ? `Listed under "${skill.category}" on the document.` : "No group label was printed for this item.",
+        skill.canonical && skill.canonical !== skill.value ? `The parser knows this spelling as "${skill.canonical}"; the source wording is kept.` : "",
+        "No proficiency or duration is implied: a skill mention is not evidence of years of use.",
+      ]),
+    });
+  }
+
+  for (const record of reading.education) {
+    // The schema has no institution or graduation field for an education fact, so both go into
+    // `detail` exactly as printed. Neither is invented when the document did not state it.
+    const printed = [
+      record.institution ? `institution: ${record.institution}` : "institution not stated separately on the document",
+      printedGraduation(record.graduation) ? `graduation as printed: ${printedGraduation(record.graduation)}` : "no graduation date stated",
+    ].join("; ");
+    add({
+      kind: "education",
+      value: record.degree,
+      attributes: { detail: printed.slice(0, 300) },
+      dedupeKey: `${record.degree.toLowerCase()}|${(record.institution ?? "").toLowerCase()}`,
+      file: doc.name,
+      paragraph: 0,
+      locator: locatorFor(record.page, record.evidence),
+      notes: readingNotes(reading.parserRevision, record.confidence, record.ambiguity, [
+        record.graduation?.precision === "year" ? "The graduation date is year-precision in the document; no month is recorded." : "",
+      ]),
+    });
+  }
+
+  for (const record of reading.certifications) {
+    add({
+      kind: "certification",
+      value: record.name,
+      dedupeKey: record.name.toLowerCase(),
+      file: doc.name,
+      paragraph: 0,
+      locator: locatorFor(record.page, record.evidence),
+      notes: readingNotes(reading.parserRevision, record.confidence, record.ambiguity, [
+        "Any issue or expiry date on the document was not kept with the name; add it when approving.",
+      ]),
+    });
+  }
+
+  for (const record of reading.projects) {
+    const technologies = record.technologies.filter((t) => t.trim().length > 0).slice(0, 40);
+    add({
+      kind: "project",
+      value: record.name,
+      attributes: {
+        ...(technologies.length ? { technologies } : {}),
+        ...(record.url ? { detail: `link as printed: ${record.url}`.slice(0, 300) } : {}),
+      },
+      dedupeKey: record.name.toLowerCase(),
+      file: doc.name,
+      paragraph: 0,
+      locator: locatorFor(record.page, record.evidence),
+      notes: readingNotes(reading.parserRevision, record.confidence, record.ambiguity, [
+        technologies.length ? "" : "The document listed no technologies for this project; none were inferred from its description.",
+        "A project is never counted as professional employment years.",
+      ]),
+    });
+  }
+}
 
 export function buildPendingFacts(documents: ResumeDocument[], options: { candidateId: string; importedAt: string }): ImportResult {
   const issues: ImportIssue[] = [];
@@ -130,7 +443,7 @@ export function buildPendingFacts(documents: ResumeDocument[], options: { candid
   const byKey = new Map<string, CandidateFact>();
   const usedIds = new Set<string>();
 
-  const add = (draft: { kind: CandidateFact["kind"]; value: string; attributes?: CandidateFact["attributes"]; dedupeKey: string; file: string; paragraph: number; notes?: string }): void => {
+  const add = (draft: { kind: CandidateFact["kind"]; value: string; attributes?: CandidateFact["attributes"]; dedupeKey: string; file: string; paragraph: number; locator?: string; notes?: string }): void => {
     const existing = byKey.get(`${draft.kind}|${draft.dedupeKey}`);
     if (existing) {
       existing.notes = `${existing.notes ?? ""}${existing.notes ? " " : ""}Also appears in ${draft.file}.`.slice(0, 500);
@@ -145,7 +458,7 @@ export function buildPendingFacts(documents: ResumeDocument[], options: { candid
       value: draft.value,
       polarity: "has",
       attributes: draft.attributes ?? {},
-      source: { kind: "resume-import", reference: draft.file, locator: `paragraph ${draft.paragraph + 1}` },
+      source: { kind: "resume-import", reference: draft.file, locator: (draft.locator ?? `paragraph ${draft.paragraph + 1}`).slice(0, 200) },
       verification: { verifiedBy: null, verifiedAt: null, validUntil: null },
       approvalStatus: "pending",
       sensitivity: "normal",
@@ -158,6 +471,14 @@ export function buildPendingFacts(documents: ResumeDocument[], options: { candid
   for (const doc of documents) {
     let section = "";
     let lastProject: { value: string; paragraph: number } | null = null;
+    // A PDF-extracted document knows the page and character span each line came from; a .docx
+    // has neither, and its facts keep the paragraph locator they have always had.
+    const locate = (i: number): string | undefined => {
+      const at = doc.provenance?.[i];
+      if (!at) return undefined;
+      const page = at.page === null ? "page unknown" : `page ${at.page + 1}`;
+      return `${page}, line ${i + 1}, chars ${at.start}-${at.end}`;
+    };
     doc.paragraphs.forEach((raw, i) => {
       const line = raw.replace(/[  ]+/g, " ").trim();
       if (!line) return;
@@ -168,17 +489,24 @@ export function buildPendingFacts(documents: ResumeDocument[], options: { candid
       }
 
       if (section === "TECHNICAL SKILLS") {
+        if (doc.reading) return;
         const m = line.match(/^([^:]{2,40}):\s*(.+)$/);
         if (!m) return;
         for (const item of m[2]!.split(",").map((s) => s.trim()).filter(Boolean)) {
           if (hasPlaceholder(item)) continue;
-          add({ kind: "skill", value: item, dedupeKey: item.toLowerCase(), file: doc.name, paragraph: i, notes: `Listed under "${m[1]!.trim()}" on the resume. Comma-split verbatim: reject fragments that are not a skill on their own.` });
+          add({ kind: "skill", value: item, dedupeKey: item.toLowerCase(), file: doc.name, paragraph: i, locator: locate(i), notes: `Listed under "${m[1]!.trim()}" on the resume. Comma-split verbatim: reject fragments that are not a skill on their own.` });
         }
         return;
       }
 
       if (section === "PROFESSIONAL EXPERIENCE") {
-        const m = line.match(/^(.+?) [—-] (.+?)\t(.+?) [–-] (.+)$/);
+        // A document that brought its own reading uses that instead: running both would
+        // import the same job twice over, once per set of rules.
+        if (doc.reading) return;
+        // Tab-separated is the .docx shape. A PDF text layer has no tab character, so the second
+        // form anchors on an explicit "Month YYYY - Month YYYY|Present" range. A line whose dates
+        // are not stated in that form is left for the reviewer, never guessed.
+        const m = line.match(/^(.+?) [—-] (.+?)\t(.+?) [–-] (.+)$/) ?? line.match(EMPLOYMENT_WITH_DATES);
         if (!m) return; // bullets and wrapped text are not imported
         if (hasPlaceholder(line)) {
           issues.push({ file: doc.name, paragraph: i + 1, message: "employment line has an unfilled placeholder; not imported" });
@@ -190,6 +518,13 @@ export function buildPendingFacts(documents: ResumeDocument[], options: { candid
           issues.push({ file: doc.name, paragraph: i + 1, message: `employment dates "${m[3]} - ${m[4]}" could not be parsed; not imported` });
           return;
         }
+        // A range that ends before it starts is a contradiction the profile schema refuses, and
+        // refusing it one fact at a time beats failing the whole import. Which of the two dates
+        // is wrong is not guessable, so neither is changed: the line is reported for the reviewer.
+        if (end !== null && end < start) {
+          issues.push({ file: doc.name, paragraph: i + 1, message: `employment dates "${m[3]} - ${m[4]}" end before they start; not imported, and neither date was altered` });
+          return;
+        }
         add({
           kind: "employment",
           value: `${m[1]!.trim()} — ${m[2]!.trim()}`,
@@ -197,16 +532,18 @@ export function buildPendingFacts(documents: ResumeDocument[], options: { candid
           dedupeKey: `${m[1]!.trim().toLowerCase()}|${start}`,
           file: doc.name,
           paragraph: i,
+          locator: locate(i),
           notes: "roleTags not set: role-years requirements cannot use this job until the candidate approves what it counts as.",
         });
         return;
       }
 
       if (section === "PERSONAL PROJECTS") {
+        if (doc.reading) return;
         const head = line.match(/^Personal Project [—-] (.+)$/);
         if (head) {
           lastProject = { value: head[1]!.trim(), paragraph: i };
-          add({ kind: "project", value: head[1]!.trim(), dedupeKey: head[1]!.trim().toLowerCase(), file: doc.name, paragraph: i, notes: "Personal project (undated): never counted as professional years." });
+          add({ kind: "project", value: head[1]!.trim(), dedupeKey: head[1]!.trim().toLowerCase(), file: doc.name, paragraph: i, locator: locate(i), notes: "Personal project (undated): never counted as professional years." });
           return;
         }
         if (lastProject && !line.endsWith(".") && line.includes(",") && line.split(",").length >= 3) {
@@ -218,13 +555,14 @@ export function buildPendingFacts(documents: ResumeDocument[], options: { candid
       }
 
       if (section === "CERTIFICATION" || section === "CERTIFICATIONS") {
+        if (doc.reading) return;
         const name = line.split(/ [—-] /)[0]!.trim();
         if (hasPlaceholder(name)) {
           issues.push({ file: doc.name, paragraph: i + 1, message: "certification name is a placeholder; not imported" });
           return;
         }
         if (hasPlaceholder(line)) issues.push({ file: doc.name, paragraph: i + 1, message: `certification "${name}" has an unfilled date placeholder; imported without a date` });
-        add({ kind: "certification", value: name, dedupeKey: name.toLowerCase(), file: doc.name, paragraph: i, notes: "Issue date not stated on the resume; add it when approving." });
+        add({ kind: "certification", value: name, dedupeKey: name.toLowerCase(), file: doc.name, paragraph: i, locator: locate(i), notes: "Issue date not stated on the resume; add it when approving." });
         return;
       }
 
@@ -232,6 +570,8 @@ export function buildPendingFacts(documents: ResumeDocument[], options: { candid
         issues.push({ file: doc.name, paragraph: i + 1, message: "education line is an unfilled template placeholder; not imported" });
       }
     });
+
+    if (doc.reading) addFactsFromReading(doc, doc.reading, add, issues);
   }
 
   const unreadable = documents.length === 0 ? [{ file: "(none)", paragraph: null, message: "no resume documents were provided" }] : [];

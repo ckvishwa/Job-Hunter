@@ -62,6 +62,25 @@ describe("buildPendingFacts", () => {
     expect(result.profile.preferences).toEqual({});
   });
 
+  it("reports an employment range that ends before it starts instead of failing the whole import", () => {
+    const contradictory = buildPendingFacts(
+      [{ name: "Resume_B.docx", paragraphs: readDocxParagraphs(buildDocx([
+        "TECHNICAL SKILLS",
+        "Languages: Rust",
+        "PROFESSIONAL EXPERIENCE",
+        "Dunsmere Payments — Software Engineer II\tMarch 2021 – January 2019",
+        "Harrowgate Ledger — Software Engineer\tJune 2020 – Present",
+      ])) }],
+      { candidateId: "cand-1", importedAt: "2026-10-28T10:00:00.000Z" },
+    );
+    // The impossible range is dropped and reported; neither date is "corrected".
+    expect(contradictory.profile.facts.filter((f) => f.kind === "employment").map((f) => f.attributes.employer)).toEqual(["Harrowgate Ledger"]);
+    const note = contradictory.issues.find((i) => i.message.includes("end before they start"));
+    expect(note).toMatchObject({ file: "Resume_B.docx", paragraph: 4 });
+    expect(note!.message).toContain("March 2021 - January 2019");
+    expect(contradictory.profile.facts.some((f) => f.value === "Rust")).toBe(true);
+  });
+
   it("imports skills verbatim and skips an item that contains an unfilled placeholder", () => {
     const skills = byKind("skill").map((f) => f.value);
     expect(skills).toEqual(expect.arrayContaining(["Java", "Python", "TypeScript", "Unit", "API & database testing"]));
