@@ -1,0 +1,22 @@
+# Pilot harness: LayoutLMv3 résumé token classification
+# Python 3.10+ (developed against 3.12). Install torch first if you need a
+# specific CUDA/CPU wheel: https://pytorch.org/get-started/locally/
+torch>=2.2,<3.0
+transformers>=4.46,<5.0
+datasets>=2.19
+accelerate>=0.30
+pymupdf>=1.24            # imported as `fitz`
+pillow>=10.2
+numpy>=1.26,<3.0
+pydantic>=2.7
+seqeval>=1.2.2
+scikit-learn>=1.4
+
+# OCR fallback (scanned / image-only PDFs). Heavy; only needed for scans.
+# Install with:  pip install -r requirements.txt
+# CPU-only paddle wheel; swap for paddlepaddle-gpu if you have CUDA set up.
+paddlepaddle>=2.6
+paddleocr>=2.8
+
+# Tests
+pytest>=8.0

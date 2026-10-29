@@ -1,0 +1,14 @@
+# Private candidate data and model artefacts never go into git.
+data/raw_pdfs/*
+!data/raw_pdfs/.gitkeep
+data/annotations/*
+!data/annotations/.gitkeep
+data/splits.json
+models/*
+!models/.gitkeep
+*.jsonl
+results.json
+__pycache__/
+.pytest_cache/
+.venv/
+private-runtime/
