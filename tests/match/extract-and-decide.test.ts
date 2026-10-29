@@ -378,3 +378,36 @@ describe("source-sentence rollup (R7.2)", () => {
     expect(rollupItems([d("a", "SUPPORTED"), d("b", "UNSUPPORTED")])[0]!.status).toBe("PARTIAL");
   });
 });
+
+describe("mixed AND/OR sentences and required vs preferred (gate-2 negative cases)", () => {
+  const QUAL = (lines: string[]) => ["Minimum Qualifications", ...lines.map((l) => `- ${l}`)].join("\n");
+  const PLAYWRIGHT = () => corpusOf([fact({ factId: "f-pw", kind: "skill", value: "Playwright" })]);
+
+  it("\"Python and (Selenium or Playwright)\" with only Playwright approved and no Python fact is never SUPPORTED", async () => {
+    const res = await decide(QUAL(["Familiarity with Python and (Selenium or Playwright)."]), PLAYWRIGHT());
+    // the AND member without evidence stays unsupported; one satisfied alternative cannot satisfy the whole sentence
+    expect(status(res, "Python").status).not.toBe("SUPPORTED");
+    expect(status(res, "Python").status).toBe("UNSUPPORTED");
+    const rolls = rollupItems(res.decisions);
+    expect(rolls.length).toBeGreaterThan(0);
+    for (const r of rolls) expect(r.status).not.toBe("SUPPORTED");
+  });
+
+  it("the same sentence is SUPPORTED as a whole only when Python is approved too", async () => {
+    const both = corpusOf([fact({ factId: "f-pw", kind: "skill", value: "Playwright" }), fact({ factId: "f-py", kind: "skill", value: "Python" })]);
+    const res = await decide(QUAL(["Familiarity with Python and (Selenium or Playwright)."]), both);
+    expect(status(res, "Python").status).toBe("SUPPORTED");
+    expect(rollupItems(res.decisions).every((r) => r.status === "SUPPORTED")).toBe(true);
+  });
+
+  it("required and preferred are decided identically but kept apart: an unmet preferred item does not become required", async () => {
+    const jd = ["Minimum Qualifications", "- Familiarity with Python.", "", "Preferred Qualifications", "- Familiarity with Selenium or Playwright."].join("\n");
+    const res = await decide(jd, PLAYWRIGHT());
+    expect(status(res, "Python")).toMatchObject({ status: "UNSUPPORTED", effectiveLevel: "required" });
+    expect(status(res, "Playwright")).toMatchObject({ status: "SUPPORTED", effectiveLevel: "preferred" });
+    expect(status(res, "Selenium")).toMatchObject({ status: "UNSUPPORTED", effectiveLevel: "preferred" });
+    const orRoll = rollupItems(res.decisions).find((r) => /Selenium/.test(r.quote))!;
+    expect(orRoll).toMatchObject({ status: "SUPPORTED", level: "preferred" });
+    expect(res.decisions.filter((d) => d.effectiveLevel === "required").every((d) => d.status !== "SUPPORTED")).toBe(true);
+  });
+});
