@@ -251,15 +251,28 @@ export const AI_DIR = path.resolve("services", "ai");
 export const PYTHON = path.join(AI_DIR, ".venv", process.platform === "win32" ? "Scripts" : "bin", process.platform === "win32" ? "python.exe" : "python");
 export const pythonAvailable = (): boolean => existsSync(PYTHON);
 
+/**
+ * Ports that fetch (undici) and Chrome refuse to connect to ("bad ports" in the WHATWG Fetch standard). A random free port can land on
+ * one (6667 did), and the preview server then never becomes reachable: an intermittent failure that looks like a slow start.
+ */
+const FETCH_BAD_PORTS = new Set([
+  1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79, 87, 95, 101, 102, 103, 104, 109, 110, 111, 113, 115, 117, 119, 123, 135, 137, 139, 143, 161, 179,
+  389, 427, 465, 512, 513, 514, 515, 526, 530, 531, 532, 540, 548, 554, 556, 563, 587, 601, 636, 989, 990, 993, 995, 1719, 1720, 1723, 2049, 3659, 4045, 4190, 5060, 5061, 6000,
+  6566, 6665, 6666, 6667, 6668, 6669, 6679, 6697, 10080,
+]);
+
 export async function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.listen(0, "127.0.0.1", () => {
-      const port = (server.address() as net.AddressInfo).port;
-      server.close(() => resolve(port));
+  for (;;) {
+    const port = await new Promise<number>((resolve, reject) => {
+      const server = net.createServer();
+      server.listen(0, "127.0.0.1", () => {
+        const found = (server.address() as net.AddressInfo).port;
+        server.close(() => resolve(found));
+      });
+      server.on("error", reject);
     });
-    server.on("error", reject);
-  });
+    if (!FETCH_BAD_PORTS.has(port)) return port;
+  }
 }
 
 /** Builds every case in services/ai/tests/fixtures/resume_cases.json as a real PDF/DOCX into `dir`. */
