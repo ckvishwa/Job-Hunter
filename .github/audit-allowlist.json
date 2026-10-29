@@ -29,15 +29,6 @@
       "expires": "2026-11-13"
     },
     {
-      "id": 1123525,
-      "package": "vite",
-      "severity": "high",
-      "reason": "server.fs.deny bypass on Windows alternate paths affects the Vite dev server. Vite is a transitive dependency of vitest; no dev server is started by `vitest run`.",
-      "owner": "repository owner",
-      "remediation": "Resolved by the vitest major upgrade (SDLC-T08).",
-      "expires": "2026-11-13"
-    },
-    {
       "id": 1139427,
       "package": "nanoid",
       "severity": "high",
@@ -53,6 +44,15 @@
       "reason": "Event-loop denial of service through crafted indexed source maps. Transitive dev dependency processing only repository-built maps.",
       "owner": "repository owner",
       "remediation": "A non-major fix is available (`npm audit fix`); apply it in SDLC-T08 with the lockfile diff reviewed.",
+      "expires": "2026-11-13"
+    },
+    {
+      "id": 1242658,
+      "package": "vite",
+      "severity": "high",
+      "reason": "Vite development-server advisory (GHSA-587h-7wmj-h5pm). Vite is a transitive dependency of vitest; no Vite dev server is started by vitest run, and the web app is built with Astro and previewed on loopback only.",
+      "owner": "repository owner",
+      "remediation": "Resolved by the vitest major upgrade (SDLC-T08), which also clears the vitest, tinypool and esbuild entries.",
       "expires": "2026-11-13"
     }
   ]
