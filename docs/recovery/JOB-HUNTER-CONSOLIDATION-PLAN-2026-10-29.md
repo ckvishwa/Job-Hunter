@@ -1,6 +1,6 @@
 # Job Hunter repository consolidation plan — 2026-10-29
 
-**Status: review draft. No integration branch, merge, commit, push, Docker start, or PR was created.** The six existing checkouts remain the source of their own working changes. This document is a new, untracked repository file with a separate review copy at `C:\Users\ckvis\Documents\ChatGPT\JOB HUNTER`.
+**Status: review draft. No integration branch, merge, commit, push, Docker start, or PR was created.** The six existing checkouts remain the source of their own working changes. This document is a new, untracked repository file with a separate review copy in a local folder outside every checkout.
 
 ## Goal and boundary
 

@@ -108,7 +108,7 @@ def from_prod(facts: list[dict]) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", required=True, type=Path, help="private-runtime directory")
-    ap.add_argument("--input-dir", type=Path, default=Path(r"C:\Users\ckvis\Downloads"))
+    ap.add_argument("--input-dir", type=Path, required=True, help="directory of candidate PDFs; keep it outside every checkout")
     ap.add_argument("--prompts", default="v1,v2")
     ap.add_argument("--model", default="qwen2.5:3b-instruct-q4_K_M")
     ap.add_argument("--timeout", type=int, default=300)
