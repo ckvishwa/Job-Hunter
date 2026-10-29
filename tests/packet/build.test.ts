@@ -9,6 +9,9 @@ import { buildTrackerRows } from "../../src/tracker/rows.js";
 import { buildDashboardSnapshot } from "../../src/dashboard/model.js";
 import { AS_OF, SENTINEL_EMAIL, makeWorkspace, type Workspace } from "./helpers/scaffold.js";
 
+// Each case builds a workspace on disk and renders documents; a slow Windows CI runner needs more than the 5 s default (6 cases timed out there, none failed an assertion).
+vi.setConfig({ testTimeout: 30_000 });
+
 // Integration: the packet is built from real artifacts on real temporary storage (saved job, structured job, the
 // deterministic decision, a rendered PDF, a resume plan, a pipeline checkpoint, verification and form evidence).
 // The substituted boundaries are the LLM (no extraction runs) and the live browser (see form-fill.e2e.test.ts).

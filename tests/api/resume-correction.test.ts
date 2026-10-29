@@ -1,3 +1,5 @@
+import os from "node:os";
+import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildDiagnostic } from "../../src/candidate/diagnostics.js";
 import { collectEmploymentConflicts } from "../../src/candidate/fact-context.js";
@@ -183,7 +185,7 @@ suite("fact correction, S2 invalidation and diagnostics (PostgreSQL)", { timeout
   });
 
   it("flags a disagreeing earlier record as an open conflict and blocks approving the disputed fact until it is explicitly accepted", async () => {
-    const dir = await import("node:fs").then((fs) => fs.mkdtempSync(`${process.env.TEMP ?? "."}/jh-prior-`));
+    const dir = await import("node:fs").then((fs) => fs.mkdtempSync(path.join(os.tmpdir(), "jh-prior-")));
     const priorPath = `${dir}/prior-synthetic-profile.json`;
     const prior = {
       schemaVersion: 1, candidateId: "prior", profileVersion: "p9", updatedAt: "2026-10-07", preferences: {}, employmentHistoryComplete: null,

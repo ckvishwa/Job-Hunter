@@ -200,7 +200,7 @@ async function main(): Promise<number> {
       const refreshed = await roles.refresh(user.id, today); // approved evidence may have changed: recompute S2 now and supersede stale recommendations
       console.log(`S2 recommendations recomputed: ${refreshed.superseded} superseded, ${refreshed.inserted} new.`);
     }
-    const logDir = path.resolve("private-runtime", "fact-review");
+    const logDir = path.resolve(process.env.JH_FACT_REVIEW_DIR ?? path.join("private-runtime", "fact-review"));
     mkdirSync(logDir, { recursive: true });
     appendFileSync(path.join(logDir, `${file.resumeId}.apply-log.jsonl`), JSON.stringify({ at: new Date().toISOString(), actor, ...result, fileProblems: result.fileProblems }) + "\n");
     console.log(`\nApplied: ${result.applied.length}   already in state: ${result.alreadyApplied.length}   conflicts: ${result.conflicts.length}   failed: ${result.failed.length}   left unchanged: ${result.skippedUndecided}`);

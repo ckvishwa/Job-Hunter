@@ -76,6 +76,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Install web (Astro) dependencies; tests/web import web/ (Astro tsconfig)
+        run: npm ci --prefix web
       - name: Private-path guard (no candidate data, secrets, weights or file over 5 MB in the committed tree)
         run: npm run ci:private-tree
       - name: Check isolation before tests
@@ -194,9 +196,9 @@ jobs:
           mkdir -p "${RUNNER_TEMP}/gitleaks" && tar -xzf gitleaks.tgz -C "${RUNNER_TEMP}/gitleaks" gitleaks
           rm gitleaks.tgz
       - name: Scan Git history (values redacted in logs; fingerprints in .gitleaksignore are reviewed history)
-        run: '"${RUNNER_TEMP}/gitleaks/gitleaks" detect --source . --config .gitleaks.toml --redact --no-banner --exit-code 1'
+        run: '"${RUNNER_TEMP}/gitleaks/gitleaks" detect --source . --config .gitleaks.toml --redact --verbose --no-banner --exit-code 1'
       - name: Scan the checked-out tree (catches content not visible in commit diffs)
-        run: '"${RUNNER_TEMP}/gitleaks/gitleaks" detect --source . --no-git --config .gitleaks.toml --redact --no-banner --exit-code 1'
+        run: '"${RUNNER_TEMP}/gitleaks/gitleaks" detect --source . --no-git --config .gitleaks.toml --redact --verbose --no-banner --exit-code 1'
 
   dependency-audit:
     name: Dependency advisory triage

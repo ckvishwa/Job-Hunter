@@ -47,7 +47,7 @@ suite("CLI: facts:correct, A/R export-apply and resumes:diagnose (PostgreSQL, se
 
   const run = (args: string[], input?: string) => {
     const r = spawnSync(process.execPath, ["--import", "tsx", ...args], {
-      cwd: process.cwd(), encoding: "utf8", input, timeout: 90_000, env: { ...process.env, JH_PG_DB: h.dbName, JH_USER_HANDLE: "local", FORCE_COLOR: "0" },
+      cwd: process.cwd(), encoding: "utf8", input, timeout: 90_000, env: { ...process.env, JH_PG_DB: h.dbName, JH_USER_HANDLE: "local", FORCE_COLOR: "0", JH_UPLOAD_DIR: h.uploadDir, JH_FACT_REVIEW_DIR: path.join(h.uploadDir, "fact-review") },
     });
     return { code: r.status, out: `${r.stdout}${r.stderr}` };
   };
