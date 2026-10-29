@@ -68,7 +68,7 @@ const reviewBody = z
     action: z.enum(["approve", "reject", "edit"]),
     expectedDigest: z.string().regex(/^[a-f0-9]{64}$/),
     confirmSensitive: z.boolean().optional(),
-    edit: z.object({ value: z.string().max(300).optional(), attributes: z.record(z.unknown()).optional() }).strict().optional(),
+    edit: z.object({ value: z.string().max(300).optional(), attributes: z.record(z.string(), z.unknown()).optional() }).strict().optional(),
   })
   .strict();
 

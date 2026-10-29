@@ -190,7 +190,7 @@ export const intakeDraftSchema = z
     pageCount: z.number().int().nonnegative(),
     pages: z.array(pageSchema),
     warnings: z.array(z.string()),
-    metrics: z.record(z.union([z.number(), z.boolean()])),
+    metrics: z.record(z.string(), z.union([z.number(), z.boolean()])),
     textSha256: z.string().regex(/^[0-9a-f]{64}$/).or(z.literal("")),
     text: z.string(),
     lines: z.array(lineSchema),

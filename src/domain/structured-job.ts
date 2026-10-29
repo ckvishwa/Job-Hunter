@@ -280,11 +280,11 @@ function zodIssues(error: z.ZodError): SemanticIssue[] {
       case "unrecognized_keys":
         message = `unsupported field(s): ${issue.keys.map((k) => k.slice(0, 40)).join(", ")}`;
         break;
-      case "invalid_enum_value":
-        message = `value not in the allowed set: ${issue.options.join(" | ")}`;
+      case "invalid_value":
+        message = `value not in the allowed set: ${issue.values.map(String).join(" | ")}`;
         break;
       case "invalid_type":
-        message = `expected ${issue.expected}, received ${issue.received}`;
+        message = `expected ${issue.expected}`;
         break;
       case "custom":
         message = issue.message.slice(0, 120);

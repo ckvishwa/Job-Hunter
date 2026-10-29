@@ -58,7 +58,7 @@ const selectorsSchema = z
       .optional(),
   })
   .strict()
-  .default({});
+  .prefault({});
 
 export const searchTargetSchema = z
   .object({
@@ -76,7 +76,7 @@ export const searchTargetSchema = z
         reviewByTeam: z.boolean().default(true),
       })
       .strict()
-      .default({}),
+      .prefault({}),
     selectors: selectorsSchema,
   })
   .strict();

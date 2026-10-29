@@ -22,7 +22,7 @@ export const reviewFactSchema = z
     value: z.string(),
     valueMasked: z.boolean(),
     polarity: z.enum(["has", "lacks"]),
-    attributes: z.record(z.unknown()),
+    attributes: z.record(z.string(), z.unknown()),
     source: z.object({ reference: z.string(), locator: z.string().nullable() }).strict(),
     quote: z.string().nullable(),
     contentDigest: z.string().regex(/^[a-f0-9]{64}$/),

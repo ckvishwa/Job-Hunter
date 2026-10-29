@@ -40,7 +40,7 @@ export const careerOpsScanResultSchema = z.object({
   companiesAvailable: z.number(),
   companiesScanned: z.number(),
   capHit: z.boolean(),
-  datasetStatus: z.record(z.string()),
+  datasetStatus: z.record(z.string(), z.string()),
   postingsKept: z.number(),
   postingsDroppedNoDate: z.number(),
   postingsFilteredBlacklist: z.number(),

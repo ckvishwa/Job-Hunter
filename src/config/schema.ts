@@ -8,7 +8,7 @@ export const collectSettingsSchema = z
     navigationTimeoutMs: z.number().int().positive().default(30000),
     delayBetweenRequestsMs: z.number().int().nonnegative().default(500),
   })
-  .default({});
+  .prefault({});
 
 export const workdaySiteSchema = z.object({
   hostname: z.string().min(1),

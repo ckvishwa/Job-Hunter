@@ -14,7 +14,7 @@ export type ProposableKind = (typeof PROPOSABLE_KINDS)[number];
 const yearMonth = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 const sourceSpanSchema = z.object({ start: z.number().int().min(0), end: z.number().int().min(1), quote: z.string().min(1) }).strict();
 const sourceFieldSchema = z.enum(["employer", "title", "startDate", "endDate", "institution", "graduationDate", "issuer", "certificationDate", "technologies", "description"]);
-export const fieldSpansSchema = z.record(sourceFieldSchema, sourceSpanSchema);
+export const fieldSpansSchema = z.partialRecord(sourceFieldSchema, sourceSpanSchema);
 
 export const proposedAttributesSchema = z
   .object({

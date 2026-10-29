@@ -63,7 +63,7 @@ export const factAttributesSchema = z
     issuer: textValue.optional(),
     certificationDate: yearMonth.optional(),
     description: z.string().min(1).max(2000).optional(),
-    fieldSpans: z.record(z.enum(["employer", "title", "startDate", "endDate", "institution", "graduationDate", "issuer", "certificationDate", "technologies", "description"]),
+    fieldSpans: z.partialRecord(z.enum(["employer", "title", "startDate", "endDate", "institution", "graduationDate", "issuer", "certificationDate", "technologies", "description"]),
       z.object({ start: z.number().int().min(0), end: z.number().int().positive(), quote: z.string().min(1) }).strict()).optional(),
     // education / certification / clearance / authorization: free approved detail
     detail: z.string().max(300).optional(),

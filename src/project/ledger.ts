@@ -22,7 +22,7 @@ const taskSchema = z
     id: z.string().min(1),
     name: z.string(),
     status: z.string(),
-    evidence: evidenceSchema.default({}),
+    evidence: evidenceSchema.prefault({}),
     owner_role: z.string().nullable().default(null),
     reviewer_role: z.string().nullable().default(null),
     github_issue: z.number().int().positive().nullable().default(null),
@@ -40,7 +40,7 @@ const phaseSchema = z
     prd_refs: z.array(z.string()).default([]),
     exit_criterion: z.string().default(""),
     blocker: z.string().nullable().default(null),
-    qa_signoff: z.object({ reviewer: text, approved_at: text, evidence: text }).passthrough().default({}),
+    qa_signoff: z.object({ reviewer: text, approved_at: text, evidence: text }).passthrough().prefault({}),
     tasks: z.array(taskSchema),
   })
   .passthrough();
@@ -54,9 +54,9 @@ export const ledgerSchema = z
     status_claim: z.string().default(""),
     phases: z.array(phaseSchema).min(1),
     collaboration: z
-      .object({ github_accounts: z.record(z.string()).default({}) })
+      .object({ github_accounts: z.record(z.string(), z.string()).default({}) })
       .passthrough()
-      .default({}),
+      .prefault({}),
   })
   .passthrough();
 
