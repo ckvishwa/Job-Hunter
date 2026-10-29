@@ -7,7 +7,7 @@
 ## 0. Five-minute read: instructions for every agent
 
 1. **Locate and verify the actual checkout.** Expected historical location: the owner's local Windows checkout of this repository, branch `careerops-integration`; never assume those are current. Check `pwd`, `git status --short --branch`, `git rev-parse HEAD`, `git remote -v`, worktrees, repo-level instructions and available package scripts. **Never start by resetting, cleaning, changing branches or installing things.**
-2. **Read in this order:** this document (§0, plus relevant sections) → existing root `CLAUDE.md` → **short session handoff** at `.agent-runtime/HANDOFF.md` if it exists → current issue/acceptance criteria → applicable product requirement ID(s) in `docs/product/PRD-JOB-HUNTER-SAAS.md` → `docs/ard/00-START-HERE.md` / `docs/ard/00-SHARED-CONTRACTS.md` → relevant version ARD or `docs/architecture/SAAS-SYSTEM-ARCHITECTURE.md` section. Read only what the bounded task needs. Read other ARDs only when the contract truly requires it. Check paths; do not invent missing files.
+2. **Read in this order:** this document (§0, plus relevant sections) → existing root `CLAUDE.md` → **short session handoff** at `.agent-runtime/HANDOFF.md` if it exists → current issue/acceptance criteria → applicable product requirement ID(s) in `docs/product/drafts/PRD-JOB-HUNTER-SAAS.md` → `docs/ard/00-START-HERE.md` / `docs/ard/00-SHARED-CONTRACTS.md` → relevant version ARD or `docs/architecture/SAAS-SYSTEM-ARCHITECTURE.md` section. Read only what the bounded task needs. Read other ARDs only when the contract truly requires it. Check paths; do not invent missing files.
 3. **Trust evidence, not summaries.** Session notes and historical counts are navigation hints. Verify current symbols, scripts, tests and Git state before claiming anything is implemented or passing.
 4. **One task, one owner, one acceptance contract.** Do not add unrelated features. Record `KEEP/EXTEND/CREATE` and affected file ownership before edits. One agent writes a given module at a time; browser profile, ledger writer and application record each have one owner.
 5. **Follow the SDLC gates in §4–§10.** Developer self-tests, CI, headed-browser E2E, live proof, independent UAT, and release authorization are *different* claims. No test or agent may impersonate a human acceptance decision.
@@ -25,12 +25,12 @@
 
 ## 1. Authority and conflict resolution
 
-**Priority, highest first:** platform/safety rules and explicit current user scope → actual repository policy and approved candidate decisions → `docs/ard/00-SHARED-CONTRACTS.md` → applicable V1–V5 ARD → this file's operational coordination rules → session handoff. Product outcomes are defined by the **human-approved** PRD; until approved, `docs/product/PRD-JOB-HUNTER-SAAS.md` is a proposed scope for review, not authorization to build features. For technical details, the shared contracts and applicable ARDs govern. This ordering does **not** allow a newly written document to silently revoke established security contracts. When project instructions conflict materially, stop the affected change, show exact references and request a decision; continue unrelated safe work.
+**Priority, highest first:** platform/safety rules and explicit current user scope → actual repository policy and approved candidate decisions → `docs/ard/00-SHARED-CONTRACTS.md` → applicable V1–V5 ARD → this file's operational coordination rules → session handoff. Product outcomes are defined by the **human-approved** PRD; until approved, `docs/product/drafts/PRD-JOB-HUNTER-SAAS.md` is a proposed scope for review, not authorization to build features. For technical details, the shared contracts and applicable ARDs govern. This ordering does **not** allow a newly written document to silently revoke established security contracts. When project instructions conflict materially, stop the affected change, show exact references and request a decision; continue unrelated safe work.
 
 | Artifact | Owns | Does **not** prove |
 |---|---|---|
 | This file | Agent workflow, SDLC stage gates, responsibilities, concise handoffs | A feature is implemented or CI exists |
-| `docs/product/PRD-JOB-HUNTER-SAAS.md` | Product users, requirements, MVP/alpha/beta scope and human acceptance targets (once approved) | Engineering feasibility or feature implementation |
+| `docs/product/drafts/PRD-JOB-HUNTER-SAAS.md` | Product users, requirements, MVP/alpha/beta scope and human acceptance targets (once approved) | Engineering feasibility or feature implementation |
 | `docs/product/REQUIREMENTS-TRACEABILITY.md` | Map PRD IDs to architecture, tests, UAT and evidence status | That mapped tests actually ran |
 | `docs/architecture/SAAS-SYSTEM-ARCHITECTURE.md` | Proposed cloud/local trust boundaries, deployable services, queues and rollout | Cloud services or tenant isolation actually exist |
 | `CLAUDE.md` | Existing repo-specific agent instructions | User approval of application answers |
@@ -426,7 +426,7 @@ NEXT: [one concrete action]
 
 ## 19. PRD → ARD → implementation traceability (hybrid SaaS)
 
-For **product changes**, follow `docs/product/PRD-JOB-HUNTER-SAAS.md` → `docs/product/REQUIREMENTS-TRACEABILITY.md` → existing `docs/ard/*` and/or proposed `docs/architecture/SAAS-SYSTEM-ARCHITECTURE.md` → scoped issue/test plan → code/CI → UAT → release. For **risk/correctness fixes** covered by existing safety contracts, do not wait for a draft PRD to become approved; preserve the stronger existing gates. The PRD remains `DRAFT` until the human Product Owner explicitly approves its scope.
+For **product changes**, follow `docs/product/drafts/PRD-JOB-HUNTER-SAAS.md` → `docs/product/REQUIREMENTS-TRACEABILITY.md` → existing `docs/ard/*` and/or proposed `docs/architecture/SAAS-SYSTEM-ARCHITECTURE.md` → scoped issue/test plan → code/CI → UAT → release. For **risk/correctness fixes** covered by existing safety contracts, do not wait for a draft PRD to become approved; preserve the stronger existing gates. The PRD remains `DRAFT` until the human Product Owner explicitly approves its scope.
 
 - Each feature issue names at least one `PRD-*` or `NFR-*` ID (or clearly identifies a defect against an established ARD contract), specific acceptance oracle, test layer, affected trust boundary and release stage.
 - The traceability matrix contains **plans**, not invented evidence. After actual tests, attach exact SHA/test run/CI/UAT references and mark status. An AI agent cannot record its own human UAT sign-off.

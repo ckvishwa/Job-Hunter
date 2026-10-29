@@ -5,9 +5,9 @@
 **Date:** 2026-10-08  
 **Status:** DRAFT / NOT YET ACCEPTED  
 **Product Owner:** Human owner  
-**Technical companion:** [`../architecture/SAAS-SYSTEM-ARCHITECTURE.md`](../architecture/SAAS-SYSTEM-ARCHITECTURE.md)  
-**Execution policy:** [`../AGENT-OPERATING-SYSTEM.md`](../AGENT-OPERATING-SYSTEM.md)  
-**Traceability:** [`REQUIREMENTS-TRACEABILITY.md`](REQUIREMENTS-TRACEABILITY.md)
+**Technical companion:** [`../../architecture/SAAS-SYSTEM-ARCHITECTURE.md`](../../architecture/SAAS-SYSTEM-ARCHITECTURE.md)  
+**Execution policy:** [`../AGENT-OPERATING-SYSTEM.md`](../../AGENT-OPERATING-SYSTEM.md)  
+**Traceability:** [`REQUIREMENTS-TRACEABILITY.md`](../REQUIREMENTS-TRACEABILITY.md)
 
 > **Source and scope disclosure.** This PRD is an implementation proposal derived from the supplied Job Hunter V1–V5 ARDs, shared contracts, agent operating policy, and the owner's decision to pursue a small hybrid SaaS. The uploaded ARDs primarily specify a **single-candidate** application engine, not a production multi-tenant SaaS. Sections on accounts, pairing, cloud queues, subscriptions, and tenants are **new proposed product requirements**, not features demonstrated in the current repository. Reported baseline (2026-10-08): branch `careerops-integration` pushed through `9bc067b`, 1,036 tests reportedly passed; this document does not verify the live repository.
 

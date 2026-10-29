@@ -15,6 +15,7 @@ files.push(join(root, 'CLAUDE.md'));
 
 const broken = [];
 const inbound = new Set();
+const edges = new Map();
 for (const file of files) {
   if (!existsSync(file)) continue;
   const lines = readFileSync(file, 'utf8').split(/\r?\n/);
@@ -34,7 +35,14 @@ for (const file of files) {
       if (!path) continue;
       const absolute = resolve(dirname(file), path);
       if (!existsSync(absolute)) broken.push(`${file.slice(root.length + 1)}:${i + 1}: ${target}`);
-      else if (statSync(absolute).isFile()) inbound.add(absolute.toLowerCase());
+      else if (statSync(absolute).isFile()) {
+        inbound.add(absolute.toLowerCase());
+        if (extname(absolute).toLowerCase() === '.md') {
+          const from = file.toLowerCase();
+          if (!edges.has(from)) edges.set(from, new Set());
+          edges.get(from).add(absolute.toLowerCase());
+        }
+      }
     }
   }
 }
@@ -51,9 +59,19 @@ const core = [
   '.github/pull_request_template.md',
 ];
 const orphaned = core.filter(path => existsSync(join(root, path)) && !inbound.has(join(root, path).toLowerCase()));
+// Every Markdown file under docs/ must be reachable from docs/INDEX.md through local Markdown links.
+const indexFile = join(root, 'docs', 'INDEX.md').toLowerCase();
+const reached = new Set([indexFile]);
+const queue = [indexFile];
+while (queue.length) for (const next of edges.get(queue.shift()) ?? []) if (!reached.has(next)) { reached.add(next); queue.push(next); }
+const docsDir = join(root, 'docs').toLowerCase();
+const unreachable = files.filter(f => f.toLowerCase().startsWith(docsDir) && !reached.has(f.toLowerCase())).map(f => f.slice(root.length + 1).replace(/\\/g, '/'));
+
 console.log(`Checked ${files.length} Markdown files.`);
 console.log(`Broken local links: ${broken.length}`);
 for (const item of broken) console.log(`  ${item}`);
 console.log(`Unlinked core references: ${orphaned.length}`);
 for (const item of orphaned) console.log(`  ${item}`);
-if (broken.length || orphaned.length) process.exitCode = 1;
+console.log(`Docs not reachable from docs/INDEX.md: ${unreachable.length}`);
+for (const item of unreachable) console.log(`  ${item}`);
+if (broken.length || orphaned.length || unreachable.length) process.exitCode = 1;

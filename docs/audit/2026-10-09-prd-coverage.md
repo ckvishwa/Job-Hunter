@@ -1,6 +1,6 @@
 # PRD requirement coverage audit — 2026-10-09 (SDLC-01)
 
-**Scope:** audit of the actual repository against every requirement ID in `docs/product/PRD-JOB-HUNTER-SAAS.md` (JH-PRD-001 v0.1.0, DRAFT). Read-only inspection of source and tests; no feature was implemented for this audit.
+**Scope:** audit of the actual repository against every requirement ID in `docs/product/drafts/PRD-JOB-HUNTER-SAAS.md` (JH-PRD-001 v0.1.0, DRAFT). Read-only inspection of source and tests; no feature was implemented for this audit.
 **Checkout:** branch `careerops-integration`, audited at `de07985` (one local commit ahead of `origin/careerops-integration` = `9bc067b`; nothing pushed by this task).
 **Automated results at `de07985`:** `npm run typecheck` clean; `npx vitest run` 95 files / 1,049 tests passed, 0 failed (headed-Chrome tests included). These results prove only the exercised behavior at the stated layer.
 **Boundaries:** this file records implementation evidence. It does **not** approve the PRD, sign a UAT, or accept any requirement; those remain human decisions (PRD §11, AOS §4). Private candidate data, resumes and `private-runtime/` contents were not opened for this audit.

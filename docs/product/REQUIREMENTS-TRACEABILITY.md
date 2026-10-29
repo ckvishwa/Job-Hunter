@@ -2,7 +2,7 @@
 
 **Version:** 0.1.0 / PROPOSED  
 **Date:** 2026-10-08  
-**PRD:** [`PRD-JOB-HUNTER-SAAS.md`](PRD-JOB-HUNTER-SAAS.md)  
+**PRD:** [`PRD-JOB-HUNTER-SAAS.md`](drafts/PRD-JOB-HUNTER-SAAS.md)  
 **SaaS architecture:** [`../architecture/SAAS-SYSTEM-ARCHITECTURE.md`](../architecture/SAAS-SYSTEM-ARCHITECTURE.md)  
 **Execution/UAT policy:** [`../AGENT-OPERATING-SYSTEM.md`](../AGENT-OPERATING-SYSTEM.md)
 

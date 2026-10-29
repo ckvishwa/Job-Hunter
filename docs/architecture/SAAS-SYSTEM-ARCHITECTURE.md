@@ -4,7 +4,7 @@
 **Version:** 0.1.0 / PROPOSED  
 **Date:** 2026-10-08  
 **Decision:** Hosted modular-monolith control plane + per-user local headed-browser worker.  
-**Source of product scope:** [`../product/PRD-JOB-HUNTER-SAAS.md`](../product/PRD-JOB-HUNTER-SAAS.md)  
+**Source of product scope:** [`../product/drafts/PRD-JOB-HUNTER-SAAS.md`](../product/drafts/PRD-JOB-HUNTER-SAAS.md)  
 **Existing technical contracts:** `../ard/00-SHARED-CONTRACTS.md` and V1–V5 ARDs; these retain authority over the application engine.
 
 > This is a **target architecture**. Supplied Job Hunter contracts already describe the single-user discovery/resume/ATS workflow; they do not attest to working SaaS authentication, PostgreSQL, web APIs, tenant isolation or cloud deployment. The named technologies below are recommendations requiring a repository audit, security review and bounded implementation decisions.

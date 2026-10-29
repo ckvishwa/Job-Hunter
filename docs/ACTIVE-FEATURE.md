@@ -20,6 +20,6 @@
 
 ### Last JH-MATCH-001 checkpoint (before the pause)
 
-- **Decisions:** Reuse the existing candidate, JD, match, API, and UI path. PRD changes require [ADR-0001](DECISIONS.md). The approved [PRD](PRD.md) and separate [draft SaaS PRD](product/PRD-JOB-HUNTER-SAAS.md) were not edited.
+- **Decisions:** Reuse the existing candidate, JD, match, API, and UI path. PRD changes require [ADR-0001](DECISIONS.md). The approved [PRD](PRD.md) and separate [draft SaaS PRD](product/drafts/PRD-JOB-HUNTER-SAAS.md) were not edited.
 - **Risks/blocker:** No approved facts in the accepted Stage B.3 corpus; certification fragmentation remains. Positive evidence must be independently expected and explicitly approved in a synthetic fixture.
 - **Resume with:** one independently expected positive-evidence candidate-to-JD match through the existing production API and matching UI, with an approved synthetic fact and exact JD requirement evidence (R7.1).
