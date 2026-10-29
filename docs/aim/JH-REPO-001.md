@@ -590,7 +590,7 @@ Rows are in execution order; an agent takes the first `Ready` row, and sets the 
 | 17 | R3.2 Execute moves | R3.1 | covered by R2.1 | Done |
 | 18 | R3.3 Single sources of truth | R3.2 | Merged `CLAUDE.md` | Done |
 | 19 | R4.3 One ignore file and guard | R3.3 | covered by R2.1 | Done (hook install parked) |
-| 20 | R4.4 Canonical evidence screenshots | R2.5 | Pick variants | Ready |
+| 20 | R4.4 Canonical evidence screenshots | R2.5 | Pick variants | Waiting on owner (contact sheet built) |
 | 21 | R6.1 One-command dev stack | R3.3 | Start Docker | Ready |
 | 22 | R6.2 Run DB-backed suites | R6.1 | covered by R6.1 | Not started |
 | 23 | R7.1 Positive-evidence E2E | R6.2 | covered by R6.1 | Not started |
