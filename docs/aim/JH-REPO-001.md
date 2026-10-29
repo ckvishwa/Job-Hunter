@@ -585,12 +585,12 @@ Rows are in execution order; an agent takes the first `Ready` row, and sets the 
 | 12 | R4.2 Rewrite or clear | R4.1 | Rewrite plan if hits | Done |
 | 13 | R2.4 Area review of the merge | R2.3 | none | Ready |
 | 14 | R2.5 Classify all dirty work | R2.3 | Classification table | Done |
-| 15 | R2.6 Index repair | R2.5 | covered by R2.1 | Ready |
-| 16 | R3.1 Structure map | R2.6 | Move list | Not started |
+| 15 | R2.6 Index repair | R2.5 | covered by R2.1 | Done |
+| 16 | R3.1 Structure map | R2.6 | Move list | Ready |
 | 17 | R3.2 Execute moves | R3.1 | covered by R2.1 | Not started |
 | 18 | R3.3 Single sources of truth | R3.2 | Merged `CLAUDE.md` | Not started |
 | 19 | R4.3 One ignore file and guard | R3.3 | covered by R2.1 | Not started |
-| 20 | R4.4 Canonical evidence screenshots | R2.5 | Pick variants | Not started |
+| 20 | R4.4 Canonical evidence screenshots | R2.5 | Pick variants | Ready |
 | 21 | R6.1 One-command dev stack | R3.3 | Start Docker | Not started |
 | 22 | R6.2 Run DB-backed suites | R6.1 | covered by R6.1 | Not started |
 | 23 | R7.1 Positive-evidence E2E | R6.2 | covered by R6.1 | Not started |
