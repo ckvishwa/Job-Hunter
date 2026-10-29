@@ -356,3 +356,25 @@ describe("retrieval", () => {
     expect(d.matchedFactIds).toEqual([]);
   });
 });
+
+describe("source-sentence rollup (R7.2)", () => {
+  const d = (id: string, status: "SUPPORTED" | "PARTIAL" | "UNSUPPORTED" | "UNKNOWN", over: Record<string, unknown> = {}) =>
+    ({ requirementId: id, value: id, status, applicable: true, groupId: null, effectiveLevel: "required", jd: { start: 10, end: 52, quote: "Familiarity with Kubernetes or Terraform." }, ...over }) as never;
+
+  it("an OR sentence with one supported alternative is SUPPORTED as a whole, not PARTIAL", () => {
+    const [roll] = rollupItems([d("kubernetes", "SUPPORTED", { groupId: "g-1" }), d("terraform", "UNSUPPORTED", { groupId: "g-1" })]);
+    expect(roll).toMatchObject({ status: "SUPPORTED", memberIds: ["kubernetes", "terraform"] });
+    expect(roll!.note).toMatch(/alternative/i);
+  });
+
+  it("an OR sentence with no supported alternative stays PARTIAL, UNSUPPORTED or UNKNOWN by its best branch", () => {
+    expect(rollupItems([d("a", "PARTIAL", { groupId: "g-1" }), d("b", "UNSUPPORTED", { groupId: "g-1" })])[0]!.status).toBe("PARTIAL");
+    expect(rollupItems([d("a", "UNSUPPORTED", { groupId: "g-1" }), d("b", "UNSUPPORTED", { groupId: "g-1" })])[0]!.status).toBe("UNSUPPORTED");
+    expect(rollupItems([d("a", "UNKNOWN", { groupId: "g-1" }), d("b", "UNSUPPORTED", { groupId: "g-1" })])[0]!.status).toBe("UNKNOWN");
+  });
+
+  it("an AND or example list is unchanged: all supported -> SUPPORTED, some -> PARTIAL", () => {
+    expect(rollupItems([d("a", "SUPPORTED"), d("b", "SUPPORTED")])[0]!.status).toBe("SUPPORTED");
+    expect(rollupItems([d("a", "SUPPORTED"), d("b", "UNSUPPORTED")])[0]!.status).toBe("PARTIAL");
+  });
+});

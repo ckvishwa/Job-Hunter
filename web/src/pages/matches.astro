@@ -38,6 +38,8 @@ import OrbitalTile from "../components/OrbitalTile.astro";
   .req .jdq { margin: 0; padding: 6px 10px; border-left: 4px solid var(--royal); background: var(--blue-wash); border-radius: 6px; font-size: 14px; }
   .req .ev { margin: 0; padding: 6px 10px; border-left: 4px solid #111; background: var(--tint); border-radius: 6px; font-size: 14px; }
   .req .why { font-size: 14px; color: #2c313a; }
+  .itemgroup { border: 1px solid var(--hair); border-radius: 14px; padding: 10px 14px; margin: 12px 0; display: grid; gap: 6px; background: var(--tint); }
+  .itemgroup .req { margin: 6px 0; }
   .flagbox { display: grid; gap: 6px; margin-top: 6px; }
   .flagbox textarea { width: 100%; min-height: 56px; }
   .stale { border-style: dashed; }
@@ -59,11 +61,12 @@ import OrbitalTile from "../components/OrbitalTile.astro";
     requirementId: string; value: string; type: string; effectiveLevel: string; status: string; explanation: string; jd: { quote: string }; support: Quote[];
     notCounted: Array<{ reason: string }>; missingEvidence: string[]; retrievalLeads: Array<{ factId: string; hybridRank: number }>;
   }
+  interface Rollup { start: number; end: number; quote: string; level: string; status: string; memberIds: string[]; note: string }
   interface Cond { type: string; result: string; severity: string; explanation: string; jd: { quote: string | null; value: string | null } }
   interface Report {
     status: string; failure?: { code: string; issues: Array<{ message: string }> };
     summary?: { required: Record<string, number>; preferred: Record<string, number>; criticalBlockers: Cond[]; needsCandidateAnswer: Cond[]; extractionGaps: Cond[] };
-    requirements?: Req[]; conditions?: Cond[]; evidence?: { approvedProfessionalEmployment: number; unitsSearched: number };
+    requirements?: Req[]; itemRollups?: Rollup[]; conditions?: Cond[]; evidence?: { approvedProfessionalEmployment: number; unitsSearched: number };
     job?: { title: string; company: string; url: string | null };
   }
   interface Detail { disclaimer: string; current: boolean; staleReasons: string[]; match: { id: string; status: string; createdAt: string; report: Report } | null }
@@ -96,7 +99,16 @@ import OrbitalTile from "../components/OrbitalTile.astro";
     try { showAlert(null); await api.post(`/api/v1/jobs/${r.jobId}/match`, {}); await load(); } catch (e) { showAlert(describe(e)); }
   }
 
-  function reqCard(r: Req, matchId: string): HTMLElement {
+  /** One source sentence that produced several requirement cards: its quote and overall state once, then its cards. */
+  function groupCard(g: Rollup, members: Req[], matchId: string): HTMLElement {
+    return h("section", { class: "itemgroup", "data-item": String(g.start), "data-status": g.status },
+      h("div", { class: "row" }, h("strong", {}, "One sentence in the posting, as a whole"), h("span", { class: `chip ${g.status === "SUPPORTED" ? "done" : g.status === "UNSUPPORTED" ? "failed" : "in-progress"}`, "data-rollup": g.status }, STATE[g.status] ?? g.status), h("span", { class: "tag" }, g.level)),
+      h("p", { class: "jdq" }, `Posting says: “${g.quote}”`),
+      h("p", { class: "why" }, g.note),
+      ...members.map((m) => reqCard(m, matchId, true)));
+  }
+
+  function reqCard(r: Req, matchId: string, inGroup = false): HTMLElement {
     const box = h("div", { class: "flagbox", hidden: true });
     const note = h("textarea", { maxlength: "1000", "aria-label": "What is wrong with this reading", placeholder: "What did Orbital misread? (for example: this is a preference, not a requirement)" });
     const msg = h("span", { class: "small", role: "status" });
@@ -107,7 +119,7 @@ import OrbitalTile from "../components/OrbitalTile.astro";
       } }, "Send"), msg));
     return h("div", { class: "req", "data-status": r.status, "data-requirement": r.requirementId },
       h("div", { class: "row" }, h("strong", {}, r.value), h("span", { class: `chip ${r.status === "SUPPORTED" ? "done" : r.status === "UNSUPPORTED" ? "failed" : "in-progress"}` }, STATE[r.status] ?? r.status), h("span", { class: "tag" }, r.effectiveLevel)),
-      h("p", { class: "jdq" }, `Posting says: “${r.jd.quote}”`),
+      inGroup ? null : h("p", { class: "jdq" }, `Posting says: “${r.jd.quote}”`),
       ...r.support.map((s) => h("p", { class: "ev", "data-evidence": "1" }, `Your approved evidence (${s.category}): ${s.value}${s.quote ? ` — “${s.quote}”` : ""}${s.strength === "mention" ? " (a mention only)" : ""}`)),
       r.support.length === 0 ? h("p", { class: "small", "data-empty-evidence": "1" }, r.status === "UNKNOWN" ? "Orbital cannot tell for this requirement." : "No approved evidence was found for this. That is a gap in what you have approved, not proof you lack it.") : null,
       h("p", { class: "why" }, r.explanation),
@@ -140,7 +152,17 @@ import OrbitalTile from "../components/OrbitalTile.astro";
         if ((rep.evidence?.unitsSearched ?? 0) === 0) body.append(h("div", { class: "empty", id: "m-no-evidence" }, tile(), "You have no approved evidence in the active profile yet, so nothing can be supported. Approve facts on the Résumés and Review pages first."));
         const conds = (rep.conditions ?? []).filter((c) => c.result !== "NOT_APPLICABLE");
         if (conds.length) body.append(h("h4", {}, "Eligibility conditions in the posting"), ...conds.map(condCard));
-        body.append(h("h4", {}, "Requirements"), ...(rep.requirements ?? []).map((q) => reqCard(q, d.match!.id)));
+        const rolls = rep.itemRollups ?? [];
+        const done = new Set<string>();
+        const cards: HTMLElement[] = [];
+        for (const q of rep.requirements ?? []) {
+          const g = rolls.find((x) => x.memberIds.includes(q.requirementId));
+          if (!g) { cards.push(reqCard(q, d.match!.id)); continue; }
+          if (done.has(String(g.start))) continue;
+          done.add(String(g.start));
+          cards.push(groupCard(g, (rep.requirements ?? []).filter((m) => g.memberIds.includes(m.requirementId)), d.match!.id));
+        }
+        body.append(h("h4", {}, "Requirements"), ...cards);
       }
       $("#m-detail").hidden = false;
       $("#m-detail").scrollIntoView({ behavior: "smooth", block: "start" });

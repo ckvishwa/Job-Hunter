@@ -320,6 +320,14 @@ suite("S4 matches page: approved evidence reaches a visible SUPPORTED card (head
     await pw(wireshark.locator("[data-empty-evidence]")).toBeVisible();
     await pw(page.locator("[data-condition=citizenship][data-result=UNKNOWN]")).toBeVisible();
     await pw(page.locator("#m-no-evidence")).toBeHidden();
+    // R7.2: one source sentence that yields two cards with opposite verdicts appears once, as a group with its overall state
+    const group = page.locator(".itemgroup").filter({ hasText: "Familiarity with Kubernetes or Terraform." });
+    await pw(group).toHaveCount(1);
+    await pw(group.locator("[data-rollup=SUPPORTED]")).toBeVisible();
+    expect(((await group.first().textContent()) ?? "").split("Familiarity with Kubernetes or Terraform.").length - 1).toBe(1);
+    expect(await group.first().locator(".req").count()).toBe(2);
+    await pw(group.locator(".req[data-status=SUPPORTED]").filter({ hasText: "Kubernetes" })).toBeVisible();
+    await pw(group.locator(".req[data-status=UNSUPPORTED]").filter({ hasText: "Terraform" })).toBeVisible();
 
     const text = (await page.locator("#app").textContent()) ?? "";
     expect(text).not.toMatch(/\b\d{1,3}\s?%|match score|hiring probability|ats score/i);

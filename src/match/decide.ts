@@ -242,6 +242,13 @@ export function rollupItems(decisions: RequirementDecision[]): Array<{ start: nu
     const grouped = members.filter((m) => m.groupId);
     if (members.length < 2) continue;
     const basis = live.length ? live : grouped;
+    if (!live.length) {
+      // Only alternatives ("A or B"): one supported branch satisfies the sentence, as the alternative group itself decides.
+      const best: ReqStatus = grouped.some((m) => m.status === "SUPPORTED") ? "SUPPORTED" : grouped.some((m) => m.status === "PARTIAL") ? "PARTIAL" : grouped.every((m) => m.status === "UNSUPPORTED") ? "UNSUPPORTED" : "UNKNOWN";
+      const supported = grouped.filter((m) => m.status === "SUPPORTED").map((m) => m.value);
+      out.push({ start, end: members[0]!.jd.end, quote: members[0]!.jd.quote, level: members[0]!.effectiveLevel, status: best, memberIds: members.map((m) => m.requirementId), note: supported.length ? `At least one alternative is supported (${supported.join(", ")}).` : `No alternative is fully supported (${grouped.length} listed).` });
+      continue;
+    }
     const status: ReqStatus = basis.every((m) => m.status === "SUPPORTED") ? "SUPPORTED" : basis.some((m) => m.status === "SUPPORTED" || m.status === "PARTIAL") ? "PARTIAL" : basis.every((m) => m.status === "UNSUPPORTED") ? "UNSUPPORTED" : "UNKNOWN";
     out.push({ start, end: members[0]!.jd.end, quote: members[0]!.jd.quote, level: members[0]!.effectiveLevel, status, memberIds: members.map((m) => m.requirementId), note: `${basis.filter((m) => m.status === "SUPPORTED").length} of ${basis.length} listed terms supported` });
   }

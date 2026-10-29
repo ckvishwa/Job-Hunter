@@ -594,8 +594,8 @@ Rows are in execution order; an agent takes the first `Ready` row, and sets the 
 | 21 | R6.1 One-command dev stack | R3.3 | Start Docker | Done |
 | 22 | R6.2 Run DB-backed suites | R6.1 | covered by R6.1 | Done |
 | 23 | R7.1 Positive-evidence E2E | R6.2 | covered by R6.1 | Done |
-| 24 | R7.2 Duplicate-sentence rendering | R7.1 | Fix or accept | Ready |
-| 25 | R6.3 CI tiers | R6.2, R4.2, R4.3 | CI files, first push | Not started |
+| 24 | R7.2 Duplicate-sentence rendering | R7.1 | Fix or accept | Done (Option A) |
+| 25 | R6.3 CI tiers | R6.2, R4.2, R4.3 | CI files, first push | Ready (HARD GATE: push) |
 | 26 | R6.4 Protect `main` | R6.3 | Apply settings | Not started |
 | 27 | R6.5 Ownership and conventions | R6.4 | Approve files | Not started |
 | 28 | R7.3 Final gates and draft PR | R7.2, R6.5, R4.4 | Push, draft PR | Not started |

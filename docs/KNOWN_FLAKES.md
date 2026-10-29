@@ -137,3 +137,8 @@ Observed 5 rows against an assertion requiring >5; a diagnostic rerun with fresh
 
 ## 2026-10-14 — five serialized full runs, no green gate (details: docs/testing/V01-REGRESSION-RECOVERY.md)
 Different DB/browser tests failed in each run (s3-api x2, s1-api, review-db suite setup, matches-ui 5 s timeout x2, s1-ui "Uploading..." stuck 15 s); every one passes alone. The bare-Node loopback probe (no project code) still shows 3.1% ETIMEDOUT and stalls up to 4.5 s today. Two real tooling/test defects found and fixed (runner gate self-invalidation via `private-runtime/test-cache/current-run.json`; stale migration list). Cause of the individual full-run failures is a supported hypothesis (loopback stalls), not proven; no timeout was changed.
+
+## Browser E2E: preview server unreachable on a random port (fixed 2026-10-29)
+
+Cause: reePort() could return a port on the fetch/Chrome bad-port list (for example 6667), so the Astro preview never became reachable and a headed-browser suite failed intermittently. Fix: 	ests/helpers/s1-harness.ts skips those ports. Seen once in a parallel 
+pm test run; passes in isolation.
