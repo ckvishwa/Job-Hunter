@@ -1,0 +1,31 @@
+name: Job Hunter Progress Integrity
+on:
+  push:
+    paths:
+      - 'docs/PRD.md'
+      - 'docs/PROGRESS_LEDGER.json'
+      - 'docs/PROGRESS.md'
+      - 'docs/AGENT_PROTOCOL.md'
+      - 'docs/DECISIONS.md'
+      - 'scripts/sync_progress.py'
+      - '.github/workflows/job-hunter-progress-integrity.yml'
+  pull_request:
+    paths:
+      - 'docs/PRD.md'
+      - 'docs/PROGRESS_LEDGER.json'
+      - 'docs/PROGRESS.md'
+      - 'docs/AGENT_PROTOCOL.md'
+      - 'docs/DECISIONS.md'
+      - 'scripts/sync_progress.py'
+      - '.github/workflows/job-hunter-progress-integrity.yml'
+permissions:
+  contents: read
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0 (same pin as ci.yml)
+        with:
+          persist-credentials: false
+      - name: Validate PRD baseline and status evidence
+        run: python3 scripts/sync_progress.py --check

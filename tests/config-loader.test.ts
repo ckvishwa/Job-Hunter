@@ -200,8 +200,13 @@ describe("loadCompanyRegistry", () => {
           careersUrl: "https://jobs.lever.co/thinkahead",
           atsType: "lever",
           atsTenantOrBoardId: "thinkahead",
+          atsWorkdaySite: null,
+          atsWorkdayHostname: null,
+          enabled: true,
           verificationStatus: "verified",
-          lastVerifiedDate: "2026-07-27"
+          verificationNote: null,
+          sourceProvenance: ["test-fixture"],
+          lastVerifiedAt: "2026-07-27"
         }
       ])
     );
@@ -214,8 +219,13 @@ describe("loadCompanyRegistry", () => {
         careersUrl: "https://jobs.lever.co/thinkahead",
         atsType: "lever",
         atsTenantOrBoardId: "thinkahead",
+        atsWorkdaySite: null,
+        atsWorkdayHostname: null,
+        enabled: true,
         verificationStatus: "verified",
-        lastVerifiedDate: "2026-07-27"
+        verificationNote: null,
+        sourceProvenance: ["test-fixture"],
+        lastVerifiedAt: "2026-07-27"
       }
     ]);
   });

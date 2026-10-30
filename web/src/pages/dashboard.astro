@@ -1,0 +1,272 @@
+---
+import Base from "../layouts/Base.astro";
+import PageHead from "../components/PageHead.astro";
+import OrbitalTile from "../components/OrbitalTile.astro";
+---
+
+<Base title="Orbital — Dashboard" crumbs={[{ label: "Dashboard" }]}>
+  <PageHead eyebrow="Your workspace" number="00" title="Your career search" lead="Where you are, what is proven, and the one thing to do next. Everything here comes from what you approved." >
+    <span class="muted small" id="dash-meta"></span>
+  </PageHead>
+  <p id="dash-sub" class="sr-only">Dashboard</p>
+  <template id="tile-template"><OrbitalTile /></template>
+
+  <div id="partial" class="notice" role="status" hidden>
+    <span id="partial-text"></span>
+    <button id="partial-retry" type="button" class="secondary">Try again</button>
+  </div>
+
+  <section id="next-card" class="next-card" aria-labelledby="next-title">
+    <p class="eyebrow">Next step</p>
+    <h2 id="next-title">Loading...</h2>
+    <p class="muted" id="next-reason"></p>
+    <div class="row" id="next-actions"></div>
+  </section>
+
+  <section aria-labelledby="pipe-title">
+    <h2 id="pipe-title">Progress</h2>
+    <ol class="pipeline" id="pipeline"></ol>
+  </section>
+
+  <div class="dash-grid">
+    <section aria-labelledby="facts-title" id="facts-card">
+      <h2 id="facts-title">Resume and facts</h2>
+      <p id="resume-line" class="muted">Loading...</p>
+      <div class="stats" id="fact-stats"></div>
+      <p class="muted small" id="statement-line"></p>
+      <div class="row">
+        <a class="button secondary" href="/resumes" id="link-resumes">Upload or manage resumes</a>
+        <a class="button secondary" id="link-review" href="/resumes" hidden>Review facts</a>
+        <a class="button secondary" href="/profile" id="link-statements">Explicit statements</a>
+      </div>
+    </section>
+
+    <section aria-labelledby="exp-title" id="exp-card">
+      <h2 id="exp-title">Verified experience</h2>
+      <p id="exp-summary" class="big-line">Loading...</p>
+      <p class="muted small" id="exp-uncertainty"></p>
+      <ul class="small" id="exp-issues"></ul>
+      <div class="row"><a class="button secondary" href="/roles">See how it is counted</a></div>
+    </section>
+  </div>
+
+  <section aria-labelledby="roles-title" id="roles-card">
+    <h2 id="roles-title">Suggested cybersecurity roles</h2>
+    <p class="muted small">Exploratory suggestions from facts you approved. Not a hiring chance, an ATS score or a promise of eligibility.</p>
+    <div id="roles-list" class="role-list"></div>
+    <p class="muted small" id="roles-more"></p>
+    <div class="row"><a class="button" href="/roles">Open roles</a></div>
+  </section>
+
+  <section aria-labelledby="sel-title" id="sel-card">
+    <h2 id="sel-title">Your approved role selection</h2>
+    <div id="sel-body">Loading...</div>
+  </section>
+
+  <section class="upcoming" aria-labelledby="s3-title" id="s3-card">
+    <h2 id="s3-title">Official openings <span class="chip upcoming-chip" id="s3-chip">Loading</span></h2>
+    <p class="muted" id="s3-text">Loading...</p>
+    <div class="row"><a class="button secondary" href="/jobs" id="s3-link">Open Jobs</a></div>
+  </section>
+</Base>
+
+<style is:global>
+  .next-card { background: var(--ink) !important; color: #fff; border-color: var(--ink) !important; position: relative; overflow: hidden; }
+  .next-card::after { content: ""; position: absolute; width: 330px; height: 330px; border: 1px solid #2855e881; border-radius: 50%; right: 6%; top: -190px; transform: rotate(20deg) scaleX(1.65); pointer-events: none; }
+  .next-card .eyebrow { color: #98b2ff; margin: 0 0 4px; }
+  .next-card h2 { font-size: clamp(28px, 3vw, 44px) !important; font-weight: 950 !important; line-height: 1; letter-spacing: -.06em !important; margin: 8px 0 !important; color: #fff; }
+  .next-card .muted { color: #ced3dd; }
+  .next-card a.button, .next-card button { background: var(--royal); border-color: var(--royal); position: relative; z-index: 1; }
+  .big-line { font-size: clamp(22px, 2.2vw, 30px); font-weight: 900; letter-spacing: -.05em; line-height: 1.1; margin: 0 0 8px; }
+  .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 18px; }
+  .dash-grid > section { margin-bottom: 0; }
+  .dash-grid { margin-bottom: 18px; }
+  .pipeline { list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 12px; padding: 0; margin: 0; }
+  .pipeline li { border: 1px solid var(--hair); border-radius: 14px; padding: 16px; background: #fff; }
+  .pipeline li[data-status="done"] { border: 2px solid var(--royal); }
+  .pipeline li[data-status="in-progress"] { background: var(--blue-wash); border-color: var(--blue-line); }
+  .pipeline li[data-status="upcoming"] { border-style: dashed; background: var(--tint); }
+  .pipeline .step-id { font-size: 11px; font-weight: 900; letter-spacing: .24em; color: var(--blue-ink); }
+  .pipeline .step-title { font-weight: 900; font-size: 18px; letter-spacing: -.04em; margin: 4px 0 8px; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 10px 0; }
+  .stat { border: 1px solid var(--hair); border-radius: 14px; padding: 12px 14px; background: var(--tint); }
+  .stat .n { display: block; font-size: clamp(34px, 3.4vw, 48px); font-weight: 950; letter-spacing: -.06em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12px; font-weight: 850; text-transform: uppercase; letter-spacing: .12em; color: #3f4550; }
+  .stat.approved .n { color: var(--royal); }
+  .stat.rejected { border-style: dotted; }
+  .role-list { display: grid; gap: 12px; }
+  .role-row { border: 1px solid var(--hair); border-radius: 14px; padding: 14px 16px; background: #fff; }
+  .role-row h3 { margin: 0; font-size: 19px; font-weight: 900; letter-spacing: -.045em; display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+  .role-row ul { margin: 8px 0 0; padding-left: 20px; }
+  @media (max-width: 560px) { .stats { grid-template-columns: 1fr; } }
+</style>
+
+<script>
+  import { api, ApiError } from "../lib/api";
+  import { startPage, reloadPage } from "../lib/gate";
+  import { $, clear, h } from "../lib/dom";
+  const tile = (): Node | null => (document.getElementById("tile-template") as HTMLTemplateElement | null)?.content.firstElementChild?.cloneNode(true) ?? null;
+  import { buildDashboard, monthsText, type DashboardView, type DiscoverySummary, type ResumeRow, type RolesState } from "../lib/dashboard-model";
+
+  const STATUS_LABEL: Record<string, string> = { "not-started": "Not started", "in-progress": "In progress", done: "Done", upcoming: "Upcoming" };
+  const SUPPORT_LABEL: Record<string, string> = { SUPPORTED: "Evidence found", PARTIAL: "Partial evidence" };
+  const DECISION_LABEL: Record<string, string> = { PROPOSED: "Not decided", APPROVED: "You approved", DISMISSED: "You dismissed" };
+
+  function renderNext(v: DashboardView): void {
+    $("#next-title").textContent = v.next.label;
+    $("#next-reason").textContent = v.next.reason;
+    const box = $("#next-actions");
+    clear(box);
+    $("#next-card").dataset.kind = v.next.kind;
+    if (v.next.kind === "link") box.append(h("a", { class: "button", id: "next-link", href: v.next.href }, "Continue"));
+    if (v.next.kind === "retry") box.append(h("button", { id: "next-retry", type: "button", onclick: () => void reloadPage() }, "Try again"));
+  }
+
+  function renderPipeline(v: DashboardView): void {
+    const ol = $("#pipeline");
+    clear(ol);
+    for (const s of v.pipeline) {
+      ol.append(h("li", { "data-step": s.id, "data-status": s.status },
+        h("div", { class: "step-id" }, s.id),
+        h("div", { class: "step-title" }, s.title),
+        h("span", { class: `chip ${s.status}` }, STATUS_LABEL[s.status] ?? s.status),
+        h("p", { class: "muted small" }, s.detail)));
+    }
+  }
+
+  function renderFacts(v: DashboardView, resumes: ResumeRow[] | null): void {
+    const stats = $("#fact-stats");
+    clear(stats);
+    const line = $("#resume-line");
+    if (!v.facts.loaded) {
+      line.textContent = "Resume status could not be loaded.";
+      stats.append(h("div", { class: "section-error", id: "facts-error" }, "Fact counts unavailable."));
+    } else {
+      const r = v.resumeStatus;
+      line.textContent = r.total === 0 ? "No resume uploaded yet. Upload a PDF or DOCX to begin."
+        : `${r.total} resume${r.total === 1 ? "" : "s"} uploaded. Latest: ${r.latest!.fileType.toUpperCase()}, ${new Date(r.latest!.createdAt).toLocaleDateString()}, ${r.latest!.state.toLowerCase()}${r.latest!.errorCode ? ` (${r.latest!.errorCode})` : ""}.`;
+      for (const [key, label, n] of [["approved", "Approved", v.facts.approved], ["pending", "Pending", v.facts.pending], ["rejected", "Rejected", v.facts.rejected]] as const) {
+        stats.append(h("div", { class: `stat ${key}`, "data-count": key }, h("span", { class: "n" }, String(n)), h("span", { class: "l" }, label)));
+      }
+    }
+    $("#statement-line").textContent = v.facts.statements === null ? "" : `${v.facts.statements} explicit statement${v.facts.statements === 1 ? "" : "s"} on file (values are not shown here).`;
+    const review = $("#link-review") as HTMLAnchorElement;
+    const target = resumes?.find((r) => r.state === "PROPOSED" && r.counts.pending > 0) ?? resumes?.find((r) => r.state === "PROPOSED");
+    review.hidden = !target;
+    if (target) review.href = `/review?id=${encodeURIComponent(target.resumeId)}`;
+  }
+
+  function renderExperience(v: DashboardView): void {
+    const e = v.experience;
+    const issues = $("#exp-issues");
+    clear(issues);
+    if (!e) {
+      $("#exp-summary").textContent = "Experience could not be loaded.";
+      $("#exp-uncertainty").textContent = "";
+      return;
+    }
+    $("#exp-summary").textContent = e.summary;
+    $("#exp-uncertainty").textContent = e.uncertainty;
+    $("#exp-card").dataset.status = e.status;
+    for (const m of e.issueMessages) issues.append(h("li", {}, m));
+    if (e.internship) issues.append(h("li", {}, `Internship / co-op, counted separately: ${monthsText(e.internship.lower, e.internship.upper)}.`));
+  }
+
+  function renderRoles(v: DashboardView): void {
+    const list = $("#roles-list");
+    clear(list);
+    const r = v.cyberRoles;
+    if (!r) {
+      list.append(h("div", { class: "section-error", id: "roles-error" }, "Role suggestions could not be loaded."));
+      $("#roles-more").textContent = "";
+      return;
+    }
+    if (r.items.length === 0) {
+      list.append(h("div", { class: "empty", id: "roles-empty" }, tile(), v.facts.approved === 0
+        ? "No suggestions yet. Approve facts from your resume (skills, jobs, certifications) and cybersecurity roles with evidence will appear here."
+        : "None of your approved facts support a cybersecurity role yet. See Roles for what is missing."));
+    }
+    for (const item of r.items) {
+      list.append(h("article", { class: "role-row", "data-role": item.roleSlug },
+        h("h3", {}, item.title,
+          h("span", { class: `chip ${item.support === "SUPPORTED" ? "done" : "in-progress"}` }, SUPPORT_LABEL[item.support] ?? item.support),
+          h("span", { class: "chip" }, DECISION_LABEL[item.status] ?? item.status)),
+        h("p", { class: "muted small" }, `${item.family}. ${item.coreMet} of ${item.coreTotal} core requirements shown in your approved facts.`),
+        item.gaps.length ? h("ul", { class: "small" }, ...item.gaps.map((g) => h("li", {}, g))) : null));
+    }
+    const notes: string[] = [];
+    if (r.hiddenCount) notes.push(`${r.hiddenCount} more cybersecurity suggestion${r.hiddenCount === 1 ? "" : "s"} on the Roles page.`);
+    if (r.otherSuggestionCount) notes.push(`${r.otherSuggestionCount} secondary-track suggestion${r.otherSuggestionCount === 1 ? "" : "s"} (QA, cloud, network) on the Roles page.`);
+    if (r.staleCount) notes.push(`${r.staleCount} earlier decision${r.staleCount === 1 ? "" : "s"} no longer apply because the evidence changed.`);
+    $("#roles-more").textContent = notes.join(" ");
+  }
+
+  function renderSelection(v: DashboardView): void {
+    const body = $("#sel-body");
+    clear(body);
+    if (v.cyberRoles === null) {
+      body.append(h("div", { class: "section-error", id: "sel-error" }, "Your selection could not be loaded."));
+      return;
+    }
+    const s = v.selection;
+    if (!s || s.roles.length === 0) {
+      body.append(h("div", { class: "empty", id: "sel-empty" }, tile(), "You have not saved a role selection. Choose roles on the Roles page; only your selection decides what job discovery will search."),
+        h("div", { class: "row" }, h("a", { class: "button", href: "/roles" }, "Choose roles")));
+      return;
+    }
+    body.append(
+      h("p", { class: "muted small" }, `Saved revision ${s.revisionNo}. Chosen by you, not by the suggestions.`),
+      h("div", { class: "tags", id: "sel-roles" }, ...s.roles.map((r) => h("span", { class: "tag", "data-role": r.slug }, r.title))),
+      h("p", { class: "small" }, `Where: ${s.places.length ? s.places.join(", ") : "not specified"}. Work mode: ${s.workModes.length ? s.workModes.join(", ") : "not specified"}. Level: ${s.levels.length ? s.levels.join(", ") : "not specified"}.`),
+      h("p", { class: "small muted" }, `Search window: ${s.band}. This only decides which postings to look at later; it is not a claim about your experience.`),
+      h("div", { class: "row" }, h("a", { class: "button secondary", href: "/roles" }, "Change selection")));
+  }
+
+  function renderS3(v: DashboardView): void {
+    const step = v.pipeline.find((p) => p.id === "S3")!;
+    const chip = $("#s3-chip");
+    chip.textContent = STATUS_LABEL[step.status] ?? step.status;
+    chip.className = `chip ${step.status}`;
+    $("#s3-text").textContent = step.detail + " Whether you qualify is not evaluated yet.";
+    $("#s3-card").dataset.status = step.status;
+  }
+
+  let lastAttempt: number | undefined;
+  async function load(): Promise<void> {
+    const [resumesR, rolesR, statementsR, discoveryR] = await Promise.allSettled([
+      api.get<{ resumes: ResumeRow[] }>("/api/v1/resumes"),
+      api.get<RolesState>("/api/v1/roles/recommendations"),
+      api.get<{ facts: unknown[] }>("/api/v1/profile/attested-facts"),
+      api.get<DiscoverySummary>("/api/v1/discovery/overview"),
+    ]);
+    const results = [resumesR, rolesR, statementsR, discoveryR];
+    const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected").map((r) => r.reason);
+    // Sign-in problems and a dead API are page-level (the gate explains them); anything else is a per-section failure.
+    const pageLevel = failures.find((e) => e instanceof ApiError && (e.kind === "unauthenticated" || e.kind === "unavailable" || e.kind === "offline"));
+    if (pageLevel) throw pageLevel;
+    if (failures.length === results.length) throw failures[0];
+
+    const resumes = resumesR.status === "fulfilled" ? resumesR.value.resumes : null;
+    const roles = rolesR.status === "fulfilled" ? rolesR.value : null;
+    const statements = statementsR.status === "fulfilled" ? statementsR.value.facts.length : null;
+    const discovery = discoveryR.status === "fulfilled" ? discoveryR.value : null;
+    const view = buildDashboard({ resumes, roles, statementCount: statements, discovery });
+
+    const partial = $("#partial");
+    partial.hidden = view.missing.length === 0 && statements !== null;
+    $("#partial-text").textContent = `Some information could not be loaded (${[...view.missing, ...(statements === null ? ["explicit statements"] : [])].join(", ")}). What you see below is real, but incomplete.`;
+
+    renderNext(view);
+    renderPipeline(view);
+    renderFacts(view, resumes);
+    renderExperience(view);
+    renderRoles(view);
+    renderSelection(view);
+    renderS3(view);
+    lastAttempt = Date.now();
+    $("#dash-meta").textContent = `Updated ${new Date(lastAttempt).toLocaleTimeString()}`;
+  }
+
+  $("#partial-retry").addEventListener("click", () => void reloadPage());
+  startPage({ load });
+</script>

@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "batches": [
+    {
+      "name": "baseline",
+      "companies": [
+        {
+          "company": "Sparksoft Corporation",
+          "ats": "greenhouse",
+          "board": "sparksoftcorporation",
+          "employerCareersUrl": "https://sparksoftcorp.com/careers/",
+          "manualOwnershipNote": "M5.2 manual check: official careers page links to current job openings, which embeds Greenhouse."
+        },
+        {
+          "company": "TrueML",
+          "ats": "lever",
+          "board": "trueml",
+          "employerCareersUrl": "https://trueml.co/careers/",
+          "manualOwnershipNote": "M5.2 manual check: official careers page links to public Lever postings."
+        },
+        {
+          "company": "Spotify",
+          "ats": "lever",
+          "board": "spotify",
+          "employerCareersUrl": "https://www.lifeatspotify.com/start-your-journey",
+          "manualOwnershipNote": "M5.2 manual check: Spotify Careers directs full-time roles to its Lever board."
+        }
+      ]
+    },
+    {
+      "name": "qa-1",
+      "companies": [
+        {
+          "company": "Datadog",
+          "ats": "greenhouse",
+          "board": "datadog",
+          "employerCareersUrl": "https://careers.datadoghq.com/"
+        },
+        {
+          "company": "Cloudflare",
+          "ats": "greenhouse",
+          "board": "cloudflare",
+          "employerCareersUrl": "https://www.cloudflare.com/careers/"
+        },
+        {
+          "company": "Elastic",
+          "ats": "greenhouse",
+          "board": "elastic",
+          "employerCareersUrl": "https://www.elastic.co/careers"
+        },
+        {
+          "company": "Okta",
+          "ats": "greenhouse",
+          "board": "okta",
+          "employerCareersUrl": "https://www.okta.com/company/careers/",
+          "corporateDomain": "okta.com"
+        },
+        {
+          "company": "Coinbase",
+          "ats": "greenhouse",
+          "board": "coinbase",
+          "employerCareersUrl": "https://www.coinbase.com/careers",
+          "corporateDomain": "coinbase.com"
+        },
+        {
+          "company": "Stripe",
+          "ats": "greenhouse",
+          "board": "stripe",
+          "employerCareersUrl": "https://stripe.com/jobs",
+          "corporateDomain": "stripe.com"
+        },
+        {
+          "company": "Twilio",
+          "ats": "greenhouse",
+          "board": "twilio",
+          "employerCareersUrl": "https://www.twilio.com/en-us/company/jobs"
+        },
+        {
+          "company": "Dropbox",
+          "ats": "greenhouse",
+          "board": "dropbox",
+          "employerCareersUrl": "https://jobs.dropbox.com/"
+        },
+        {
+          "company": "Reddit",
+          "ats": "greenhouse",
+          "board": "reddit",
+          "employerCareersUrl": "https://www.redditinc.com/careers"
+        },
+        {
+          "company": "Plaid",
+          "ats": "lever",
+          "board": "plaid",
+          "employerCareersUrl": "https://plaid.com/careers/"
+        }
+      ]
+    },
+    {
+      "name": "qa-2",
+      "companies": [
+        {
+          "company": "Robinhood",
+          "ats": "greenhouse",
+          "board": "robinhood",
+          "employerCareersUrl": "https://careers.robinhood.com/"
+        },
+        {
+          "company": "Discord",
+          "ats": "greenhouse",
+          "board": "discord",
+          "employerCareersUrl": "https://discord.com/careers"
+        },
+        {
+          "company": "Databricks",
+          "ats": "greenhouse",
+          "board": "databricks",
+          "employerCareersUrl": "https://www.databricks.com/company/careers"
+        },
+        {
+          "company": "GitLab",
+          "ats": "greenhouse",
+          "board": "gitlab",
+          "employerCareersUrl": "https://about.gitlab.com/jobs/"
+        },
+        {
+          "company": "MongoDB",
+          "ats": "greenhouse",
+          "board": "mongodb",
+          "employerCareersUrl": "https://www.mongodb.com/company/careers"
+        },
+        {
+          "company": "Toast",
+          "ats": "greenhouse",
+          "board": "toast",
+          "employerCareersUrl": "https://careers.toasttab.com/"
+        },
+        {
+          "company": "Snyk",
+          "ats": "greenhouse",
+          "board": "snyk",
+          "employerCareersUrl": "https://snyk.io/careers/"
+        },
+        {
+          "company": "Palantir",
+          "ats": "lever",
+          "board": "palantir",
+          "employerCareersUrl": "https://www.palantir.com/careers/"
+        }
+      ]
+    }
+  ]
+}

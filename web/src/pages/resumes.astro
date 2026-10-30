@@ -1,0 +1,88 @@
+---
+import Base from "../layouts/Base.astro";
+import PageHead from "../components/PageHead.astro";
+---
+
+<Base title="Orbital — Résumés" crumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Résumés" }]}>
+  <PageHead eyebrow="Step 1 · Your résumé" number="01" title="Turn your résumé into facts you can verify." lead="Upload a PDF or DOCX. Facts are proposed from the text; nothing counts until you review and approve it." />
+    <section>
+      <h2>Upload a résumé</h2>
+      <p class="muted">PDF or DOCX, up to 5 MB. Files are checked on the server (type, size, safe structure); scanned images are not read.</p>
+      <form id="upload-form" class="row">
+        <label class="sr-only" for="file">Résumé file (PDF or DOCX)</label>
+        <input id="file" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required />
+        <button id="upload" type="submit">Upload</button>
+        <span id="upload-msg" role="status"></span>
+      </form>
+    </section>
+
+    <section>
+      <h2>Your résumés</h2>
+      <table>
+        <thead><tr><th>Uploaded</th><th>Type</th><th>State</th><th>Pending</th><th>Approved</th><th>Rejected</th><th></th></tr></thead>
+        <tbody id="resumes"></tbody>
+      </table>
+      <p id="resumes-empty" class="empty" hidden>No résumés yet. Upload one above; the first step is always your own document.</p>
+    </section>
+</Base>
+
+<script>
+  import { api, ApiError } from "../lib/api";
+  import { startPage } from "../lib/gate";
+  import { $, clear, h, say } from "../lib/dom";
+
+  interface ResumeRow {
+    resumeId: string; fileType: string; createdAt: string; state: string; errorCode: string | null;
+    counts: { pending: number; approved: number; rejected: number };
+  }
+
+  const ACTIVE = new Set(["UPLOADED", "EXTRACTING"]);
+  let timer: number | undefined;
+
+  async function refresh(): Promise<void> {
+    const { resumes } = await api.get<{ resumes: ResumeRow[] }>("/api/v1/resumes");
+    const body = $("#resumes");
+    clear(body);
+    $("#resumes-empty").hidden = resumes.length > 0;
+    for (const r of resumes) {
+      const state = r.errorCode ? `${r.state} (${r.errorCode})` : r.state;
+      body.append(
+        h("tr", { "data-resume-id": r.resumeId },
+          h("td", {}, new Date(r.createdAt).toLocaleString()),
+          h("td", {}, r.fileType.toUpperCase()),
+          h("td", { class: "state" }, state),
+          h("td", {}, String(r.counts.pending)),
+          h("td", {}, String(r.counts.approved)),
+          h("td", {}, String(r.counts.rejected)),
+          h("td", {}, r.state === "PROPOSED" ? h("a", { href: `/review?id=${encodeURIComponent(r.resumeId)}` }, "Review facts") : ""),
+        ),
+      );
+    }
+    window.clearTimeout(timer);
+    // Polling only while something is processing; a failed poll is shown, not thrown into the void.
+    if (resumes.some((r) => ACTIVE.has(r.state))) timer = window.setTimeout(() => void refresh().catch(pollFailed), 1200);
+  }
+
+  function pollFailed(error: unknown): void {
+    say($("#upload-msg"), error instanceof ApiError && error.kind !== "client" ? "Lost contact with the API while checking progress. Reload to retry." : "Could not refresh the list.", "error");
+  }
+
+  $("#upload-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const input = $("#file") as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    say($("#upload-msg"), "Uploading...", "info");
+    try {
+      const result = await api.upload<{ state: string; duplicate: boolean; requeued: boolean }>("/api/v1/resumes", file);
+      const note = result.duplicate ? (result.requeued ? "Already uploaded; processing again." : "Already uploaded; nothing was duplicated.") : "Uploaded.";
+      say($("#upload-msg"), `${note} State: ${result.state}.`, "ok");
+      input.value = "";
+      await refresh();
+    } catch (error) {
+      say($("#upload-msg"), error instanceof ApiError ? `${error.message} (${error.code})` : "Upload failed.", "error");
+    }
+  });
+
+  startPage({ load: refresh });
+</script>

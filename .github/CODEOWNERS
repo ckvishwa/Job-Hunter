@@ -1,0 +1,12 @@
+# Reviewers. Technical Lead owns everything; Hani456 co-owns tests and QA/KT docs (ignored by GitHub until the collaborator invitation is accepted).
+* @ckvishwa
+/tests/ @ckvishwa @Hani456
+/docs/qa/ @ckvishwa @Hani456
+/docs/kt/ @ckvishwa @Hani456
+/services/ml/test_*.py @ckvishwa @Hani456
+
+# JH-REPO-001 R6.5: truth-critical and governance paths need the owner explicitly.
+/src/candidate/ @ckvishwa
+/src/application/ @ckvishwa
+/docs/aim/ @ckvishwa
+/docs/DECISIONS.md @ckvishwa

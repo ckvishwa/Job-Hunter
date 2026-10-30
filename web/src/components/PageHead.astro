@@ -1,0 +1,13 @@
+---
+// Editorial page header: numbered eyebrow, heavy headline, lead copy and an optional actions slot.
+interface Props { eyebrow: string; title: string; lead?: string; number?: string }
+const { eyebrow, title, lead, number } = Astro.props;
+---
+<header class="page-head">
+  <div>
+    <div class="eyebrow">{number ? <span class="section-number">{number}</span> : null}<span>{eyebrow}</span></div>
+    <h1>{title}</h1>
+    {lead ? <p class="lead">{lead}</p> : null}
+  </div>
+  <div class="row"><slot /></div>
+</header>

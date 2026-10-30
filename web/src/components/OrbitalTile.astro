@@ -1,0 +1,13 @@
+---
+// The angular Orbital tile with a thin orbit path and nodes (from the landing hero), as a small vector mark for empty states.
+interface Props { class?: string; size?: number }
+const { class: cls = "tile", size = 84 } = Astro.props;
+const id = `ot-${Math.random().toString(36).slice(2, 8)}`;
+---
+<svg class={cls} width={size} height={size} viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+  <defs><clipPath id={id}><rect x="26" y="30" width="70" height="66" rx="16" transform="rotate(-13 61 63)"/></clipPath></defs>
+  <ellipse cx="60" cy="62" rx="52" ry="26" transform="rotate(-26 60 62)" fill="none" stroke="#2855e8" stroke-width="1.6" opacity=".75"/>
+  <rect x="26" y="30" width="70" height="66" rx="16" transform="rotate(-13 61 63)" fill="#2855e8"/>
+  <g clip-path={`url(#${id})`}><path d="m18 36 82-10-26 44-48 10z" fill="#101116"/><path d="m70 70 28-44 6 78-16-2z" fill="#fff"/><path d="m22 76 50-9 16 6-44 30z" fill="#fff"/></g>
+  <circle cx="104" cy="34" r="5" fill="#2855e8"/><circle cx="18" cy="92" r="3.2" fill="#101116"/>
+</svg>

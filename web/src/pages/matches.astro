@@ -1,0 +1,184 @@
+---
+import Base from "../layouts/Base.astro";
+import PageHead from "../components/PageHead.astro";
+import OrbitalTile from "../components/OrbitalTile.astro";
+---
+
+<Base title="Orbital — Job matches" crumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Official openings", href: "/jobs" }, { label: "Matches" }]}>
+  <PageHead eyebrow="Step 5 · Evidence-based matches" number="05" title="What each posting asks for, and the evidence you have approved." lead="Orbital reads each saved official posting, lists its requirements with the exact words it used, and looks for support only in facts you approved. There is no score: every line is one of four states, with the evidence or the reason shown.">
+    <a class="button secondary" href="/jobs">&larr; Official openings</a>
+  </PageHead>
+  <template id="tile-template"><OrbitalTile /></template>
+
+  <div id="m-alert" class="alert error" role="alert" hidden></div>
+  <p class="muted small" id="m-disclaimer"></p>
+
+  <section aria-labelledby="m-list-title">
+    <h2 id="m-list-title">Saved official postings <span class="muted small" id="m-total"></span></h2>
+    <div id="m-list" aria-live="polite"><span class="skeleton w80"></span><span class="skeleton w60"></span></div>
+  </section>
+
+  <section id="m-detail" aria-labelledby="m-detail-title" hidden>
+    <h2 id="m-detail-title">Match detail</h2>
+    <div id="m-detail-body"></div>
+    <div class="row"><button id="m-close" type="button" class="secondary">Close</button></div>
+  </section>
+</Base>
+
+<style is:global>
+  .mrow { border: 1px solid var(--hair); border-radius: 14px; padding: 14px 18px; background: #fff; display: grid; gap: 8px; margin-bottom: 12px; }
+  .mrow h3 { margin: 0; font-size: 20px; font-weight: 900; letter-spacing: -.04em; }
+  .mrow .meta { color: #4b505b; font-size: 14px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .states { display: flex; flex-wrap: wrap; gap: 6px; }
+  .req { border: 1px solid var(--hair); border-radius: 12px; padding: 12px 14px; margin: 10px 0; display: grid; gap: 6px; background: #fff; }
+  .req[data-status="SUPPORTED"] { border-left: 5px solid var(--royal); }
+  .req[data-status="PARTIAL"] { border-left: 5px solid #7a8aa8; }
+  .req[data-status="UNSUPPORTED"] { border-left: 5px dashed #111; }
+  .req[data-status="UNKNOWN"] { border-left: 5px dotted #777; }
+  .req .jdq { margin: 0; padding: 6px 10px; border-left: 4px solid var(--royal); background: var(--blue-wash); border-radius: 6px; font-size: 14px; }
+  .req .ev { margin: 0; padding: 6px 10px; border-left: 4px solid #111; background: var(--tint); border-radius: 6px; font-size: 14px; }
+  .req .why { font-size: 14px; color: #2c313a; }
+  .itemgroup { border: 1px solid var(--hair); border-radius: 14px; padding: 10px 14px; margin: 12px 0; display: grid; gap: 6px; background: var(--tint); }
+  .itemgroup .req { margin: 6px 0; }
+  .flagbox { display: grid; gap: 6px; margin-top: 6px; }
+  .flagbox textarea { width: 100%; min-height: 56px; }
+  .stale { border-style: dashed; }
+</style>
+
+<script>
+  import { api, ApiError } from "../lib/api";
+  import { startPage } from "../lib/gate";
+  import { $, clear, h } from "../lib/dom";
+
+  interface Summary { required: Record<string, number>; preferred: Record<string, number>; blockers: number }
+  interface Row {
+    jobId: string; company: string; title: string; location: string | null; officialUrl: string; atsIdentity: string;
+    freshness: { state: string; note: string };
+    match: null | { id: string; status: string; createdAt: string; current: boolean; staleReasons: string[]; summary: Summary | null };
+  }
+  interface Quote { value: string; quote: string | null; basis: string; strength: string; category: string }
+  interface Req {
+    requirementId: string; value: string; type: string; effectiveLevel: string; status: string; explanation: string; jd: { quote: string }; support: Quote[];
+    notCounted: Array<{ reason: string }>; missingEvidence: string[]; retrievalLeads: Array<{ factId: string; hybridRank: number }>;
+  }
+  interface Rollup { start: number; end: number; quote: string; level: string; status: string; memberIds: string[]; note: string }
+  interface Cond { type: string; result: string; severity: string; explanation: string; jd: { quote: string | null; value: string | null } }
+  interface Report {
+    status: string; failure?: { code: string; issues: Array<{ message: string }> };
+    summary?: { required: Record<string, number>; preferred: Record<string, number>; criticalBlockers: Cond[]; needsCandidateAnswer: Cond[]; extractionGaps: Cond[] };
+    requirements?: Req[]; itemRollups?: Rollup[]; conditions?: Cond[]; evidence?: { approvedProfessionalEmployment: number; unitsSearched: number };
+    job?: { title: string; company: string; url: string | null };
+  }
+  interface Detail { disclaimer: string; current: boolean; staleReasons: string[]; match: { id: string; status: string; createdAt: string; report: Report } | null }
+
+  const STATE: Record<string, string> = { SUPPORTED: "Supported by approved evidence", PARTIAL: "Partly supported", UNSUPPORTED: "No supporting evidence found", UNKNOWN: "Cannot tell" };
+  const alertBox = $("#m-alert");
+  const showAlert = (t: string | null) => { alertBox.hidden = !t; alertBox.textContent = t ?? ""; };
+  const describe = (e: unknown) => (e instanceof ApiError ? `${e.message} (${e.code})` : "Something went wrong.");
+  const safeHref = (u: string): string | null => { try { const x = new URL(u); return x.protocol === "https:" || x.protocol === "http:" ? x.toString() : null; } catch { return null; } };
+  const tile = (): Node | null => (document.getElementById("tile-template") as HTMLTemplateElement | null)?.content.firstElementChild?.cloneNode(true) ?? null;
+  const stateChips = (s: Record<string, number>) => ["SUPPORTED", "PARTIAL", "UNSUPPORTED", "UNKNOWN"].map((k) => h("span", { class: `chip ${k === "SUPPORTED" ? "done" : k === "UNSUPPORTED" ? "failed" : "in-progress"}`, "data-state": k }, `${s[k] ?? 0} ${STATE[k]!.toLowerCase()}`));
+
+  function row(r: Row): HTMLElement {
+    const href = safeHref(r.officialUrl);
+    const m = r.match;
+    return h("article", { class: `mrow${m && !m.current ? " stale" : ""}`, "data-job": r.jobId, "data-req": r.atsIdentity },
+      h("h3", {}, r.title),
+      h("div", { class: "meta" }, h("strong", {}, r.company), h("span", {}, r.location ?? "Location not listed"), h("span", { class: r.freshness.state === "STALE" ? "chip failed" : "chip upcoming", "data-freshness": r.freshness.state }, r.freshness.state === "STALE" ? "Not re-checked recently" : r.freshness.state === "RECENT" ? "Recently read" : "Read time unknown")),
+      h("p", { class: "small muted" }, r.freshness.note),
+      m?.summary ? h("div", { class: "states" }, h("span", { class: "muted small" }, "Required:"), ...stateChips(m.summary.required), m.summary.blockers ? h("span", { class: "chip failed", "data-blockers": String(m.summary.blockers) }, `${m.summary.blockers} possible blocker${m.summary.blockers === 1 ? "" : "s"}`) : null) : null,
+      m ? h("p", { class: "small muted" }, m.status === "EXTRACTION_FAILED" ? "The posting's requirements could not be read reliably, so nothing is claimed about it." : "", m.current ? "" : ` Out of date: ${m.staleReasons.join(", ").toLowerCase().replace(/_/g, " ")}. Refresh to recompute.`, ` Computed ${new Date(m.createdAt).toLocaleString()}.`)
+        : h("p", { class: "small muted" }, "No match computed yet."),
+      h("div", { class: "row" },
+        h("button", { type: "button", "data-action": "open", onclick: () => void open(r) }, m ? "View requirements and evidence" : "Compute match"),
+        m && !m.current ? h("button", { type: "button", class: "secondary", "data-action": "refresh", onclick: () => void refresh(r) }, "Refresh match") : null,
+        href ? h("a", { class: "button secondary", href, target: "_blank", rel: "noopener noreferrer" }, "Open official posting ↗") : null));
+  }
+
+  async function refresh(r: Row): Promise<void> {
+    try { showAlert(null); await api.post(`/api/v1/jobs/${r.jobId}/match`, {}); await load(); } catch (e) { showAlert(describe(e)); }
+  }
+
+  /** One source sentence that produced several requirement cards: its quote and overall state once, then its cards. */
+  function groupCard(g: Rollup, members: Req[], matchId: string): HTMLElement {
+    return h("section", { class: "itemgroup", "data-item": String(g.start), "data-status": g.status },
+      h("div", { class: "row" }, h("strong", {}, "One sentence in the posting, as a whole"), h("span", { class: `chip ${g.status === "SUPPORTED" ? "done" : g.status === "UNSUPPORTED" ? "failed" : "in-progress"}`, "data-rollup": g.status }, STATE[g.status] ?? g.status), h("span", { class: "tag" }, g.level)),
+      h("p", { class: "jdq" }, `Posting says: “${g.quote}”`),
+      h("p", { class: "why" }, g.note),
+      ...members.map((m) => reqCard(m, matchId, true)));
+  }
+
+  function reqCard(r: Req, matchId: string, inGroup = false): HTMLElement {
+    const box = h("div", { class: "flagbox", hidden: true });
+    const note = h("textarea", { maxlength: "1000", "aria-label": "What is wrong with this reading", placeholder: "What did Orbital misread? (for example: this is a preference, not a requirement)" });
+    const msg = h("span", { class: "small", role: "status" });
+    box.append(note, h("div", { class: "row" },
+      h("button", { type: "button", class: "secondary", "data-action": "send-flag", onclick: async () => {
+        try { await api.post(`/api/v1/matches/${matchId}/flags`, { requirementId: r.requirementId, note: (note as HTMLTextAreaElement).value }); msg.textContent = "Recorded for review. Nothing was changed."; (note as HTMLTextAreaElement).value = ""; }
+        catch (e) { msg.textContent = describe(e); }
+      } }, "Send"), msg));
+    return h("div", { class: "req", "data-status": r.status, "data-requirement": r.requirementId },
+      h("div", { class: "row" }, h("strong", {}, r.value), h("span", { class: `chip ${r.status === "SUPPORTED" ? "done" : r.status === "UNSUPPORTED" ? "failed" : "in-progress"}` }, STATE[r.status] ?? r.status), h("span", { class: "tag" }, r.effectiveLevel)),
+      inGroup ? null : h("p", { class: "jdq" }, `Posting says: “${r.jd.quote}”`),
+      ...r.support.map((s) => h("p", { class: "ev", "data-evidence": "1" }, `Your approved evidence (${s.category}): ${s.value}${s.quote ? ` — “${s.quote}”` : ""}${s.strength === "mention" ? " (a mention only)" : ""}`)),
+      r.support.length === 0 ? h("p", { class: "small", "data-empty-evidence": "1" }, r.status === "UNKNOWN" ? "Orbital cannot tell for this requirement." : "No approved evidence was found for this. That is a gap in what you have approved, not proof you lack it.") : null,
+      h("p", { class: "why" }, r.explanation),
+      r.notCounted.length ? h("p", { class: "small muted" }, `Related evidence not counted: ${r.notCounted.map((n) => n.reason).join("; ")}`) : null,
+      r.missingEvidence.length ? h("p", { class: "small muted" }, `Missing: ${r.missingEvidence.join("; ")}`) : null,
+      h("div", { class: "row" }, h("button", { type: "button", class: "secondary", "data-action": "flag", onclick: () => { box.hidden = !box.hidden; } }, "Flag incorrect interpretation")),
+      box);
+  }
+
+  function condCard(c: Cond): HTMLElement {
+    return h("div", { class: "req", "data-condition": c.type, "data-result": c.result },
+      h("div", { class: "row" }, h("strong", {}, c.type.replace(/_/g, " ")), h("span", { class: `chip ${c.result === "BLOCKER" ? "failed" : c.result === "SATISFIED" ? "done" : "in-progress"}` }, c.result.toLowerCase().replace(/_/g, " "))),
+      c.jd.quote ? h("p", { class: "jdq" }, `Posting says: “${c.jd.quote}”`) : null, h("p", { class: "why" }, c.explanation));
+  }
+
+  async function open(r: Row): Promise<void> {
+    try {
+      showAlert(null);
+      let d = await api.get<Detail>(`/api/v1/jobs/${r.jobId}/match`);
+      if (!d.match) { await api.post(`/api/v1/jobs/${r.jobId}/match`, {}); d = await api.get<Detail>(`/api/v1/jobs/${r.jobId}/match`); await load(); }
+      const body = $("#m-detail-body");
+      clear(body);
+      const rep = d.match!.report;
+      body.append(h("h3", {}, `${r.company} — ${r.title}`));
+      if (!d.current) body.append(h("div", { class: "alert", id: "m-stale" }, `This match is out of date (${d.staleReasons.join(", ").toLowerCase().replace(/_/g, " ")}). Refresh it from the list.`));
+      if (rep.status !== "COMPLETE") {
+        body.append(h("div", { class: "empty", id: "m-failed" }, tile(), `The requirements of this posting could not be extracted reliably (${rep.failure?.code ?? "unknown"}). Orbital makes no claim about it rather than guess.`));
+      } else {
+        body.append(h("p", { class: "muted small" }, `Searched ${rep.evidence?.unitsSearched ?? 0} approved evidence item${rep.evidence?.unitsSearched === 1 ? "" : "s"}. Experience is counted only from approved professional employment.`));
+        if ((rep.evidence?.unitsSearched ?? 0) === 0) body.append(h("div", { class: "empty", id: "m-no-evidence" }, tile(), "You have no approved evidence in the active profile yet, so nothing can be supported. Approve facts on the Résumés and Review pages first."));
+        const conds = (rep.conditions ?? []).filter((c) => c.result !== "NOT_APPLICABLE");
+        if (conds.length) body.append(h("h4", {}, "Eligibility conditions in the posting"), ...conds.map(condCard));
+        const rolls = rep.itemRollups ?? [];
+        const done = new Set<string>();
+        const cards: HTMLElement[] = [];
+        for (const q of rep.requirements ?? []) {
+          const g = rolls.find((x) => x.memberIds.includes(q.requirementId));
+          if (!g) { cards.push(reqCard(q, d.match!.id)); continue; }
+          if (done.has(String(g.start))) continue;
+          done.add(String(g.start));
+          cards.push(groupCard(g, (rep.requirements ?? []).filter((m) => g.memberIds.includes(m.requirementId)), d.match!.id));
+        }
+        body.append(h("h4", {}, "Requirements"), ...cards);
+      }
+      $("#m-detail").hidden = false;
+      $("#m-detail").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (e) { showAlert(describe(e)); }
+  }
+
+  async function load(): Promise<void> {
+    const d = await api.get<{ disclaimer: string; total: number; jobs: Row[] }>("/api/v1/matches");
+    $("#m-disclaimer").textContent = d.disclaimer;
+    $("#m-total").textContent = `(${d.total})`;
+    const list = $("#m-list");
+    clear(list);
+    if (d.jobs.length === 0) list.append(h("div", { class: "empty", id: "m-empty" }, tile(), "No official postings are saved yet. ", h("a", { href: "/jobs" }, "Run discovery on the Jobs page"), "."));
+    else list.append(...d.jobs.map(row));
+  }
+
+  $("#m-close").addEventListener("click", () => { $("#m-detail").hidden = true; });
+  startPage({ load: async () => { showAlert(null); await load(); } });
+</script>

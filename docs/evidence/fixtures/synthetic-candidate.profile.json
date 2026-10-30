@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "candidateId": "synthetic-candidate",
+  "profileVersion": "synthetic.1",
+  "updatedAt": "2026-10-01",
+  "facts": [
+    {
+      "factId": "e-secops",
+      "kind": "employment",
+      "value": "Synthetic Corp — Security Engineer",
+      "polarity": "has",
+      "attributes": {
+        "employer": "Synthetic Corp",
+        "title": "Security Engineer",
+        "startDate": "2017-03",
+        "endDate": "2022-09",
+        "roleTags": [
+          "Security Engineering"
+        ]
+      },
+      "source": {
+        "kind": "user-statement",
+        "reference": "SYNTHETIC_CANDIDATE fixture"
+      },
+      "verification": {
+        "verifiedBy": "synthetic-reviewer (not a real person)",
+        "verifiedAt": "2026-10-01",
+        "validUntil": null
+      },
+      "approvalStatus": "approved",
+      "sensitivity": "normal"
+    },
+    {
+      "factId": "e-swe",
+      "kind": "employment",
+      "value": "Synthetic Labs — Software Engineer",
+      "polarity": "has",
+      "attributes": {
+        "employer": "Synthetic Labs",
+        "title": "Software Engineer",
+        "startDate": "2017-06",
+        "endDate": "2019-06",
+        "roleTags": [
+          "Software Engineering"
+        ]
+      },
+      "source": {
+        "kind": "user-statement",
+        "reference": "SYNTHETIC_CANDIDATE fixture"
+      },
+      "verification": {
+        "verifiedBy": "synthetic-reviewer (not a real person)",
+        "verifiedAt": "2026-10-01",
+        "validUntil": null
+      },
+      "approvalStatus": "approved",
+      "sensitivity": "normal"
+    },
+    {
+      "factId": "s-python",
+      "kind": "skill",
+      "value": "Python",
+      "polarity": "has",
+      "attributes": {
+        "experienceIds": [
+          "e-secops",
+          "e-swe"
+        ]
+      },
+      "source": {
+        "kind": "user-statement",
+        "reference": "SYNTHETIC_CANDIDATE fixture"
+      },
+      "verification": {
+        "verifiedBy": "synthetic-reviewer (not a real person)",
+        "verifiedAt": "2026-10-01",
+        "validUntil": null
+      },
+      "approvalStatus": "approved",
+      "sensitivity": "normal"
+    },
+    {
+      "factId": "s-java",
+      "kind": "skill",
+      "value": "Java",
+      "polarity": "has",
+      "attributes": {},
+      "source": {
+        "kind": "user-statement",
+        "reference": "SYNTHETIC_CANDIDATE fixture"
+      },
+      "verification": {
+        "verifiedBy": "synthetic-reviewer (not a real person)",
+        "verifiedAt": "2026-10-01",
+        "validUntil": null
+      },
+      "approvalStatus": "approved",
+      "sensitivity": "normal"
+    },
+    {
+      "factId": "s-aws",
+      "kind": "skill",
+      "value": "AWS IAM",
+      "polarity": "has",
+      "attributes": {},
+      "source": {
+        "kind": "user-statement",
+        "reference": "SYNTHETIC_CANDIDATE fixture"
+      },
+      "verification": {
+        "verifiedBy": "synthetic-reviewer (not a real person)",
+        "verifiedAt": "2026-10-01",
+        "validUntil": null
+      },
+      "approvalStatus": "approved",
+      "sensitivity": "normal"
+    }
+  ],
+  "preferences": {
+    "locationWorkMode": {
+      "terms": [
+        "united states"
+      ],
+      "strength": "mandatory",
+      "approvedBy": "synthetic-reviewer (not a real person)",
+      "approvedAt": "2026-10-01"
+    }
+  },
+  "employmentHistoryComplete": null
+}

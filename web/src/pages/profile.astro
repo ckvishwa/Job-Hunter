@@ -1,0 +1,96 @@
+---
+import Base from "../layouts/Base.astro";
+import PageHead from "../components/PageHead.astro";
+---
+
+<Base title="Orbital — Explicit statements" crumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Statements" }]}>
+  <PageHead eyebrow="Your explicit statements" number="04" title="Only you can state these." lead="Citizenship, security clearance, work authorization and future sponsorship are never read from a résumé and never guessed. Each exists only if you state it here, as its own fact." />
+  <section>
+    <h2>Add a statement</h2>
+    <form id="attest-form" class="row">
+      <select id="attest-kind" aria-label="Kind">
+        <option value="citizenship">Citizenship</option>
+        <option value="clearance">Security clearance</option>
+        <option value="work_authorization">Current work authorization</option>
+        <option value="sponsorship_need">Future sponsorship need</option>
+      </select>
+      <select id="attest-polarity" aria-label="Statement">
+        <option value="has">I have / I need</option>
+        <option value="lacks">I do not have / I do not need</option>
+      </select>
+      <input id="attest-value" placeholder="e.g. U.S. citizen" maxlength="300" required style="min-width:260px" />
+      <label><input id="attest-confirm" type="checkbox" /> I confirm this statement is true and current</label>
+      <button id="attest-submit" type="submit" disabled>Save statement</button>
+    </form>
+    <p id="attest-msg" role="status"></p>
+  </section>
+
+  <section>
+    <h2>Your statements</h2>
+    <table>
+      <thead><tr><th>Kind</th><th>Statement</th><th>Status</th><th>Confirmed</th></tr></thead>
+      <tbody id="attested"></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Profile revisions</h2>
+    <p class="muted">A new revision is recorded whenever a fact is approved, rejected, edited or stated.</p>
+    <table>
+      <thead><tr><th>#</th><th>Reason</th><th>Approved facts</th><th>Digest</th></tr></thead>
+      <tbody id="revisions"></tbody>
+    </table>
+  </section>
+</Base>
+
+<script>
+  import { api, ApiError, type FactView } from "../lib/api";
+  import { startPage } from "../lib/gate";
+  import { $, clear, h, say } from "../lib/dom";
+
+  const LABEL: Record<string, string> = { citizenship: "Citizenship", clearance: "Security clearance", work_authorization: "Work authorization", sponsorship_need: "Future sponsorship" };
+
+  async function load(): Promise<void> {
+    const { facts } = await api.get<{ facts: FactView[] }>("/api/v1/profile/attested-facts");
+    const body = $("#attested");
+    clear(body);
+    for (const f of facts) {
+      body.append(h("tr", { "data-fact-id": f.factId },
+        h("td", {}, LABEL[f.kind] ?? f.kind),
+        h("td", {}, `${f.polarity === "lacks" ? "NOT: " : ""}${f.value}`),
+        h("td", {}, h("span", { class: `badge ${f.approvalStatus}` }, f.approvalStatus)),
+        h("td", {}, f.verification.verifiedAt ?? "")));
+    }
+    const { revisions } = await api.get<{ revisions: Array<{ revisionNo: number; reason: string; approvedCount: number; profileDigest: string }> }>("/api/v1/profile/revisions");
+    const rev = $("#revisions");
+    clear(rev);
+    for (const r of [...revisions].reverse().slice(0, 25)) {
+      rev.append(h("tr", {}, h("td", {}, String(r.revisionNo)), h("td", {}, r.reason), h("td", {}, String(r.approvedCount)), h("td", {}, r.profileDigest.slice(0, 12))));
+    }
+  }
+
+  const confirm = $("#attest-confirm") as HTMLInputElement;
+  const submit = $("#attest-submit") as HTMLButtonElement;
+  confirm.addEventListener("change", () => (submit.disabled = !confirm.checked));
+
+  $("#attest-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const r = await api.post<{ created: boolean }>("/api/v1/profile/attested-facts", {
+        kind: ($("#attest-kind") as HTMLSelectElement).value,
+        polarity: ($("#attest-polarity") as HTMLSelectElement).value,
+        value: ($("#attest-value") as HTMLInputElement).value,
+        confirm: confirm.checked,
+      });
+      say($("#attest-msg"), r.created ? "Statement saved." : "That statement already exists.", "ok");
+      ($("#attest-value") as HTMLInputElement).value = "";
+      confirm.checked = false;
+      submit.disabled = true;
+      await load();
+    } catch (e) {
+      say($("#attest-msg"), e instanceof ApiError ? `${e.message} (${e.code})` : "Something went wrong.", "error");
+    }
+  });
+
+  startPage({ load });
+</script>

@@ -1,0 +1,1289 @@
+{
+  "schema_version": "1.0",
+  "name": "Job Hunter Execution Ledger",
+  "created_utc_date": "2026-10-14",
+  "baseline": "Reported as of Oct 14 2026; not a live code audit",
+  "canonical_prd": "docs/PRD.md",
+  "prd_sha256": "f308155c8dcfdf39e09dd7e38d1d9f9f580d40bac6278d1ef28b7df1cb3c60e7",
+  "allowed_task_statuses": [
+    "PLANNED",
+    "REPORTED_UNVERIFIED",
+    "IN_PROGRESS",
+    "BLOCKED",
+    "QA_REVIEW",
+    "VERIFIED"
+  ],
+  "status_claim": "No task or phase is VERIFIED at creation; prior working foundations are reported but unverified against current repository.",
+  "foundation_snapshots": [
+    {
+      "component": "Astro UI and Node/TypeScript orchestration",
+      "reported": "WORKING FOUNDATION",
+      "verified_now": false
+    },
+    {
+      "component": "Job discovery (25/30 boards; 5991 jobs at Oct 8 snapshot)",
+      "reported": "WORKING FOUNDATION",
+      "verified_now": false
+    },
+    {
+      "component": "PostgreSQL and migrations through 0011",
+      "reported": "WORKING FOUNDATION",
+      "verified_now": false
+    },
+    {
+      "component": "Qwen2.5:3B local JD extraction integration",
+      "reported": "WORKING FOUNDATION / QUALITY GAPS",
+      "verified_now": false
+    },
+    {
+      "component": "Relevance ML code and labels",
+      "reported": "SHADOW / NOT PROMOTED",
+      "verified_now": false
+    },
+    {
+      "component": "ATS final READY_TO_SUBMIT",
+      "reported": "NOT DEMONSTRATED",
+      "verified_now": false
+    }
+  ],
+  "phases": [
+    {
+      "id": "P0",
+      "name": "Audit, stabilize and recover",
+      "depends_on": [],
+      "prd_refs": [
+        "PRD \u00a72",
+        "PRD \u00a712 P0",
+        "G8"
+      ],
+      "exit_criterion": "Approved current repo baseline, non-destructive DB check, reproducible accepted Gate A (two clean serial runs or formal rebaseline).",
+      "blocker": "Latest reported full regression Gate A is BLOCKED; current branch/CI must be audited before marking any work complete.",
+      "qa_signoff": {
+        "reviewer": "",
+        "approved_at": "",
+        "evidence": ""
+      },
+      "tasks": [
+        {
+          "id": "P0-01",
+          "name": "Inventory branch/worktree, existing modules, dirty files and unpushed commits",
+          "status": "IN_PROGRESS",
+          "evidence": {
+            "commit_sha": "bfb21f8",
+            "test_command": "python scripts/sync_progress.py --check; git worktree list; git rev-list --left-right --count origin/main...careerops-integration",
+            "test_result": "PASS: ledger check OK; main is 118 commits behind careerops-integration (0 118); branch in sync with origin",
+            "test_log_or_ci": "docs/audit/REPOSITORY_INVENTORY.md",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": "Inventory authored by the Technical Lead session; docs/audit/REPOSITORY_INVENTORY.md. Independent review by Hani456 pending (invitation not yet accepted). Deliverable complete and awaiting review; not moved to QA_REVIEW because the checker requires an exact PASS result and a doc inventory has no automated test."
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": 2,
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 1
+        },
+        {
+          "id": "P0-02",
+          "name": "Verify PostgreSQL backup, migrations, data counts, and source board coverage",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": 3,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P0-03",
+          "name": "Diagnose CI/full-suite Gate A without weakening tests",
+          "status": "IN_PROGRESS",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": "Serialized Gate A runs 1-4 recorded in docs/qa/GATE_A_REPORT.md. Run 4 (ae5cf95): 1636 pass / 1 fail (s1-ui e2e). No run is clean yet. No test weakened."
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": 4,
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 1
+        },
+        {
+          "id": "P0-04",
+          "name": "Capture accepted complete regression evidence and baseline commit SHA",
+          "status": "IN_PROGRESS",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": "Needs two consecutive clean serialized runs on an identical code state plus independent reproduction; none yet."
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": 5,
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 1
+        },
+        {
+          "id": "P0-05",
+          "name": "Dashboard e2e sign-in regression: reproduce, root-cause, fix (6 failing tests in serialized run)",
+          "status": "IN_PROGRESS",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": "Dashboard e2e: 6 failures in run 1 only; 8/8 alone and in runs 2-4. Root cause unproven (suspected resource contention; host had ~5 GB of 31.7 GB free after run 4). Open until reproduced or explained."
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": 6,
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 1
+        },
+        {
+          "id": "P0-06",
+          "name": "Browser-search e2e typing-sequence race: classify test vs product defect and fix without weakening",
+          "status": "IN_PROGRESS",
+          "evidence": {
+            "commit_sha": "ae5cf95",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": "Browser-search render-sequence loss in runs 1 and 3; fixture now chains telemetry sends with retry (ae5cf95); passed in run 4 and alone x3. One passing full run is not proof; needs repeat and independent review."
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": 7,
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 1
+        },
+        {
+          "id": "P0-07",
+          "name": "Run services/ai and services/ml pytest suites independently and record results",
+          "status": "IN_PROGRESS",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": "pytest run by the Technical Lead session: services/ai 61 passed; services/ml 4 passed. Independent rerun by Hani456 pending."
+          },
+          "owner_role": "HANI",
+          "reviewer_role": "DEVELOPER",
+          "github_issue": 8,
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 1
+        },
+        {
+          "id": "P0-08",
+          "name": "GitHub security baseline: secret/PII scan in CI, branch protection, PR/issue templates, CODEOWNERS",
+          "status": "IN_PROGRESS",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": "main protected (PR + CI gate + 1 review, no force push); careerops-integration blocks force push/deletion; secret scanning enabled; gitleaks job in CI; CI fix for web deps; tiered CI via PR #12 merged into the M0 branch with a fail-closed draft lookup. Required-check behaviour on GitHub still to be proven (draft/manual/ready tests). Verified on Actions: draft = FAST-ONLY (runs 38640863205, 38641092817), manual full success (38641035560), ready_for_review full success (38641659563), stale draft re-run fails closed (38641092817 rerun). Still IN_PROGRESS: Hani review and required-check settings review pending."
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": 9,
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 12
+        },
+        {
+          "id": "P0-09",
+          "name": "Independent local setup and smoke run by QA on a second machine from docs/kt/LOCAL_SETUP.md",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "HANI",
+          "reviewer_role": "DEVELOPER",
+          "github_issue": 10,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P0-10",
+          "name": "M0 collaboration baseline: governance, notebook, KT package, draft PR",
+          "status": "IN_PROGRESS",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": "PR #1 open as draft with all documents; not mergeable until Gate A and independent review."
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": 11,
+          "branch": "chore/m0-collaboration-baseline",
+          "pull_request": 1
+        },
+        {
+          "id": "P0-11",
+          "name": "Internal read-only Project command center (/project): ledger/PRD/notebook dashboard and API",
+          "status": "IN_PROGRESS",
+          "evidence": {
+            "commit_sha": "d3959ee",
+            "test_command": "npm run typecheck; npm run test:fast; npx vitest run tests/e2e/offline/project.e2e.test.ts; npm run build --prefix web; python scripts/sync_progress.py --check",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": "Developer-run 2026-10-14 on feature/project-command-center (src/project/*, src/api/project-routes.ts, web/src/pages/project.astro, web/src/lib/project-model.ts, markdown-lite.ts, tests/project/*, tests/web/project-model.test.ts, tests/e2e/offline/project.e2e.test.ts): typecheck clean; test:fast 29 files / 418 tests pass; project e2e 13/13 (headed Chrome, synthetic data); web build OK; sync_progress --check OK. NOT VERIFIED: needs Hani456 independent reproduction on her machine plus CI at the review checkpoint. test_result is left empty on purpose (QA_REVIEW requires a recorded PASS from a clean reproduced run). Acceptance: counts/phase progress from ledger records, only accepted evidence counts as verified, Gate A shown BLOCKED while the ledger records a blocker, read-only authenticated API with fixed sources, text-only Markdown rendering, existing candidate routes unchanged. Dependency: branch is based on chore/m0-collaboration-baseline (e6d90b5); it needs that branch's ledger, notebook and tiered CI. Not Gate A evidence. No GitHub issue created yet."
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": "feature/project-command-center",
+          "pull_request": 14
+        }
+      ]
+    },
+    {
+      "id": "P1",
+      "name": "Secure intake and parser",
+      "depends_on": [
+        "P0"
+      ],
+      "prd_refs": [
+        "FR-0001\u20130005",
+        "FR-0101\u20130106",
+        "G0",
+        "G1"
+      ],
+      "exit_criterion": "Resume PDF/DOCX upload with consent, isolation, source spans, layout/security checks, passing negative tests.",
+      "blocker": null,
+      "qa_signoff": {
+        "reviewer": "",
+        "approved_at": "",
+        "evidence": ""
+      },
+      "tasks": [
+        {
+          "id": "P1-01",
+          "name": "Candidate consent, actor identity, file isolation and upload idempotency",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P1-02",
+          "name": "Build source-span PDF/DOCX parsing contract and FastAPI endpoint",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P1-03",
+          "name": "Test multi-column/DOCX ordering, hidden text, scans and untrusted input",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "HANI",
+          "reviewer_role": "DEVELOPER",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "name": "Resume fact intelligence",
+      "depends_on": [
+        "P1"
+      ],
+      "prd_refs": [
+        "FR-0201\u20130208",
+        "G2"
+      ],
+      "exit_criterion": "Employment/skill/date associations prove correct against independent gold cases; no invented skill duration.",
+      "blocker": null,
+      "qa_signoff": {
+        "reviewer": "",
+        "approved_at": "",
+        "evidence": ""
+      },
+      "tasks": [
+        {
+          "id": "P2-01",
+          "name": "Heuristic line type baseline and role/header/date grouping",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P2-02",
+          "name": "Skill graph aliases, negation, evidence tier and bounded duration",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P2-03",
+          "name": "Benchmark GLiNER Small CPU and selectively integrate only where it helps",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P2-04",
+          "name": "Independent skill/role-binding gold evaluation and edge-case suite",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "HANI",
+          "reviewer_role": "DEVELOPER",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "name": "Auto-grounding and fact persistence",
+      "depends_on": [
+        "P2"
+      ],
+      "prd_refs": [
+        "FR-0301\u20130308",
+        "G3"
+      ],
+      "exit_criterion": "Source-linked facts, permission-aware routing, append-only events, targeted reviews and safe resume re-upload.",
+      "blocker": null,
+      "qa_signoff": {
+        "reviewer": "",
+        "approved_at": "",
+        "evidence": ""
+      },
+      "tasks": [
+        {
+          "id": "P3-01",
+          "name": "Canonical Python schema, generated TS/Zod API validation",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P3-02",
+          "name": "PostgreSQL provenance, fact events, separate claim/review statuses",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P3-03",
+          "name": "AUTO/REVIEW/BLOCK routing with calibrated quality measurement",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P3-04",
+          "name": "Astro just-in-time exceptions, actor attribution and resume V2 diff tests",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        }
+      ]
+    },
+    {
+      "id": "P4",
+      "name": "JD AST, matching and eligibility",
+      "depends_on": [
+        "P3"
+      ],
+      "prd_refs": [
+        "FR-0401\u20130413",
+        "FR-0420\u20130426",
+        "FR-0430\u20130435",
+        "G4"
+      ],
+      "exit_criterion": "Official live JD has source-linked requirement coverage, correct three-valued matching and explainable shortlist.",
+      "blocker": null,
+      "qa_signoff": {
+        "reviewer": "",
+        "approved_at": "",
+        "evidence": ""
+      },
+      "tasks": [
+        {
+          "id": "P4-01",
+          "name": "ATS/HTTP discovery versioning, deduplication and closure safety",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P4-02",
+          "name": "JD requirement tree AND/OR, required/preferred, source coverage and disputed leaves",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P4-03",
+          "name": "Canonical skills plus semantic retrieval shortlist with partial-JD uncertainty",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P4-04",
+          "name": "TypeScript Kleene evaluator and experience-bound golden tests",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        }
+      ]
+    },
+    {
+      "id": "P5",
+      "name": "Custom ML classifier evaluation",
+      "depends_on": [
+        "P0"
+      ],
+      "prd_refs": [
+        "PRD \u00a77",
+        "FR-0421\u20130422",
+        "G4",
+        "G8"
+      ],
+      "exit_criterion": "Shadow relevance ML evaluated on independent, class-balanced holdout with calibrated accepted-prediction accuracy and coverage; promote only by separate approval.",
+      "blocker": null,
+      "qa_signoff": {
+        "reviewer": "",
+        "approved_at": "",
+        "evidence": ""
+      },
+      "tasks": [
+        {
+          "id": "P5-01",
+          "name": "Audit 216 reported label rows, consent, labeling tasks and leakage controls",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "HANI",
+          "reviewer_role": "DEVELOPER",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P5-02",
+          "name": "Train TF-IDF + Logistic Regression against deterministic baseline",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P5-03",
+          "name": "Evaluate class-wise precision/recall, calibration, abstention and shadow outcomes",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "HANI",
+          "reviewer_role": "DEVELOPER",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P5-04",
+          "name": "Write promotion/no-promotion decision; do not replace eligibility rules",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        }
+      ]
+    },
+    {
+      "id": "P6",
+      "name": "Deterministic ResumePlan",
+      "depends_on": [
+        "P4"
+      ],
+      "prd_refs": [
+        "FR-0501\u20130504",
+        "FR-0508",
+        "G5"
+      ],
+      "exit_criterion": "Candidate-authorized source-backed ResumePlan assembled without an SLM and with zero unsupported material claims in mandatory tests.",
+      "blocker": null,
+      "qa_signoff": {
+        "reviewer": "",
+        "approved_at": "",
+        "evidence": ""
+      },
+      "tasks": [
+        {
+          "id": "P6-01",
+          "name": "Rank/select grounded roles, skills and original bullets deterministically",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P6-02",
+          "name": "Preserve career chronology and immutable title/employer/date facts",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P6-03",
+          "name": "Astro material-fact approval and provenance-based claim policy",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P6-04",
+          "name": "Create source-linked ResumePlan and gold validation tests",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        }
+      ]
+    },
+    {
+      "id": "P7",
+      "name": "ATS DOCX/PDF and independent recovery",
+      "depends_on": [
+        "P6"
+      ],
+      "prd_refs": [
+        "FR-0601\u20130607",
+        "G6"
+      ],
+      "exit_criterion": "Approved single-column DOCX and PDF recover all critical fields and agree with same ResumePlan; report parseability separately from target ATS behavior.",
+      "blocker": null,
+      "qa_signoff": {
+        "reviewer": "",
+        "approved_at": "",
+        "evidence": ""
+      },
+      "tasks": [
+        {
+          "id": "P7-01",
+          "name": "Implement tested single-column ATS template and python-docx renderer",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P7-02",
+          "name": "Benchmark/implement Typst PDF renderer from same ResumePlan",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P7-03",
+          "name": "Independent DOCX/PDF parsers validate exact critical fields and order",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "HANI",
+          "reviewer_role": "DEVELOPER",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P7-04",
+          "name": "Persist artifact hash, parser results and separate ATS verification statuses",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        }
+      ]
+    },
+    {
+      "id": "P8",
+      "name": "Selective SLM rewriting",
+      "depends_on": [
+        "P7"
+      ],
+      "prd_refs": [
+        "FR-0505\u20130507",
+        "FR-0509",
+        "G5"
+      ],
+      "exit_criterion": "SLM improves selected writing while all claims remain traceable, with bounded retry and fallback; approved on independent adversarial tests.",
+      "blocker": null,
+      "qa_signoff": {
+        "reviewer": "",
+        "approved_at": "",
+        "evidence": ""
+      },
+      "tasks": [
+        {
+          "id": "P8-01",
+          "name": "Benchmark existing Qwen2.5:3B and candidate Llama without switching blindly",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P8-02",
+          "name": "Per-bullet constrained rewrite with evidence-only inputs and caching",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P8-03",
+          "name": "Novelty/tense/unsupported material claim rejection, optional NLI benchmark",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P8-04",
+          "name": "Regression tests and fallback to original on invalid rewrites",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "HANI",
+          "reviewer_role": "DEVELOPER",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        }
+      ]
+    },
+    {
+      "id": "P9",
+      "name": "Local Playwright application preparation",
+      "depends_on": [
+        "P7"
+      ],
+      "prd_refs": [
+        "FR-0701\u20130709",
+        "G7"
+      ],
+      "exit_criterion": "Authorized local headed browser correctly uploads, fills, reads back and stops at unexpired READY_TO_SUBMIT; never submits.",
+      "blocker": null,
+      "qa_signoff": {
+        "reviewer": "",
+        "approved_at": "",
+        "evidence": ""
+      },
+      "tasks": [
+        {
+          "id": "P9-01",
+          "name": "Inspect ATS fields in user-local headed Chrome and map authorized facts",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P9-02",
+          "name": "Automate allowed field fill/upload, read-back and failure states",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P9-03",
+          "name": "Test offline ATS snapshots, session expiry, sensitive answers and no submit",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "HANI",
+          "reviewer_role": "DEVELOPER",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P9-04",
+          "name": "QA-verified supervised application reaches READY_TO_SUBMIT",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        }
+      ]
+    },
+    {
+      "id": "P10",
+      "name": "Release and pilot hardening",
+      "depends_on": [
+        "P0",
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "P5",
+        "P6",
+        "P7",
+        "P8",
+        "P9"
+      ],
+      "prd_refs": [
+        "FR-0801\u20130805",
+        "PRD \u00a710\u201315",
+        "G0\u2013G8"
+      ],
+      "exit_criterion": "Security, privacy, model governance, QA, operations and pilot acceptance all signed off; release decision documented.",
+      "blocker": null,
+      "qa_signoff": {
+        "reviewer": "",
+        "approved_at": "",
+        "evidence": ""
+      },
+      "tasks": [
+        {
+          "id": "P10-01",
+          "name": "Trace IDs, idempotency, bounded retries, resource and failure recovery",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "DEVELOPER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P10-02",
+          "name": "Privacy/tenant isolation, deletion, retention and prompt-injection testing",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "HANI",
+          "reviewer_role": "DEVELOPER",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P10-03",
+          "name": "Re-run complete CI, E2E and performance/QA signoff on final SHA",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "HANI",
+          "reviewer_role": "DEVELOPER",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        },
+        {
+          "id": "P10-04",
+          "name": "Pilot UAT and explicit human product release approval",
+          "status": "PLANNED",
+          "evidence": {
+            "commit_sha": "",
+            "test_command": "",
+            "test_result": "",
+            "test_log_or_ci": "",
+            "qa_reviewer": "",
+            "qa_signoff_at": "",
+            "notes": ""
+          },
+          "owner_role": "PRODUCT_OWNER",
+          "reviewer_role": "HANI",
+          "github_issue": null,
+          "branch": null,
+          "pull_request": null
+        }
+      ]
+    }
+  ],
+  "collaboration": {
+    "roles": {
+      "DEVELOPER": "ckvishwa: Technical Lead, Principal Developer, AI/ML Architect and Mentor. Owns architecture, technology decisions, AI/ML model development, full-stack implementation, delegation, integration, production model promotion.",
+      "HANI": "Senior AI/ML & SDET Intern reporting to the Technical Lead. Shadows AI/ML, writes automated tests and ML evaluation code, reports defects, independently verifies the Technical Lead's work, contributes supporting code under mentorship. No architecture or production-promotion authority unless explicitly delegated. GitHub: Hani456 (invitation sent, acceptance pending).",
+      "PRODUCT_OWNER": "Same person as the Technical Lead; scope/ADR decisions and release approval. Never substitutes for QA evidence."
+    },
+    "rule": "owner_role may not be the sole approver; reviewer_role performs QA_REVIEW -> VERIFIED only with commit-specific, actually-run test evidence",
+    "milestones": {
+      "M0": [
+        "P0-01",
+        "P0-05",
+        "P0-06",
+        "P0-07",
+        "P0-08",
+        "P0-09",
+        "P0-10",
+        "P0-11"
+      ],
+      "M1": [
+        "P0-02",
+        "P0-03",
+        "P0-04"
+      ],
+      "M2": [
+        "P1",
+        "P2",
+        "P3"
+      ],
+      "M3": [
+        "P4",
+        "P5"
+      ],
+      "M4": [
+        "P6",
+        "P7",
+        "P8"
+      ],
+      "M5": [
+        "P9"
+      ],
+      "M6": [
+        "P10"
+      ]
+    },
+    "note": "M0 (collaboration-ready baseline) may complete with Gate A red; M1 requires Gate A green.",
+    "role_change_2026-10-14": "Final reporting structure (ADR-0001 amendment A2) supersedes A1: ML models are built by the Technical Lead; Hani owns test/evaluation-code tasks and independent verification.",
+    "github_accounts": {
+      "DEVELOPER": "ckvishwa",
+      "HANI": "Hani456"
+    }
+  }
+}

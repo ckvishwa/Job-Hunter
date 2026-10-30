@@ -1,23 +1,44 @@
 import type { DiscoveredJobLite, PortalDiscoveryAdapter, DiscoveryContext } from "../types.js";
 import { pauseForVerification } from "../../browser/verification.js";
+import { pacer, withRetry } from "../rate-limit.js";
 
 export const linkedinPublicDiscoveryAdapter: PortalDiscoveryAdapter = {
   source: "linkedin-public",
 
   async discover(context: DiscoveryContext): Promise<void> {
-    const { page, keyword, location, settings, checkpoint, onPageProcessed } = context;
+    const { page, keyword, location, settings, checkpoint, onPageProcessed, portalConfig } = context;
+    if (!portalConfig) {
+      throw new Error(
+        `linkedin-public adapter requires a portalConfig (config/portals.yml entry with id "linkedin-public") in the discovery context`,
+      );
+    }
+    if (!portalConfig.jobLinkSelector) {
+      throw new Error(`Portal "${portalConfig.id}" (linkedin-public) is missing required "jobLinkSelector"`);
+    }
+    const jobLinkSelector = portalConfig.jobLinkSelector;
     const startPage = checkpoint.lastPage + 1;
+    const pace = pacer(settings.delayBetweenRequestsMs);
+    const keywordParam = portalConfig.keywordParam ?? "keywords";
+    const locationParam = portalConfig.locationParam ?? "location";
 
     for (let pageNum = startPage; pageNum <= settings.maxPagesPerSource; pageNum++) {
+      // "start" is LinkedIn's pagination-offset param, not a portal-identity selector, kept
+      // hardcoded per adapter.
       const startParam = (pageNum - 1) * 25;
-      const url = `https://www.linkedin.com/jobs/search?keywords=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}&start=${startParam}`;
+      const url = `${portalConfig.baseUrl}?${keywordParam}=${encodeURIComponent(keyword)}&${locationParam}=${encodeURIComponent(location)}&start=${startParam}`;
 
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs });
-      await pauseForVerification(page);
+      await pace(url);
+      await withRetry(
+        () => page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs }),
+        { retries: 2, backoffMs: 500 },
+      );
+      const verification = await pauseForVerification(page);
+      if (verification.detected) {
+        context.onVerificationPause?.();
+      }
 
-      // Selectors for LinkedIn public
-      const cardSelector = ".job-search-card, .base-search-card, li[data-id]";
-      const cards = await page.$$(cardSelector);
+      // Selectors for LinkedIn public (from config/portals.yml's "linkedin-public" entry)
+      const cards = await page.$$(portalConfig.resultCardSelector);
 
       if (cards.length === 0) {
         break;
@@ -25,12 +46,18 @@ export const linkedinPublicDiscoveryAdapter: PortalDiscoveryAdapter = {
 
       const jobs: DiscoveredJobLite[] = [];
       for (const card of cards) {
-        const title = await card.$eval(".base-search-card__title, h3", (el) => el.textContent?.trim() ?? "").catch(() => "");
-        const href = await card.$eval("a.base-card__full-link, a", (el) => (el as HTMLAnchorElement).href).catch(() => "");
-        const company = await card.$eval(".base-search-card__subtitle, h4, [class*='subtitle']", (el) => el.textContent?.trim() ?? "").catch(() => "");
-        const loc = await card.$eval(".job-search-card__location, span[class*='location']", (el) => el.textContent?.trim() ?? "").catch(() => "");
-        const salary = await card.$eval(".job-search-card__salary-info", (el) => el.textContent?.trim() ?? null).catch(() => null);
-        const age = await card.$eval("time, .job-search-card__listdate", (el) => el.textContent?.trim() ?? el.getAttribute("datetime") ?? null).catch(() => null);
+        const title = await card.$eval(portalConfig.titleSelector, (el) => el.textContent?.trim() ?? "").catch(() => "");
+        const href = await card.$eval(jobLinkSelector, (el) => (el as HTMLAnchorElement).href).catch(() => "");
+        const company = portalConfig.companySelector
+          ? await card.$eval(portalConfig.companySelector, (el) => el.textContent?.trim() ?? "").catch(() => "")
+          : "";
+        const loc = await card.$eval(portalConfig.locationSelector, (el) => el.textContent?.trim() ?? "").catch(() => "");
+        const salary = portalConfig.salarySelector
+          ? await card.$eval(portalConfig.salarySelector, (el) => el.textContent?.trim() ?? null).catch(() => null)
+          : null;
+        const age = portalConfig.dateSelector
+          ? await card.$eval(portalConfig.dateSelector, (el) => el.textContent?.trim() ?? el.getAttribute("datetime") ?? null).catch(() => null)
+          : null;
 
         if (!href || !title) continue;
 
@@ -56,6 +83,12 @@ export const linkedinPublicDiscoveryAdapter: PortalDiscoveryAdapter = {
           sourceJobId: jobId,
           discoveredAt: new Date().toISOString(),
           matchedProfiles: [],
+          department: null,
+          descriptionSnippet: null,
+          searchedProfile: null,
+          matchedKeywords: [],
+          matchedFields: [],
+          relevanceReason: "",
         });
       }
 

@@ -1,10 +1,77 @@
 node_modules/
 dist/
 .chrome-profile/
+.chrome-profile-run-*/
 data/*.sqlite
 data/*.jsonl
+data/checkpoints.json
+data/hunt-state.json
+data/pre-hunt-mvp-backup/
 output/*.html
 output/*.csv
 output/*.json
 !output/.gitkeep
 *.log
+
+# V1 Slice 1 live-proof outputs (private to this machine; evidence summary lives in docs/evidence)
+data/slice1-*/
+data/search-demo/
+
+# Private candidate data (pending/approved facts, reviews); never commit
+private-runtime/
+
+# Private and generated artifacts: never commit
+*.xlsx
+tmp/
+generated-resumes/
+resumes/
+resume-preview*.pdf
+output/**/resume*.pdf
+output/**/resume-plan.json
+output/**/application-*.json
+candidate-facts/
+candidate-profile.reviewed*.json
+candidate-answer-observations*.json
+pending-facts*.json
+canonical-resume-registry*.json
+
+# Local agent working notes (compact handoff); never tracked
+.agent-runtime/
+
+# S1 (candidate workflow): local secrets, virtualenv, Astro build output
+infra/.env
+services/ai/.venv/
+services/ai/**/__pycache__/
+services/ai/.pytest_cache/
+web/node_modules/
+web/dist/
+web/.astro/
+web/.build-lock/
+
+# S3: the owner's own list of official employer boards (see config/company-boards.example.json)
+config/company-boards.json
+
+# ML build output / private reference imagery
+services/ml/__pycache__/
+**/__pycache__/
+*.pyc
+docs/evidence/orbital-screens/
+# JH-REPO-001 R4.3: private candidate data and ML runtime artefacts (PII: never commit)
+data/Resumes/
+HIGH_CONFIDENT/
+services/ai/.venv-marker/
+services/resume-layoutlmv3/private-runtime/
+services/resume-layoutlmv3/.venv/
+services/resume-layoutlmv3/models/*
+!services/resume-layoutlmv3/models/.gitkeep
+/ml/
+# Secrets, key material, local databases, model weights and browser profiles
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.safetensors
+*.gguf
+*.onnx
+JobHunterPrivate/

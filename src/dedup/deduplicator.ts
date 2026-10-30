@@ -1,6 +1,6 @@
 import { canonicalizeUrl } from "./canonicalize-url.js";
 import { fingerprintDescription } from "./fingerprint.js";
-import type { JobPosting } from "../adapters/types.js";
+import type { JobPosting, SourceObservation } from "../adapters/types.js";
 
 function normalizeKey(...parts: (string | null)[]): string {
   return parts.map((part) => (part ?? "").toLowerCase().trim().replace(/\s+/g, " ")).join("::");
@@ -53,6 +53,24 @@ function hasFingerprintableDescription(descriptionText: string): boolean {
   return descriptionText.trim().length >= MIN_FINGERPRINTABLE_DESCRIPTION_LENGTH;
 }
 
+function observationKey(o: SourceObservation): string {
+  return `${o.sourceKind}|${o.observedUrl}|${o.finalUrl}|${o.extractionMethod}`;
+}
+
+// Same sighting seen again keeps one entry (with the newest observedAt); a new URL or a
+// different extraction method is a new observation. Capped so a job re-seen for months stays small.
+const MAX_OBSERVATIONS = 20;
+
+function mergeObservations(
+  previous: SourceObservation[] | undefined,
+  incoming: SourceObservation[] | undefined,
+): SourceObservation[] | undefined {
+  if (!previous && !incoming) return undefined;
+  const byKey = new Map<string, SourceObservation>();
+  for (const o of [...(previous ?? []), ...(incoming ?? [])]) byKey.set(observationKey(o), o);
+  return [...byKey.values()].slice(-MAX_OBSERVATIONS);
+}
+
 export function mergeJobs(
   existing: JobPosting[],
   incoming: JobPosting[],
@@ -63,8 +81,10 @@ export function mergeJobs(
   const byReq = new Map<string, number>();
   const byCompanyTitleLoc = new Map<string, number>();
   const byFingerprint = new Map<string, number>();
+  const byAtsIdentity = new Map<string, number>();
 
   function index(job: JobPosting, idx: number): void {
+    if (job.atsIdentity) byAtsIdentity.set(job.atsIdentity, idx);
     byUrl.set(canonicalizeUrl(job.canonicalUrl), idx);
     if (job.requisitionId) byReq.set(`${job.source}::${job.requisitionId}`, idx);
     if (hasUsableTitle(job.title)) {
@@ -76,6 +96,7 @@ export function mergeJobs(
   }
 
   function deindex(job: JobPosting, idx: number): void {
+    if (job.atsIdentity && byAtsIdentity.get(job.atsIdentity) === idx) byAtsIdentity.delete(job.atsIdentity);
     const urlKey = canonicalizeUrl(job.canonicalUrl);
     if (byUrl.get(urlKey) === idx) byUrl.delete(urlKey);
     if (job.requisitionId) {
@@ -102,13 +123,24 @@ export function mergeJobs(
     const ctlKey = normalizeKey(incomingJob.company, incomingJob.title, incomingJob.location);
     const fpKey = fingerprintDescription(incomingJob.descriptionText);
 
-    const matchIdx =
+    // Two postings with different stable ATS identities are different requisitions, full stop:
+    // they may share a title, a location and even a boilerplate description. The looser
+    // tiers below can only ever *join* postings when no such identity contradicts the match.
+    const candidateIdx =
+      (incomingJob.atsIdentity ? byAtsIdentity.get(incomingJob.atsIdentity) : undefined) ??
       byUrl.get(urlKey) ??
       (reqKey ? byReq.get(reqKey) : undefined) ??
       (hasUsableTitle(incomingJob.title) ? byCompanyTitleLoc.get(ctlKey) : undefined) ??
       (hasFingerprintableDescription(incomingJob.descriptionText)
         ? byFingerprint.get(fpKey)
         : undefined);
+
+    const identityConflict =
+      candidateIdx !== undefined &&
+      !!incomingJob.atsIdentity &&
+      !!result[candidateIdx]!.atsIdentity &&
+      result[candidateIdx]!.atsIdentity !== incomingJob.atsIdentity;
+    const matchIdx = identityConflict ? undefined : candidateIdx;
 
     if (matchIdx !== undefined) {
       const original = result[matchIdx]!;
@@ -132,6 +164,7 @@ export function mergeJobs(
         lastSeenAt: now,
         discoveredFrom: mergedDiscoveredFrom,
         matchedProfiles: mergedProfiles,
+        sourceObservations: mergeObservations(original.sourceObservations, incomingJob.sourceObservations),
       };
       result[matchIdx] = merged;
       index(merged, matchIdx);

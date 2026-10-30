@@ -10,17 +10,30 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
   async discover(context: DiscoveryContext): Promise<void> {
     const { page, keyword, settings, checkpoint, onPageProcessed } = context;
 
-    const registryPath = path.resolve("config/fortune500_registry.json");
+    const registryPath = path.resolve(context.companyRegistryPath ?? "config/fortune500-registry.json");
     const companies = loadCompanyRegistry(registryPath);
 
     const searches = [
       {
         keyword: keyword,
-        profileIds: (context as any).profileIds || [],
+        profileIds: context.profileIds,
       },
     ];
 
-    const startIndex = checkpoint.lastPage;
+    // Company completion isn't sequential (company 5 can fail while company 6 succeeds), so
+    // unlike portal pagination's lastPage cursor, resume tracks exactly which companies are
+    // done via checkpoint.completedCompanyKeys. Keyed by "company::corporateDomain" (the same
+    // pair Task 2's registry schema already enforces as unique) rather than array index -- the
+    // registry can grow/reorder between runs, and a raw index would silently point at the
+    // wrong company after that. Every run considers every company, skipping only keys already
+    // recorded as done; failed companies are retried each run/resume.
+    if (!checkpoint.completedCompanyKeys) checkpoint.completedCompanyKeys = [];
+    const completedKeys = checkpoint.completedCompanyKeys;
+    // corporateDomain can be null (ambiguous/unverified identity) -- falls back to a stable
+    // "no-domain" marker rather than crashing; the company name half of the key still keeps
+    // distinct unresolved companies from colliding in practice.
+    const registryKey = (c: { company: string; corporateDomain: string | null }): string =>
+      `${c.company.toLowerCase()}::${c.corporateDomain?.toLowerCase() ?? "(no-domain)"}`;
 
     // Only greenhouse/lever registry entries carry enough verified data to build a real
     // SiteConfig today (a boardToken/site slug). Workday needs a verified per-company ATS
@@ -32,30 +45,74 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
     let readyCount = 0;
     const skipped: { company: string; atsType: string; reason: string; missingFields: string[] }[] = [];
 
-    // checkpointCursor is the resume point persisted to disk. It only advances past a
-    // company once that company has been attempted (successfully or as a structural skip);
-    // it freezes at the first *failure* so a future --resume retries that company instead
-    // of silently skipping it forever. Within this run we still attempt every remaining
-    // company once -- no retry loop within a single run.
-    let checkpointCursor = startIndex;
-    let hitFailure = false;
+    // --company filter: companies that don't match are neither attempted nor marked
+    // completed, so a later run with a different (or no) --company can still process them.
+    // filteredOutCount tracks how many were excluded *this run* so the end-of-run
+    // completeness check below doesn't wrongly demand they be completed too.
+    let filteredOutCount = 0;
 
-    for (let i = startIndex; i < companies.length; i++) {
+    for (let i = 0; i < companies.length; i++) {
       const company = companies[i]!;
+      const companyKey = registryKey(company);
+      if (completedKeys.includes(companyKey)) continue;
+
+      if (context.companyFilter && company.company.toLowerCase() !== context.companyFilter.toLowerCase()) {
+        filteredOutCount += 1;
+        continue;
+      }
+
       const companyName = company.company.toLowerCase();
       console.log(`[company-careers] Processing company: ${company.company} (${company.atsType})`);
 
-      if (company.atsType === "workday") {
-        console.log(`[company-careers] Skipping ${company.company}: workday requires a verified per-company ATS site identifier not yet stored in the registry. No site value guessed.`);
+      if (!company.careersUrl) {
+        console.log(`[company-careers] Skipping ${company.company}: no verified careers URL yet. No value guessed.`);
         skipped.push({
           company: company.company,
           atsType: company.atsType,
-          reason: "missing verified Workday ATS site identifier",
-          missingFields: ["atsWorkdaySite"],
+          reason: "no verified careers URL",
+          missingFields: ["careersUrl"],
         });
-        if (!hitFailure) checkpointCursor = i + 1;
-        await onPageProcessed([], checkpointCursor);
+        completedKeys.push(companyKey);
+        await onPageProcessed([], i + 1);
+        context.onCompanyProcessed?.();
         continue;
+      }
+      // Narrowed from here on: careersUrl is a non-null string for the rest of this iteration.
+      const careersUrl = company.careersUrl;
+
+      if (company.atsType === "workday") {
+        const missingFields: string[] = [];
+        if (!company.atsWorkdayHostname) missingFields.push("atsWorkdayHostname");
+        if (!company.atsTenantOrBoardId) missingFields.push("atsTenantOrBoardId");
+        if (!company.atsWorkdaySite) missingFields.push("atsWorkdaySite");
+        // "careers" is the generic guessed default an earlier version of this adapter used to
+        // fabricate when no real site segment was known -- explicitly rejected here so a
+        // stale/guessed value left in the registry can never silently pass validation just
+        // because the field happens to be non-empty.
+        if (company.atsWorkdaySite === "careers") missingFields.push('atsWorkdaySite (guessed value "careers" rejected)');
+
+        if (missingFields.length > 0) {
+          console.log(`[company-careers] Skipping ${company.company}: workday requires verified registry fields not yet present: ${missingFields.join(", ")}. No value guessed.`);
+          skipped.push({
+            company: company.company,
+            atsType: company.atsType,
+            reason: "missing or guessed Workday ATS fields",
+            missingFields,
+          });
+          // A structural skip is a permanent, non-transient outcome (the registry data will
+          // never appear mid-run) -- mark it done so it isn't reattempted every run. If the
+          // registry is later filled in with real data for this company, a --reset-checkpoint
+          // (or manually clearing this key) is required to retry it -- matches how a completed
+          // success is handled, no separate mechanism invented for this narrower case.
+          completedKeys.push(companyKey);
+          await onPageProcessed([], i + 1);
+          // Structural skips ARE company-level attempts (this company was considered this run,
+          // just couldn't proceed past the ATS-adapter step) -- reported same as a full attempt.
+          context.onCompanyProcessed?.();
+          continue;
+        }
+        // Falls through to the shared try/catch below, which builds site.workday from these
+        // exact verified fields (no guessing) and delegates to the real workday adapter.
       }
 
       if (company.atsType === "generic") {
@@ -66,8 +123,27 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
           reason: "missing verified generic-portal selectors",
           missingFields: ["genericSelectors"],
         });
-        if (!hitFailure) checkpointCursor = i + 1;
-        await onPageProcessed([], checkpointCursor);
+        completedKeys.push(companyKey);
+        await onPageProcessed([], i + 1);
+        context.onCompanyProcessed?.();
+        continue;
+      }
+
+      // ashby/icims/unknown -- no native adapter exists for these; CareerOps is the intended
+      // discovery path for them (--source careerops), not this company-careers pipeline.
+      // "generic" is already excluded above (always skipped), so this check narrows atsType
+      // to exactly "greenhouse" | "lever" | "workday" for the rest of this iteration.
+      if (company.atsType !== "greenhouse" && company.atsType !== "lever" && company.atsType !== "workday") {
+        console.log(`[company-careers] Skipping ${company.company}: atsType "${company.atsType}" has no native adapter (use --source careerops).`);
+        skipped.push({
+          company: company.company,
+          atsType: company.atsType,
+          reason: "atsType has no native adapter",
+          missingFields: [],
+        });
+        completedKeys.push(companyKey);
+        await onPageProcessed([], i + 1);
+        context.onCompanyProcessed?.();
         continue;
       }
 
@@ -75,7 +151,7 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
         const site: SiteConfig = {
           id: `company-careers::${companyName}`,
           name: company.company,
-          url: company.careersUrl,
+          url: careersUrl,
           adapter: company.atsType,
           enabled: true,
         };
@@ -84,13 +160,21 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
           site.greenhouse = { boardToken: company.atsTenantOrBoardId || undefined };
         } else if (company.atsType === "lever") {
           site.lever = { site: company.atsTenantOrBoardId || undefined };
+        } else if (company.atsType === "workday") {
+          // All three fields were already confirmed present (non-null, non-guessed) by the
+          // validation above -- built exclusively from verified registry values, never guessed.
+          site.workday = {
+            hostname: company.atsWorkdayHostname!,
+            tenant: company.atsTenantOrBoardId!,
+            site: company.atsWorkdaySite!,
+          };
         }
 
         const genericDeps = {
           context: page.context(),
           onVerificationPause: () => {
-            if ((context as any).onVerificationPause) {
-              (context as any).onVerificationPause();
+            if (context.onVerificationPause) {
+              context.onVerificationPause();
             }
           },
         };
@@ -103,15 +187,31 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
         // is free and gives the real location instead of guessing one. Workday/generic (both
         // skipped above) are the only adapters where fetchesPerJob is true; if that ever
         // changes, this still only fetches real data, never fabricates it.
+        // Snippet length cap for the lightweight relevance-evaluation field -- this is
+        // deliberately NOT the full JD (that's what resolution is for); just enough of the
+        // real, already-fetched description text for relevance.ts to check for domain terms.
+        const SNIPPET_MAX_CHARS = 500;
+
         const jobs: DiscoveredJobLite[] = [];
         for (const job of discovered) {
           let location = "";
           let salarySnippet: string | null = null;
+          let department: string | null = null;
+          let descriptionSnippet: string | null = null;
           if (!adapter.fetchesPerJob) {
+            // Greenhouse/Lever's fetchJobDetails is a pure local transform over data already
+            // fetched by discoverJobs (no extra network call) -- department/description come
+            // along for free here, real data, never a separate detail fetch just for this.
             const raw = await adapter.fetchJobDetails(job, site, settings);
             location = raw.location ?? "";
             salarySnippet = raw.salaryText;
+            department = raw.department;
+            descriptionSnippet = raw.descriptionText ? raw.descriptionText.slice(0, SNIPPET_MAX_CHARS) : null;
           }
+          // Workday (fetchesPerJob: true) has no department/description at discovery time --
+          // its list endpoint only returns title + a path segment. Left null ("when
+          // available") rather than triggering a per-job detail fetch before relevance
+          // filtering has even decided whether this job is worth resolving at all.
           jobs.push({
             source: "company-careers",
             searchKeyword: keyword,
@@ -125,6 +225,15 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
             sourceJobId: job.externalId,
             discoveredAt: new Date().toISOString(),
             matchedProfiles: job.matchedProfiles,
+            department,
+            descriptionSnippet,
+            // Relevance evaluation (evidence + retain/reject) runs centrally in
+            // orchestrator.ts's onPageProcessed, not per-adapter -- these start as neutral
+            // placeholders and are overwritten there before a job is ever written to disk.
+            searchedProfile: null,
+            matchedKeywords: [],
+            matchedFields: [],
+            relevanceReason: "",
           });
         }
 
@@ -137,22 +246,51 @@ export const companyCareersDiscoveryAdapter: PortalDiscoveryAdapter = {
         });
 
         readyCount += 1;
-        if (!hitFailure) checkpointCursor = i + 1;
-        await onPageProcessed(newJobs, checkpointCursor);
+        completedKeys.push(companyKey);
+        await onPageProcessed(newJobs, i + 1);
+        context.onCompanyProcessed?.();
       } catch (err) {
-        hitFailure = true;
         console.error(
-          `[company-careers] Error processing company ${company.company}: ${(err as Error).message}. Checkpoint held at index ${checkpointCursor} -- will retry on next --resume.`,
+          `[company-careers] Error processing company ${company.company}: ${(err as Error).message}. Not marked complete -- will retry on next --resume.`,
         );
-        await onPageProcessed([], checkpointCursor);
+        await onPageProcessed([], i + 1);
+        // Still an attempt -- it just failed. Only the --company-filtered exclusion above
+        // (never attempted at all) skips this callback.
+        context.onCompanyProcessed?.();
       }
     }
 
     console.log(
-      `[company-careers] Registry coverage: ${readyCount} ready, ${skipped.length} skipped, ${companies.length} total. ` +
+      `[company-careers] Registry coverage: ${readyCount} ready, ${skipped.length} skipped, ` +
+        `${filteredOutCount} excluded by --company filter, ${companies.length} total. ` +
         (skipped.length > 0
           ? `Skipped: ${skipped.map((s) => `${s.company} (${s.reason})`).join("; ")}`
           : "No skips."),
     );
+
+    // The orchestrator marks the whole checkpoint `completed: true` unconditionally once
+    // discover() returns without throwing (it has no visibility into per-company outcomes).
+    // Since every per-company failure above is already caught, discover() would otherwise
+    // never throw and the orchestrator would wrongly mark this source::keyword::location
+    // combo fully done even with companies pending retry -- which would make --resume never
+    // re-enter this adapter at all (the orchestrator skips already-`completed` checkpoints
+    // before calling discover()). Throwing here, after every company's real work and
+    // checkpointing has already happened via onPageProcessed, keeps `checkpoint.completed`
+    // false so a future run retries exactly the still-incomplete companies.
+    // Companies filtered out by --company were never attempted this run -- they don't count
+    // toward "not completed" (only ATTEMPTED-and-failed companies should trigger a retry).
+    // A --company run that legitimately finished its narrower scope should not itself throw
+    // (that would misreport a clean success as a failure at the orchestrator level). The
+    // separate hazard this could otherwise cause -- the orchestrator marking the WHOLE
+    // checkpoint completed: true after a merely-narrow success, permanently skipping every
+    // other company forever -- is guarded at the orchestrator layer instead (it owns
+    // filters.company and only suppresses completion for company-careers specifically when a
+    // filter is active), not here.
+    const expectedCompleted = companies.length - filteredOutCount;
+    if (completedKeys.length < expectedCompleted) {
+      throw new Error(
+        `[company-careers] ${expectedCompleted - completedKeys.length} of ${expectedCompleted} companies not completed this run (failures); will retry on next --resume.`,
+      );
+    }
   },
 };

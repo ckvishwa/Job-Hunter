@@ -1,0 +1,38 @@
+{
+ "recordedFrom": "ollama qwen2.5:3b-instruct-q4_K_M, ollama-job-extraction@16, live run 2026-10-08; greenhouse:expel:8588028002",
+ "jdSha256": "9331dbb09a389ac35d5d0346ba2b6c43bc24767560e0d37188026bb93cff5a6a",
+ "doneReasons": [
+  "stop"
+ ],
+ "responses": [
+  {
+   "version": 1,
+   "annotations": [
+    {
+     "sourceId": "s1np",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s1sl",
+     "kind": "domain_knowledge"
+    },
+    {
+     "sourceId": "s1v1",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s1xg",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s1zx",
+     "kind": "skill"
+    },
+    {
+     "sourceId": "s220",
+     "kind": "domain_knowledge"
+    }
+   ]
+  }
+ ]
+}

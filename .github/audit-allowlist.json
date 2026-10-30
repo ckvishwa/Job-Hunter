@@ -1,0 +1,59 @@
+{
+  "policy": "docs/sdlc/CI.md section 'Dependency advisory triage'. Production advisories (moderate or higher) are never allowlisted. A critical or high advisory in development tooling needs an entry here with a reason, an owner, a remediation and an expiry; an expired entry fails the gate again.",
+  "entries": [
+    {
+      "id": 1139528,
+      "package": "vitest",
+      "severity": "critical",
+      "reason": "Concerns the Vitest UI server listening on a port. CI and local runs use `vitest run` (no UI server, no --api flag) so the vulnerable surface is not started.",
+      "owner": "repository owner",
+      "remediation": "Upgrade vitest to the next major (reported fix 5.0.x) in ticket SDLC-T08 and rerun the full suite; the fix is a major version change.",
+      "expires": "2026-11-13"
+    },
+    {
+      "id": 1241260,
+      "package": "tinypool",
+      "severity": "critical",
+      "reason": "Prototype-pollution gadget through worker options passed to the pool. Options are set only by the repository's own vitest config; no untrusted input reaches the pool in CI or locally.",
+      "owner": "repository owner",
+      "remediation": "Resolved by the same vitest major upgrade (SDLC-T08).",
+      "expires": "2026-11-13"
+    },
+    {
+      "id": 1241261,
+      "package": "tinypool",
+      "severity": "critical",
+      "reason": "Second tinypool advisory (options to run()) with the same exposure as above: only repository-controlled test configuration reaches it.",
+      "owner": "repository owner",
+      "remediation": "Resolved by the same vitest major upgrade (SDLC-T08).",
+      "expires": "2026-11-13"
+    },
+    {
+      "id": 1139427,
+      "package": "nanoid",
+      "severity": "high",
+      "reason": "Custom generators with size zero can loop. Transitive dev dependency; the repository never calls nanoid with a custom generator.",
+      "owner": "repository owner",
+      "remediation": "A non-major fix is available (`npm audit fix`); apply it in SDLC-T08 with the lockfile diff reviewed.",
+      "expires": "2026-11-13"
+    },
+    {
+      "id": 1241209,
+      "package": "source-map-js",
+      "severity": "high",
+      "reason": "Event-loop denial of service through crafted indexed source maps. Transitive dev dependency processing only repository-built maps.",
+      "owner": "repository owner",
+      "remediation": "A non-major fix is available (`npm audit fix`); apply it in SDLC-T08 with the lockfile diff reviewed.",
+      "expires": "2026-11-13"
+    },
+    {
+      "id": 1242658,
+      "package": "vite",
+      "severity": "high",
+      "reason": "Vite development-server advisory (GHSA-587h-7wmj-h5pm). Vite is a transitive dependency of vitest; no Vite dev server is started by vitest run, and the web app is built with Astro and previewed on loopback only.",
+      "owner": "repository owner",
+      "remediation": "Planned, not yet done: the vitest major upgrade (SDLC-T08) clears this and the vitest, tinypool and esbuild advisories; the lockfile still pins vitest 2.x and vite 5.x. Revisit before the expiry.",
+      "expires": "2026-11-13"
+    }
+  ]
+}

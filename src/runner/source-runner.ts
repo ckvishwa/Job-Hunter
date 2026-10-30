@@ -1,8 +1,9 @@
 import type { BrowserContext } from "playwright";
 import { loadCollectSettings, loadRolesConfig, loadSitesConfig } from "../config/loader.js";
-import { launchPersistentChrome } from "../browser/launcher.js";
+import { closePersistentChrome, launchPersistentChrome, registerShutdownOnSignal } from "../browser/launcher.js";
+import { launchManagedChrome } from "../browser/managed.js";
 import { resolveAdapter } from "../adapters/registry.js";
-import { loadJobs, saveJobs } from "../storage/jsonl-store.js";
+import { loadJobs, updateJobs } from "../storage/jsonl-store.js";
 import { mergeJobs } from "../dedup/deduplicator.js";
 import type { GenericPlaywrightDeps } from "../adapters/generic-playwright.js";
 import type { JobPosting, RoleSearch } from "../adapters/types.js";
@@ -55,7 +56,8 @@ function buildRoleSearches(
 export async function runCollect(
   paths: CollectPaths,
   filters: CollectFilters = {},
-  launchFn: typeof launchPersistentChrome = launchPersistentChrome,
+  launchFn: typeof launchPersistentChrome = launchManagedChrome,
+  closeFn: typeof closePersistentChrome = closePersistentChrome,
 ): Promise<CollectSummary> {
   const sites = loadSitesConfig(paths.sitesConfigPath);
   const roles = loadRolesConfig(paths.rolesConfigPath);
@@ -80,8 +82,12 @@ export async function runCollect(
   );
 
   let context: BrowserContext | undefined;
+  let unregisterShutdown: (() => void) | undefined;
   async function ensureContext(): Promise<BrowserContext> {
-    if (!context) context = await launchFn();
+    if (!context) {
+      context = await launchFn();
+      unregisterShutdown = registerShutdownOnSignal(context);
+    }
     return context;
   }
 
@@ -138,17 +144,17 @@ export async function runCollect(
       }
     }
 
-    const existing = loadJobs(paths.jobsStorePath);
-    const merged = mergeJobs(existing, cappedCollected, new Date().toISOString());
-    summary.duplicatesRemoved = existing.length + cappedCollected.length - merged.length;
-
-    saveJobs(paths.jobsStorePath, merged);
+    const nowIso = new Date().toISOString();
+    const baseline = loadJobs(paths.jobsStorePath);
+    summary.duplicatesRemoved = baseline.length + cappedCollected.length - mergeJobs(baseline, cappedCollected, nowIso).length;
+    const merged = await updateJobs(paths.jobsStorePath, (current) => mergeJobs(current, cappedCollected, nowIso));
     summary.jobsWritten = merged.length;
 
     return summary;
   } finally {
+    unregisterShutdown?.();
     if (context) {
-      await context.close();
+      await closeFn(context);
     }
   }
 }

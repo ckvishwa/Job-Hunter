@@ -1,4 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
+
+// pauseForVerification() runs for real in these tests (its own detectVerification heuristic
+// is never mocked) -- but when it detects a challenge, its default codepath waits on real
+// stdin via node:readline/promises, which would hang a non-interactive test run. Mocked here
+// so a genuinely-detected challenge resolves instantly instead of blocking, without touching
+// detectVerification's real pattern-matching logic at all.
+vi.mock("node:readline/promises", () => ({
+  createInterface: () => ({
+    question: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn(),
+  }),
+}));
+
 import { indeedDiscoveryAdapter } from "../../src/discovery/adapters/indeed.js";
 import { monsterDiscoveryAdapter } from "../../src/discovery/adapters/monster.js";
 import { linkedinPublicDiscoveryAdapter } from "../../src/discovery/adapters/linkedin-public.js";
@@ -6,6 +19,7 @@ import { googleJobsDiscoveryAdapter } from "../../src/discovery/adapters/google-
 import { configurableGenericPortalAdapter } from "../../src/discovery/adapters/configurable-generic-portal.js";
 import type { DiscoveryCheckpoint, DiscoveredJobLite, DiscoveryContext } from "../../src/discovery/types.js";
 import type { CollectSettings, SiteConfig } from "../../src/types.js";
+import type { PortalConfig } from "../../src/config/schema.js";
 
 const settings: CollectSettings = {
   maxPagesPerSource: 2,
@@ -13,6 +27,82 @@ const settings: CollectSettings = {
   navigationTimeoutMs: 1000,
   delayBetweenRequestsMs: 0,
 };
+
+// Shared defaults for the zod-defaulted PortalConfig fields (maxPages, maxDiscoveries,
+// navigationTimeoutMs, delayBetweenActionsMs, requiresLogin, onVerification) -- these are
+// required in the inferred PortalConfig type because the schema applies `.default(...)`.
+function makePortalConfig(overrides: Partial<PortalConfig> & Pick<PortalConfig, "id" | "type" | "baseUrl" | "resultCardSelector" | "titleSelector" | "locationSelector">): PortalConfig {
+  return {
+    enabled: false,
+    maxPages: 10,
+    maxDiscoveries: 500,
+    navigationTimeoutMs: 30000,
+    delayBetweenActionsMs: 0,
+    requiresLogin: false,
+    onVerification: "pause",
+    ...overrides,
+  };
+}
+
+// Values below mirror config/portals.yml's real entries (extracted, not invented) so these
+// tests exercise the real config shape, not a hardcoded fallback.
+const indeedPortalConfig = makePortalConfig({
+  id: "indeed",
+  type: "indeed",
+  baseUrl: "https://www.indeed.com/jobs",
+  keywordParam: "q",
+  locationParam: "l",
+  resultCardSelector: ".job_seen_beacon",
+  jobLinkSelector: "a.jcs-JobTitle",
+  titleSelector: "span[id^='jobTitle']",
+  locationSelector: "[data-testid='text-location']",
+  companySelector: "[data-testid='company-name']",
+  salarySelector: ".salary-snippet-container, .estimated-salary-container",
+  dateSelector: "span.date",
+});
+
+const monsterPortalConfig = makePortalConfig({
+  id: "monster",
+  type: "monster",
+  baseUrl: "https://www.monster.com/jobs/search",
+  keywordParam: "q",
+  locationParam: "where",
+  resultCardSelector: "article, [data-testid='job-card'], [class*='JobCard']",
+  jobLinkSelector: "a",
+  titleSelector: "[data-testid='job-title'], [class*='Title'], h2",
+  locationSelector: "[data-testid='job-location'], [class*='Location']",
+  companySelector: "[data-testid='job-company'], [class*='Company']",
+  salarySelector: "[data-testid='job-salary'], [class*='Salary']",
+  dateSelector: "[data-testid='job-date'], [class*='Date']",
+});
+
+const linkedinPortalConfig = makePortalConfig({
+  id: "linkedin-public",
+  type: "linkedin-public",
+  baseUrl: "https://www.linkedin.com/jobs/search",
+  keywordParam: "keywords",
+  locationParam: "location",
+  resultCardSelector: ".job-search-card, .base-search-card, li[data-id]",
+  jobLinkSelector: "a.base-card__full-link, a",
+  titleSelector: ".base-search-card__title, h3",
+  locationSelector: ".job-search-card__location, span[class*='location']",
+  companySelector: ".base-search-card__subtitle, h4, [class*='subtitle']",
+  salarySelector: ".job-search-card__salary-info",
+  dateSelector: "time, .job-search-card__listdate",
+});
+
+const googleJobsPortalConfig = makePortalConfig({
+  id: "google-jobs",
+  type: "google-jobs",
+  baseUrl: "https://www.google.com/search",
+  keywordParam: "q",
+  resultCardSelector: "li[data-job-id], [role='treeitem'], .i3PoEe, [class*='JobCard']",
+  titleSelector: "[role='heading'], [class*='Title'], h2, h3",
+  locationSelector: ".SuWscb, .Qk3OTc, [class*='Location'], [class*='location']",
+  companySelector: ".t7YFBb, .wTabPo, [class*='Company'], [class*='company']",
+  salarySelector: "[class*='Salary'], [class*='salary']",
+  dateSelector: "[class*='Date'], [class*='date'], span:has-text('ago')",
+});
 
 function makeFakeCard(overrides: Record<string, string> = {}) {
   return {
@@ -80,7 +170,7 @@ describe("Indeed Discovery Adapter", () => {
   it("paginates and extracts listings correctly", async () => {
     const cards = [makeFakeCard({ title: "SDET", company: "Acme", href: "https://indeed.com/viewjob?jk=123", jobId: "123" })];
     const page = makeFakePage(cards);
-    
+
     const checkpoint: DiscoveryCheckpoint = {
       key: "indeed::sdet::us",
       source: "indeed",
@@ -102,6 +192,8 @@ describe("Indeed Discovery Adapter", () => {
       onPageProcessed: async (jobs) => {
         processed.push(...jobs);
       },
+      profileIds: ["sdet"],
+      portalConfig: indeedPortalConfig,
     };
 
     await indeedDiscoveryAdapter.discover(context);
@@ -112,13 +204,167 @@ describe("Indeed Discovery Adapter", () => {
     expect(processed[0]!.company).toBe("Acme");
     expect(processed[0]!.sourceJobId).toBe("123");
   });
+
+  it("throws a clear error when no portalConfig is provided", async () => {
+    const page = makeFakePage([]);
+    const checkpoint: DiscoveryCheckpoint = {
+      key: "indeed::sdet::us",
+      source: "indeed",
+      keyword: "sdet",
+      location: "us",
+      lastPage: 0,
+      completed: false,
+      lastUpdated: "",
+      sourceJobIds: [],
+    };
+    const context: DiscoveryContext = {
+      page: page as any,
+      keyword: "sdet",
+      location: "us",
+      settings,
+      checkpoint,
+      onPageProcessed: async () => undefined,
+      profileIds: ["sdet"],
+    };
+
+    await expect(indeedDiscoveryAdapter.discover(context)).rejects.toThrow(/portalConfig/);
+  });
+
+  it("reads selector/URL values from portalConfig rather than a hardcoded fallback", async () => {
+    const cards = [makeFakeCard({ title: "Custom Title", company: "Custom Co", href: "https://custom.example.com/job/999?jk=999", jobId: "999" })];
+    const page = makeFakePage(cards);
+
+    const customPortalConfig = makePortalConfig({
+      id: "indeed",
+      type: "indeed",
+      baseUrl: "https://custom.example.com/search",
+      keywordParam: "kw",
+      locationParam: "loc",
+      resultCardSelector: ".custom-job-card",
+      jobLinkSelector: ".custom-job-link",
+      titleSelector: ".custom-title",
+      locationSelector: ".custom-location",
+      companySelector: ".custom-company",
+    });
+
+    const checkpoint: DiscoveryCheckpoint = {
+      key: "indeed::sdet::us",
+      source: "indeed",
+      keyword: "sdet",
+      location: "us",
+      lastPage: 0,
+      completed: false,
+      lastUpdated: "",
+      sourceJobIds: [],
+    };
+
+    const processed: DiscoveredJobLite[] = [];
+    const context: DiscoveryContext = {
+      page: page as any,
+      keyword: "sdet",
+      location: "us",
+      settings,
+      checkpoint,
+      onPageProcessed: async (jobs) => {
+        processed.push(...jobs);
+      },
+      profileIds: ["sdet"],
+      portalConfig: customPortalConfig,
+    };
+
+    await indeedDiscoveryAdapter.discover(context);
+
+    // Proves the adapter actually read the custom config values, not a lingering hardcoded
+    // literal: the card selector passed to page.$$ is the custom one, not ".job_seen_beacon".
+    expect(page.$$).toHaveBeenCalledWith(".custom-job-card");
+    expect(page.$$).not.toHaveBeenCalledWith(".job_seen_beacon");
+    // The goto URL uses the custom baseUrl + custom param names, not indeed.com/q/l.
+    const gotoUrl = (page.goto as ReturnType<typeof vi.fn>).mock.calls[0]![0] as string;
+    expect(gotoUrl).toContain("https://custom.example.com/search?kw=sdet&loc=us");
+    expect(processed).toHaveLength(1);
+    expect(processed[0]!.title).toBe("Custom Title");
+    expect(processed[0]!.company).toBe("Custom Co");
+  });
+
+  it("stops pagination when a page returns no NEW job ids (repeated-page detection), not because cards were empty", async () => {
+    // Same card/jobId returned on every page.$$ call -- page 2 finds nothing NEW (it's the
+    // same job as page 1), which must stop the loop via the "no new ids" check, distinct from
+    // the "cards.length === 0" check exercised by the empty-cards tests elsewhere. maxPages is
+    // set well above 2 so that if the repeated-id break didn't fire, the loop would keep going
+    // (proving the break -- not the page-limit -- is what stopped it).
+    const cards = [makeFakeCard({ title: "SDET", company: "Acme", href: "https://indeed.com/viewjob?jk=999", jobId: "999" })];
+    const page = makeFakePage(cards);
+
+    const checkpoint: DiscoveryCheckpoint = {
+      key: "indeed::sdet::us",
+      source: "indeed",
+      keyword: "sdet",
+      location: "us",
+      lastPage: 0,
+      completed: false,
+      lastUpdated: "",
+      sourceJobIds: [],
+    };
+
+    const context: DiscoveryContext = {
+      page: page as any,
+      keyword: "sdet",
+      location: "us",
+      settings: { ...settings, maxPagesPerSource: 5 },
+      checkpoint,
+      onPageProcessed: async () => undefined,
+      profileIds: ["sdet"],
+      portalConfig: indeedPortalConfig,
+    };
+
+    await indeedDiscoveryAdapter.discover(context);
+
+    expect(page.goto).toHaveBeenCalledTimes(2);
+    expect(page.$$).toHaveBeenCalledTimes(2);
+    expect(checkpoint.sourceJobIds).toEqual(["999"]);
+  });
+
+  it("calls context.onVerificationPause when pauseForVerification genuinely detects a challenge (Task 15)", async () => {
+    const cards = [makeFakeCard({ title: "SDET", company: "Acme", href: "https://indeed.com/viewjob?jk=456", jobId: "456" })];
+    // Same reCAPTCHA marker used by tests/verification.test.ts's detectVerification coverage
+    // -- this page content genuinely trips the real (unmocked) detection heuristic.
+    const page = makeFakePage(cards, `<div class="g-recaptcha" data-sitekey="abc"></div>`);
+
+    const checkpoint: DiscoveryCheckpoint = {
+      key: "indeed::sdet::us",
+      source: "indeed",
+      keyword: "sdet",
+      location: "us",
+      lastPage: 0,
+      completed: false,
+      lastUpdated: "",
+      sourceJobIds: [],
+    };
+
+    const onVerificationPause = vi.fn();
+    const context: DiscoveryContext = {
+      page: page as any,
+      keyword: "sdet",
+      location: "us",
+      settings,
+      checkpoint,
+      onPageProcessed: async () => undefined,
+      profileIds: ["sdet"],
+      portalConfig: indeedPortalConfig,
+      onVerificationPause,
+    };
+
+    await indeedDiscoveryAdapter.discover(context);
+
+    expect(onVerificationPause).toHaveBeenCalled();
+  });
 });
 
 describe("Monster Discovery Adapter", () => {
   it("extracts listings correctly", async () => {
     const cards = [makeFakeCard({ title: "Security Analyst", company: "SecureCo", href: "https://monster.com/jobs/123", jobId: "123" })];
     const page = makeFakePage(cards);
-    
+
     const checkpoint: DiscoveryCheckpoint = {
       key: "monster::security::us",
       source: "monster",
@@ -140,11 +386,38 @@ describe("Monster Discovery Adapter", () => {
       onPageProcessed: async (jobs) => {
         processed.push(...jobs);
       },
+      profileIds: ["security"],
+      portalConfig: monsterPortalConfig,
     };
 
     await monsterDiscoveryAdapter.discover(context);
     expect(processed).toHaveLength(1);
     expect(processed[0]!.title).toBe("Security Analyst");
+  });
+
+  it("throws a clear error when no portalConfig is provided", async () => {
+    const page = makeFakePage([]);
+    const checkpoint: DiscoveryCheckpoint = {
+      key: "monster::security::us",
+      source: "monster",
+      keyword: "security",
+      location: "us",
+      lastPage: 0,
+      completed: false,
+      lastUpdated: "",
+      sourceJobIds: [],
+    };
+    const context: DiscoveryContext = {
+      page: page as any,
+      keyword: "security",
+      location: "us",
+      settings,
+      checkpoint,
+      onPageProcessed: async () => undefined,
+      profileIds: ["security"],
+    };
+
+    await expect(monsterDiscoveryAdapter.discover(context)).rejects.toThrow(/portalConfig/);
   });
 });
 
@@ -152,7 +425,7 @@ describe("LinkedIn Public Discovery Adapter", () => {
   it("extracts listings correctly", async () => {
     const cards = [makeFakeCard({ title: "Cloud Engineer", company: "Cloudy", href: "https://linkedin.com/jobs/view/789", jobId: "789" })];
     const page = makeFakePage(cards);
-    
+
     const checkpoint: DiscoveryCheckpoint = {
       key: "linkedin-public::cloud::us",
       source: "linkedin-public",
@@ -174,11 +447,38 @@ describe("LinkedIn Public Discovery Adapter", () => {
       onPageProcessed: async (jobs) => {
         processed.push(...jobs);
       },
+      profileIds: ["cloud"],
+      portalConfig: linkedinPortalConfig,
     };
 
     await linkedinPublicDiscoveryAdapter.discover(context);
     expect(processed).toHaveLength(1);
     expect(processed[0]!.title).toBe("Cloud Engineer");
+  });
+
+  it("throws a clear error when no portalConfig is provided", async () => {
+    const page = makeFakePage([]);
+    const checkpoint: DiscoveryCheckpoint = {
+      key: "linkedin-public::cloud::us",
+      source: "linkedin-public",
+      keyword: "cloud",
+      location: "us",
+      lastPage: 0,
+      completed: false,
+      lastUpdated: "",
+      sourceJobIds: [],
+    };
+    const context: DiscoveryContext = {
+      page: page as any,
+      keyword: "cloud",
+      location: "us",
+      settings,
+      checkpoint,
+      onPageProcessed: async () => undefined,
+      profileIds: ["cloud"],
+    };
+
+    await expect(linkedinPublicDiscoveryAdapter.discover(context)).rejects.toThrow(/portalConfig/);
   });
 });
 
@@ -186,7 +486,7 @@ describe("Google Jobs Discovery Adapter", () => {
   it("extracts and scrolls to load listings", async () => {
     const cards = [makeFakeCard({ title: "Network Admin", company: "NetCo", jobId: "net_1" })];
     const page = makeFakePage(cards);
-    
+
     const checkpoint: DiscoveryCheckpoint = {
       key: "google-jobs::network::us",
       source: "google-jobs",
@@ -208,19 +508,46 @@ describe("Google Jobs Discovery Adapter", () => {
       onPageProcessed: async (jobs) => {
         processed.push(...jobs);
       },
+      profileIds: ["network"],
+      portalConfig: googleJobsPortalConfig,
     };
 
     await googleJobsDiscoveryAdapter.discover(context);
     expect(processed).toHaveLength(1);
     expect(processed[0]!.title).toBe("Network Admin");
   });
+
+  it("throws a clear error when no portalConfig is provided", async () => {
+    const page = makeFakePage([]);
+    const checkpoint: DiscoveryCheckpoint = {
+      key: "google-jobs::network::us",
+      source: "google-jobs",
+      keyword: "network",
+      location: "us",
+      lastPage: 0,
+      completed: false,
+      lastUpdated: "",
+      sourceJobIds: [],
+    };
+    const context: DiscoveryContext = {
+      page: page as any,
+      keyword: "network",
+      location: "us",
+      settings,
+      checkpoint,
+      onPageProcessed: async () => undefined,
+      profileIds: ["network"],
+    };
+
+    await expect(googleJobsDiscoveryAdapter.discover(context)).rejects.toThrow(/portalConfig/);
+  });
 });
 
 describe("Configurable Generic Portal Adapter", () => {
-  it("extracts listings based on custom selectors", async () => {
+  it("extracts listings based on custom selectors from sites.yml's SiteConfig.generic", async () => {
     const cards = [makeFakeCard({ title: "SDET Custom", company: "Acme", href: "https://custom.com/job/1", jobId: "1" })];
     const page = makeFakePage(cards);
-    
+
     const siteConfig: SiteConfig = {
       id: "custom-portal",
       name: "Custom Portal",
@@ -260,10 +587,89 @@ describe("Configurable Generic Portal Adapter", () => {
         processed.push(...jobs);
       },
       siteConfig,
-    } as any;
+      profileIds: ["sdet"],
+    };
 
     await configurableGenericPortalAdapter.discover(context);
     expect(processed).toHaveLength(1);
     expect(processed[0]!.title).toBe("SDET Custom");
+  });
+
+  it("extracts listings based on a portals.yml-driven generic PortalConfig", async () => {
+    const cards = [makeFakeCard({ title: "QA Custom", company: "Beta Corp", href: "https://example-generic.com/job/42", jobId: "42" })];
+    const page = makeFakePage(cards);
+
+    const portalConfig: PortalConfig = makePortalConfig({
+      id: "example-generic-portal",
+      type: "generic",
+      baseUrl: "https://example-generic.com/jobs/search",
+      searchInputSelector: "#search-input",
+      searchButtonSelector: "#search-button",
+      resultCardSelector: ".generic-job-card",
+      jobLinkSelector: "a.generic-link",
+      titleSelector: ".generic-title",
+      locationSelector: ".generic-location",
+      companySelector: ".generic-company",
+    });
+
+    const checkpoint: DiscoveryCheckpoint = {
+      key: "example-generic-portal::sdet::us",
+      source: "example-generic-portal",
+      keyword: "sdet",
+      location: "us",
+      lastPage: 0,
+      completed: false,
+      lastUpdated: "",
+      sourceJobIds: [],
+    };
+
+    const processed: DiscoveredJobLite[] = [];
+    const context: DiscoveryContext = {
+      page: page as any,
+      keyword: "sdet",
+      location: "us",
+      settings,
+      checkpoint,
+      onPageProcessed: async (jobs: DiscoveredJobLite[]) => {
+        processed.push(...jobs);
+      },
+      portalConfig,
+      profileIds: ["sdet"],
+    };
+
+    await configurableGenericPortalAdapter.discover(context);
+
+    expect(page.$$).toHaveBeenCalledWith(".generic-job-card");
+    expect(processed).toHaveLength(1);
+    expect(processed[0]!.title).toBe("QA Custom");
+    expect(processed[0]!.company).toBe("Beta Corp");
+    expect(processed[0]!.source).toBe("example-generic-portal");
+  });
+
+  it("throws a clear error when neither portalConfig nor siteConfig is provided", async () => {
+    const page = makeFakePage([]);
+    const checkpoint: DiscoveryCheckpoint = {
+      key: "unknown::sdet::us",
+      source: "unknown",
+      keyword: "sdet",
+      location: "us",
+      lastPage: 0,
+      completed: false,
+      lastUpdated: "",
+      sourceJobIds: [],
+    };
+    const context: DiscoveryContext = {
+      page: page as any,
+      keyword: "sdet",
+      location: "us",
+      settings,
+      checkpoint,
+      onPageProcessed: async () => undefined,
+      profileIds: ["sdet"],
+    };
+
+    await expect(configurableGenericPortalAdapter.discover(context)).rejects.toThrow(
+      /requires either portalConfig or siteConfig/,
+    );
   });
 });

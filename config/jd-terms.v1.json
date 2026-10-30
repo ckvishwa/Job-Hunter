@@ -1,0 +1,639 @@
+{
+  "version": 1,
+  "purpose": "Reviewed vocabulary for deterministic JD requirement extraction and deterministic requirement-to-fact matching. A term is a spelling group; a `members` list makes the term a CATEGORY whose members are tools that are, by definition, instances of it (a Splunk fact supports a SIEM requirement). Nothing here is fuzzy: a requirement matches a fact only through these exact forms. Tools that merely resemble each other are not related.",
+  "terms": [
+    {
+      "canonical": "SIEM",
+      "type": "tool",
+      "forms": [
+        "SIEM",
+        "SIEM tools",
+        "security information and event management"
+      ],
+      "members": [
+        "Splunk",
+        "Microsoft Sentinel",
+        "QRadar",
+        "Elastic SIEM",
+        "LogRhythm",
+        "Sumo Logic",
+        "Chronicle"
+      ]
+    },
+    {
+      "canonical": "EDR",
+      "type": "tool",
+      "forms": [
+        "EDR",
+        "endpoint detection and response",
+        "endpoint detection"
+      ],
+      "members": [
+        "CrowdStrike",
+        "SentinelOne",
+        "Carbon Black",
+        "Microsoft Defender for Endpoint",
+        "Cortex XDR",
+        "Windows Defender EDR"
+      ]
+    },
+    {
+      "canonical": "IDS/IPS",
+      "type": "tool",
+      "forms": [
+        "IDS/IPS",
+        "IDS",
+        "IPS",
+        "intrusion detection",
+        "intrusion prevention"
+      ],
+      "members": [
+        "Snort",
+        "Suricata",
+        "Zeek"
+      ]
+    },
+    {
+      "canonical": "Splunk",
+      "type": "tool",
+      "forms": [
+        "Splunk",
+        "Splunk Enterprise",
+        "SPL"
+      ]
+    },
+    {
+      "canonical": "Microsoft Sentinel",
+      "type": "tool",
+      "forms": [
+        "Microsoft Sentinel",
+        "Azure Sentinel"
+      ]
+    },
+    {
+      "canonical": "QRadar",
+      "type": "tool",
+      "forms": [
+        "QRadar",
+        "IBM QRadar"
+      ]
+    },
+    {
+      "canonical": "CrowdStrike",
+      "type": "tool",
+      "forms": [
+        "CrowdStrike",
+        "CrowdStrike Falcon"
+      ]
+    },
+    {
+      "canonical": "SentinelOne",
+      "type": "tool",
+      "forms": [
+        "SentinelOne"
+      ]
+    },
+    {
+      "canonical": "Carbon Black",
+      "type": "tool",
+      "forms": [
+        "Carbon Black"
+      ]
+    },
+    {
+      "canonical": "Wireshark",
+      "type": "tool",
+      "forms": [
+        "Wireshark",
+        "packet capture",
+        "packet captures",
+        "pcap"
+      ]
+    },
+    {
+      "canonical": "Nmap",
+      "type": "tool",
+      "forms": [
+        "Nmap"
+      ]
+    },
+    {
+      "canonical": "Sysmon",
+      "type": "tool",
+      "forms": [
+        "Sysmon"
+      ]
+    },
+    {
+      "canonical": "Snort",
+      "type": "tool",
+      "forms": [
+        "Snort"
+      ]
+    },
+    {
+      "canonical": "Suricata",
+      "type": "tool",
+      "forms": [
+        "Suricata"
+      ]
+    },
+    {
+      "canonical": "Zeek",
+      "type": "tool",
+      "forms": [
+        "Zeek"
+      ]
+    },
+    {
+      "canonical": "YARA",
+      "type": "tool",
+      "forms": [
+        "YARA"
+      ]
+    },
+    {
+      "canonical": "Ghidra",
+      "type": "tool",
+      "forms": [
+        "Ghidra"
+      ]
+    },
+    {
+      "canonical": "Burp Suite",
+      "type": "tool",
+      "forms": [
+        "Burp Suite",
+        "Burp"
+      ]
+    },
+    {
+      "canonical": "Metasploit",
+      "type": "tool",
+      "forms": [
+        "Metasploit"
+      ]
+    },
+    {
+      "canonical": "Nessus",
+      "type": "tool",
+      "forms": [
+        "Nessus",
+        "Tenable"
+      ]
+    },
+    {
+      "canonical": "Postman",
+      "type": "tool",
+      "forms": [
+        "Postman"
+      ]
+    },
+    {
+      "canonical": "Jira",
+      "type": "tool",
+      "forms": [
+        "Jira"
+      ]
+    },
+    {
+      "canonical": "Git",
+      "type": "tool",
+      "forms": [
+        "Git",
+        "GitHub",
+        "Git/GitHub"
+      ]
+    },
+    {
+      "canonical": "Docker",
+      "type": "tool",
+      "forms": [
+        "Docker",
+        "containers",
+        "containerization"
+      ]
+    },
+    {
+      "canonical": "Kubernetes",
+      "type": "platform",
+      "forms": [
+        "Kubernetes",
+        "K8s"
+      ]
+    },
+    {
+      "canonical": "Terraform",
+      "type": "tool",
+      "forms": [
+        "Terraform",
+        "infrastructure as code"
+      ]
+    },
+    {
+      "canonical": "Selenium",
+      "type": "tool",
+      "forms": [
+        "Selenium"
+      ]
+    },
+    {
+      "canonical": "Playwright",
+      "type": "tool",
+      "forms": [
+        "Playwright"
+      ]
+    },
+    {
+      "canonical": "Python",
+      "type": "language",
+      "forms": [
+        "Python"
+      ]
+    },
+    {
+      "canonical": "PowerShell",
+      "type": "language",
+      "forms": [
+        "PowerShell"
+      ]
+    },
+    {
+      "canonical": "Bash",
+      "type": "language",
+      "forms": [
+        "Bash",
+        "shell scripting"
+      ]
+    },
+    {
+      "canonical": "SQL",
+      "type": "language",
+      "forms": [
+        "SQL"
+      ]
+    },
+    {
+      "canonical": "Java",
+      "type": "language",
+      "forms": [
+        "Java"
+      ]
+    },
+    {
+      "canonical": "JavaScript",
+      "type": "language",
+      "forms": [
+        "JavaScript",
+        "JS"
+      ]
+    },
+    {
+      "canonical": "TypeScript",
+      "type": "language",
+      "forms": [
+        "TypeScript",
+        "TS"
+      ]
+    },
+    {
+      "canonical": "Go",
+      "type": "language",
+      "forms": [
+        "Golang"
+      ]
+    },
+    {
+      "canonical": "Windows",
+      "type": "platform",
+      "forms": [
+        "Windows"
+      ]
+    },
+    {
+      "canonical": "macOS",
+      "type": "platform",
+      "forms": [
+        "macOS",
+        "Mac OS"
+      ]
+    },
+    {
+      "canonical": "Linux",
+      "type": "platform",
+      "forms": [
+        "Linux",
+        "Unix"
+      ]
+    },
+    {
+      "canonical": "AWS",
+      "type": "platform",
+      "forms": [
+        "AWS",
+        "Amazon Web Services"
+      ]
+    },
+    {
+      "canonical": "Azure",
+      "type": "platform",
+      "forms": [
+        "Azure",
+        "Microsoft Azure"
+      ]
+    },
+    {
+      "canonical": "GCP",
+      "type": "platform",
+      "forms": [
+        "GCP",
+        "Google Cloud",
+        "Google Cloud Platform"
+      ]
+    },
+    {
+      "canonical": "O365",
+      "type": "platform",
+      "forms": [
+        "O365",
+        "Office 365",
+        "Microsoft 365",
+        "M365"
+      ]
+    },
+    {
+      "canonical": "Okta",
+      "type": "platform",
+      "forms": [
+        "Okta"
+      ]
+    },
+    {
+      "canonical": "Active Directory",
+      "type": "platform",
+      "forms": [
+        "Active Directory",
+        "AD"
+      ]
+    },
+    {
+      "canonical": "TCP/IP",
+      "type": "domain_knowledge",
+      "forms": [
+        "TCP/IP",
+        "TCP IP"
+      ]
+    },
+    {
+      "canonical": "DNS",
+      "type": "domain_knowledge",
+      "forms": [
+        "DNS"
+      ]
+    },
+    {
+      "canonical": "operating systems",
+      "type": "domain_knowledge",
+      "forms": [
+        "operating systems",
+        "operating system"
+      ]
+    },
+    {
+      "canonical": "network protocols",
+      "type": "domain_knowledge",
+      "forms": [
+        "network protocols",
+        "common network protocols"
+      ]
+    },
+    {
+      "canonical": "MITRE ATT&CK",
+      "type": "domain_knowledge",
+      "forms": [
+        "MITRE ATT&CK",
+        "ATT&CK",
+        "MITRE ATTACK"
+      ]
+    },
+    {
+      "canonical": "OWASP",
+      "type": "domain_knowledge",
+      "forms": [
+        "OWASP",
+        "OWASP Top 10"
+      ]
+    },
+    {
+      "canonical": "NIST",
+      "type": "domain_knowledge",
+      "forms": [
+        "NIST",
+        "NIST CSF",
+        "NIST 800-53"
+      ]
+    },
+    {
+      "canonical": "incident response",
+      "type": "domain_knowledge",
+      "forms": [
+        "incident response",
+        "incident handling"
+      ]
+    },
+    {
+      "canonical": "threat hunting",
+      "type": "domain_knowledge",
+      "forms": [
+        "threat hunting",
+        "threat hunts"
+      ]
+    },
+    {
+      "canonical": "alert triage",
+      "type": "skill",
+      "forms": [
+        "alert triage",
+        "triage"
+      ]
+    },
+    {
+      "canonical": "malware analysis",
+      "type": "skill",
+      "forms": [
+        "malware analysis",
+        "reverse engineering"
+      ]
+    },
+    {
+      "canonical": "vulnerability management",
+      "type": "skill",
+      "forms": [
+        "vulnerability management",
+        "vulnerability assessment",
+        "vulnerability scanning"
+      ]
+    },
+    {
+      "canonical": "scripting",
+      "type": "skill",
+      "forms": [
+        "scripting"
+      ]
+    },
+    {
+      "canonical": "command line",
+      "type": "skill",
+      "forms": [
+        "command-line",
+        "command line",
+        "CLI"
+      ]
+    },
+    {
+      "canonical": "CompTIA Security+",
+      "type": "certification",
+      "forms": [
+        "Security+",
+        "CompTIA Security+",
+        "SY0-"
+      ]
+    },
+    {
+      "canonical": "CompTIA Network+",
+      "type": "certification",
+      "forms": [
+        "Network+",
+        "CompTIA Network+"
+      ]
+    },
+    {
+      "canonical": "CompTIA CySA+",
+      "type": "certification",
+      "forms": [
+        "CySA+",
+        "CompTIA CySA+"
+      ]
+    },
+    {
+      "canonical": "CISSP",
+      "type": "certification",
+      "forms": [
+        "CISSP"
+      ]
+    },
+    {
+      "canonical": "CEH",
+      "type": "certification",
+      "forms": [
+        "CEH",
+        "Certified Ethical Hacker"
+      ]
+    },
+    {
+      "canonical": "OSCP",
+      "type": "certification",
+      "forms": [
+        "OSCP"
+      ]
+    },
+    {
+      "canonical": "GCIH",
+      "type": "certification",
+      "forms": [
+        "GCIH"
+      ]
+    },
+    {
+      "canonical": "GCIA",
+      "type": "certification",
+      "forms": [
+        "GCIA"
+      ]
+    },
+    {
+      "canonical": "CCNA",
+      "type": "certification",
+      "forms": [
+        "CCNA"
+      ]
+    },
+    {
+      "canonical": "AWS Certified",
+      "type": "certification",
+      "forms": [
+        "AWS Certified",
+        "AWS Cloud Practitioner"
+      ]
+    },
+    {
+      "canonical": "SC-200",
+      "type": "certification",
+      "forms": [
+        "SC-200"
+      ]
+    },
+    {
+      "canonical": "bachelor's degree",
+      "type": "degree",
+      "forms": [
+        "bachelor's degree",
+        "bachelor’s degree",
+        "Bachelor's",
+        "Bachelors degree",
+        "BS",
+        "B.S.",
+        "undergraduate degree"
+      ]
+    },
+    {
+      "canonical": "master's degree",
+      "type": "degree",
+      "forms": [
+        "master's degree",
+        "master’s degree",
+        "MS",
+        "M.S."
+      ]
+    }
+  ],
+  "softSkillCues": [
+    "communication",
+    "curiosity",
+    "integrity",
+    "mindset",
+    "collaborat",
+    "empathy",
+    "passion",
+    "teamwork",
+    "leadership",
+    "problem-solving",
+    "problem solving",
+    "ownership",
+    "detail-oriented"
+  ],
+  "demonstrationCues": [
+    "experience with",
+    "experience in",
+    "experience using",
+    "hands-on",
+    "proven",
+    "working experience",
+    "years of",
+    "practical experience",
+    "demonstrated",
+    "experience writing",
+    "experience building"
+  ],
+  "familiarityCues": [
+    "familiarity",
+    "familiar with",
+    "awareness",
+    "understanding",
+    "knowledge of",
+    "exposure to",
+    "fundamental",
+    "basic",
+    "curiosity about"
+  ]
+}

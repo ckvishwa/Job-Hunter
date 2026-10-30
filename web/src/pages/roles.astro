@@ -1,0 +1,306 @@
+---
+import Base from "../layouts/Base.astro";
+import PageHead from "../components/PageHead.astro";
+---
+
+<Base title="Orbital — Career paths" crumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Résumés", href: "/resumes" }, { label: "Career paths" }]}>
+  <PageHead eyebrow="Step 3 · Career paths" number="03" title="Roles your approved facts can support." lead="Suggestions come only from facts you approved. Your own selection below decides what is searched later.">
+    <a class="button secondary" href="/resumes">&larr; Résumés</a>
+    <a class="button blue" href="/jobs" id="to-jobs">Next: official openings &rarr;</a>
+  </PageHead>
+  <section aria-label="How to read this page">
+    <p class="muted" id="disclaimer">
+      Exploratory only. These suggestions are not a hiring chance, an ATS score or an eligibility decision, and they do not apply to any job.
+      They use only facts you approved. Your own selection below decides what is searched.
+    </p>
+    <ol class="legend small">
+      <li><strong>Suggested</strong> &mdash; Orbital found evidence in your approved facts. Statuses are <em>Evidence found</em> or <em>Partial evidence</em>, never a percentage.</li>
+      <li><strong>Approved target</strong> &mdash; you said this suggestion is a role you want. It does not search anything yet.</li>
+      <li><strong>Selected for discovery</strong> &mdash; roles saved in your selection below. Only these are used to look for official openings.</li>
+    </ol>
+    <p id="msg" role="status"></p>
+  </section>
+
+  <section id="experience-section">
+    <h2>Your approved experience</h2>
+    <p class="muted">Counted only from approved, classified employment. Dates are month precision, so each figure is a range. Study, projects and skill mentions never add professional time.</p>
+    <p>Status: <span id="experience-status" class="badge"></span></p>
+    <table>
+      <thead><tr><th>Kind</th><th>Months</th><th>Gaps</th></tr></thead>
+      <tbody id="experience"></tbody>
+    </table>
+    <p id="experience-counts" class="muted"></p>
+    <ul id="experience-issues"></ul>
+    <p id="search-band" class="muted"></p>
+  </section>
+
+  <section>
+    <h2>Suggested roles</h2>
+    <p class="muted">Cybersecurity roles are listed first; QA/SDET, cloud and network are secondary. A suggestion is only as good as the facts you approved.</p>
+    <div id="stale"></div>
+    <div id="cards"></div>
+    <details id="nomatch-details">
+      <summary id="nomatch-summary"></summary>
+      <div id="nomatch"></div>
+    </details>
+  </section>
+
+  <section>
+    <h2>Your role selection and search preferences</h2>
+    <p class="muted">What you choose here, not what is suggested, governs later discovery. You can choose a role even if no approved fact supports it.</p>
+    <p id="selection-revision" class="muted"></p>
+    <form id="selection-form">
+      <fieldset><legend>Roles</legend><div id="role-choices"></div></fieldset>
+      <fieldset>
+        <legend>Where</legend>
+        <div class="row">
+          <label>Countries <input id="loc-countries" placeholder="United States" /></label>
+          <label>States / regions <input id="loc-regions" placeholder="Texas, Remote-US" /></label>
+          <label>Cities <input id="loc-cities" placeholder="Austin" /></label>
+          <label><input type="checkbox" id="loc-remote" /> Remote is acceptable</label>
+        </div>
+        <div class="row" id="work-modes"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Level</legend>
+        <div class="row" id="seniority"></div>
+        <div class="row">
+          <label>Search jobs asking for at least <input id="band-min" type="number" min="0" max="30" value="0" /> years</label>
+          <label>and at most <input id="band-max" type="number" min="0" max="30" value="5" /> years</label>
+        </div>
+        <p class="muted">The 0-5 year window is a discovery filter. It is not a claim that you have five years of experience.</p>
+      </fieldset>
+      <div class="row"><button id="save-selection" type="submit">Save selection</button><span id="selection-msg" role="status"></span></div>
+    </form>
+  </section>
+</Base>
+<style is:global>
+  .legend { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+</style>
+
+<script>
+  import { api, ApiError } from "../lib/api";
+  import { startPage } from "../lib/gate";
+  import { $, clear, h, say } from "../lib/dom";
+
+  interface Match { factId: string; via: string; matchedTerm: string; demonstrated: boolean }
+  interface Requirement { id: string; label: string; importance: "core" | "supporting"; met: boolean; matches: Match[]; explicitLackFactIds: string[] }
+  interface Gap { code: string; requirementId?: string; message: string }
+  interface Hint { requirementId: string; factIds: string[] }
+  interface Rec {
+    id: string; roleSlug: string; title: string; familySlug: string; familyName: string; familyTier: string; support: "SUPPORTED" | "PARTIAL";
+    status: "PROPOSED" | "APPROVED" | "DISMISSED"; inputDigest: string; sourceFactIds: string[]; gaps: Gap[]; pendingHints: Hint[];
+    evidence: { requirements: Requirement[]; titleSignals: Array<{ factId: string; alias: string }>; coreMet: number; coreTotal: number; minCoreMatches: number };
+    experienceNote: { code: string; message: string } | null;
+  }
+  interface NoMatch { roleSlug: string; title: string; familyName: string; familyTier: string; gaps: Gap[]; pendingHints: Hint[] }
+  interface Bucket { monthsLower: number; monthsUpper: number; gaps: Array<{ from: string; to: string; months: number }>; factIds: string[] }
+  interface Issue { code: string; severity: string; factId?: string; message: string }
+  interface Selection {
+    revisionNo: number; targetFamilies: string[]; roleSlugs: string[]; locations: Array<{ kind: string; value: string }>; workModes: string[];
+    seniorityLevels: string[]; searchBand: { minYears: number; maxYears: number };
+  }
+  interface State {
+    catalogVersion: number; disclaimer: string;
+    experience: { status: string; buckets: Record<string, Bucket>; academicStudy: { monthsLower: number; monthsUpper: number }; counts: Record<string, number>; issues: Issue[]; asOf: string };
+    suggestedSearchBand: { readiness: string; minYears: number; maxYears: number; basis: string };
+    recommendations: Rec[]; noMatch: NoMatch[]; staleDecisions: Array<{ roleSlug: string; title: string; previousStatus: string; reason: string }>;
+    factIndex: Record<string, { factId: string; kind: string; value: string; approvalStatus: string; resumeId: string | null }>;
+    selection: Selection | null;
+  }
+  interface Catalog { catalogVersion: number; families: Array<{ familySlug: string; name: string; tier: string }>; roles: Array<{ roleSlug: string; familySlug: string; title: string; active: boolean }> }
+
+  const msg = $("#msg");
+  const describe = (e: unknown): string =>
+    e instanceof ApiError
+      ? e.kind === "unauthenticated" ? "Your session expired. Reload the page to sign in again."
+        : e.kind === "unavailable" || e.kind === "offline" ? "Lost contact with the API. Nothing was changed; reload to retry."
+        : `${e.message} (${e.code})`
+      : "Something went wrong.";
+  const VIA: Record<string, string> = { employment: "job", project: "project", certification: "certification", education: "study", skill_mention: "skill mention only" };
+  const SUPPORT: Record<string, string> = { SUPPORTED: "Evidence found", PARTIAL: "Partial evidence" };
+  const STATUS: Record<string, string> = { PROPOSED: "Proposed", APPROVED: "You approved", DISMISSED: "You dismissed" };
+  let state: State;
+  let catalog: Catalog;
+
+  const months = (lo: number, hi: number): string => (lo === hi ? `${lo} months` : `${lo}-${hi} months`);
+  const years = (lo: number, hi: number): string => (hi === 0 ? "" : ` (about ${(lo / 12).toFixed(1)}-${(hi / 12).toFixed(1)} years)`);
+
+  function factLink(factId: string, suffix = ""): Node {
+    const f = state.factIndex[factId];
+    if (!f) return document.createTextNode(`${factId}${suffix}`);
+    const label = `${f.value}${suffix}`;
+    if (!f.resumeId) return h("span", { class: "evidence-link" }, label);
+    return h("a", { class: "evidence-link", "data-fact-id": factId, href: `/review?id=${encodeURIComponent(f.resumeId)}&fact=${encodeURIComponent(factId)}` }, label);
+  }
+
+  function renderExperience(): void {
+    const x = state.experience;
+    const status = $("#experience-status");
+    status.textContent = x.status === "REVIEW" ? "needs review" : x.status === "NO_DATA" ? "no approved experience yet" : "ok";
+    status.className = `badge ${x.status === "OK" ? "approved" : "pending"}`;
+    status.dataset.status = x.status;
+    const body = $("#experience");
+    clear(body);
+    const rows: Array<[string, string, string, string]> = [
+      ["professional", "Professional work", months(x.buckets.professional!.monthsLower, x.buckets.professional!.monthsUpper) + years(x.buckets.professional!.monthsLower, x.buckets.professional!.monthsUpper), ""],
+      ["internship", "Internship / co-op", months(x.buckets.internship!.monthsLower, x.buckets.internship!.monthsUpper), ""],
+      ["academic", "Academic employment", months(x.buckets.academic!.monthsLower, x.buckets.academic!.monthsUpper), ""],
+      ["volunteer", "Volunteer", months(x.buckets.volunteer!.monthsLower, x.buckets.volunteer!.monthsUpper), ""],
+      ["study", "Degree study (not work)", months(x.academicStudy.monthsLower, x.academicStudy.monthsUpper), ""],
+    ];
+    for (const [key, label, text] of rows) {
+      const bucket = x.buckets[key];
+      const gaps = bucket && bucket.gaps.length ? bucket.gaps.map((g) => `${g.months} month gap ${g.from} to ${g.to}`).join("; ") : "";
+      body.append(h("tr", { "data-bucket": key }, h("td", {}, label), h("td", { class: "months" }, text), h("td", {}, gaps)));
+    }
+    $("#experience-counts").textContent = `Not experience: ${x.counts.projects ?? 0} approved projects, ${x.counts.skillMentions ?? 0} skill mentions, ${x.counts.certifications ?? 0} certifications. Skill mentions never become years.`;
+    const issues = $("#experience-issues");
+    clear(issues);
+    for (const i of x.issues) {
+      issues.append(h("li", { "data-code": i.code, "data-severity": i.severity }, `${i.code}: ${i.message} `, i.factId ? factLink(i.factId) : null));
+    }
+    $("#search-band").textContent = `Advice for later discovery: ${state.suggestedSearchBand.minYears}-${state.suggestedSearchBand.maxYears} years requested. ${state.suggestedSearchBand.basis}`;
+  }
+
+  async function decide(rec: Rec, decision: "approve" | "dismiss" | "reset"): Promise<void> {
+    try {
+      await api.post("/api/v1/roles/recommendations/decisions", { recommendationId: rec.id, decision, expectedInputDigest: rec.inputDigest });
+      say(msg, decision === "reset" ? "Decision cleared." : decision === "approve" ? `Approved ${rec.title}.` : `Dismissed ${rec.title}.`, "ok");
+    } catch (e) {
+      say(msg, describe(e), "error");
+    }
+    await load(false);
+  }
+
+  function card(rec: Rec): HTMLElement {
+    const reqs = rec.evidence.requirements.map((r) =>
+      h("li", { "data-req": r.id, "data-met": String(r.met) },
+        `${r.met ? "Shown" : "Not shown"}: ${r.label} (${r.importance}) `,
+        ...r.matches.flatMap((m) => [factLink(m.factId, ` [${VIA[m.via] ?? m.via}]`), " "]),
+        ...r.explicitLackFactIds.flatMap((id) => [h("span", { class: "muted" }, "you said you lack: "), factLink(id), " "])),
+    );
+    const hints = rec.pendingHints.length
+      ? h("p", { class: "muted pending-hint" }, "Pending facts that might help once approved: ", ...rec.pendingHints.flatMap((p) => p.factIds.flatMap((id) => [factLink(id), " "])))
+      : null;
+    const titles = rec.evidence.titleSignals.length
+      ? h("p", { class: "muted" }, "Job title resembles this role (a title alone is not proof of the skills): ", ...rec.evidence.titleSignals.flatMap((t) => [factLink(t.factId), " "]))
+      : null;
+    return h("article", { class: "role-card", "data-role": rec.roleSlug, "data-support": rec.support, "data-status": rec.status },
+      h("h3", {}, rec.title, " ", h("span", { class: "badge support" }, SUPPORT[rec.support] ?? rec.support), " ", h("span", { class: `badge status ${rec.status === "APPROVED" ? "approved" : rec.status === "DISMISSED" ? "rejected" : "pending"}` }, STATUS[rec.status] ?? rec.status)),
+      h("p", { class: "muted" }, `${rec.familyName} (${rec.familyTier === "primary" ? "primary focus" : "secondary"}). ${rec.evidence.coreMet} of ${rec.evidence.coreTotal} core requirements shown; ${rec.evidence.minCoreMatches} needed for "Evidence found".`),
+      h("ul", { class: "reqs" }, ...reqs),
+      rec.gaps.length ? h("ul", { class: "gaps" }, ...rec.gaps.map((g) => h("li", { "data-gap": g.code }, g.message))) : null,
+      hints, titles,
+      rec.experienceNote ? h("p", { class: "muted experience-note", "data-code": rec.experienceNote.code }, rec.experienceNote.message) : null,
+      h("div", { class: "actions" },
+        h("button", { "data-action": "approve", onclick: () => void decide(rec, "approve"), ...(rec.status === "APPROVED" ? { disabled: true } : {}) }, "Approve as a target"),
+        h("button", { "data-action": "dismiss", class: "danger", onclick: () => void decide(rec, "dismiss"), ...(rec.status === "DISMISSED" ? { disabled: true } : {}) }, "Dismiss"),
+        rec.status !== "PROPOSED" ? h("button", { "data-action": "reset", class: "secondary", onclick: () => void decide(rec, "reset") }, "Clear decision") : null,
+        h("button", { "data-action": "select", class: "secondary", onclick: () => {
+          const box = document.querySelector<HTMLInputElement>(`input[name=role][value="${rec.roleSlug}"]`);
+          if (box) { box.checked = true; say($("#selection-msg"), `${rec.title} added to the form. Save to keep it.`, "info"); }
+        } }, "Add to my selection"),
+      ));
+  }
+
+  function renderCards(): void {
+    const cards = $("#cards");
+    clear(cards);
+    if (state.recommendations.length === 0) {
+      cards.append(h("p", { id: "no-recs", class: "muted" }, "No role is supported yet. Approve facts from your resume (skills, jobs, projects, certifications) and come back; nothing is suggested from pending or rejected facts."));
+    }
+    for (const rec of state.recommendations) cards.append(card(rec));
+    const stale = $("#stale");
+    clear(stale);
+    for (const s of state.staleDecisions) {
+      stale.append(h("p", { class: "stale-decision", "data-role": s.roleSlug }, `Your earlier decision on ${s.title} (${s.previousStatus.toLowerCase()}) no longer applies because the evidence behind it changed (${s.reason.toLowerCase().replace(/_/g, " ")}). It is shown as a fresh proposal, if there is one.`));
+    }
+    $("#nomatch-summary").textContent = `Roles with no approved supporting evidence yet (${state.noMatch.length})`;
+    const nm = $("#nomatch");
+    clear(nm);
+    for (const r of state.noMatch) {
+      nm.append(h("div", { class: "no-match", "data-role": r.roleSlug },
+        h("strong", {}, r.title), ` - ${r.familyName}`,
+        h("ul", { class: "gaps" }, ...r.gaps.filter((g) => g.code === "UNMET_CORE" || g.code === "EXPLICIT_LACK").map((g) => h("li", {}, g.message))),
+        r.pendingHints.length ? h("p", { class: "muted" }, "Pending facts that might help once approved: ", ...r.pendingHints.flatMap((p) => p.factIds.flatMap((id) => [factLink(id), " "]))) : null));
+    }
+  }
+
+  const checkbox = (name: string, value: string, label: string, checked: boolean) =>
+    h("label", { class: "choice" }, h("input", { type: "checkbox", name, value, ...(checked ? { checked: true } : {}) }), ` ${label}`);
+
+  function renderSelection(): void {
+    const sel = state.selection;
+    $("#selection-revision").textContent = sel ? `Saved revision ${sel.revisionNo}.` : "Nothing saved yet.";
+    const supported = new Set(state.recommendations.map((r) => r.roleSlug));
+    const choices = $("#role-choices");
+    clear(choices);
+    for (const f of catalog.families) {
+      const roles = catalog.roles.filter((r) => r.familySlug === f.familySlug && r.active);
+      choices.append(h("div", { class: "family", "data-family": f.familySlug },
+        checkbox("family", f.familySlug, `${f.name}${f.tier === "primary" ? " (primary)" : ""}`, !!sel?.targetFamilies.includes(f.familySlug)),
+        h("div", { class: "role-choices" }, ...roles.map((r) => checkbox("role", r.roleSlug, `${r.title}${supported.has(r.roleSlug) ? "" : " (no approved evidence yet)"}`, !!sel?.roleSlugs.includes(r.roleSlug))))));
+    }
+    const modes = $("#work-modes");
+    clear(modes);
+    for (const m of ["remote", "hybrid", "onsite"]) modes.append(checkbox("workMode", m, m, !!sel?.workModes.includes(m)));
+    const levels = $("#seniority");
+    clear(levels);
+    for (const l of ["entry", "junior", "mid", "senior"]) levels.append(checkbox("seniority", l, l, !!sel?.seniorityLevels.includes(l)));
+    const loc = (kind: string) => (sel?.locations ?? []).filter((l) => l.kind === kind).map((l) => l.value).join(", ");
+    ($("#loc-countries") as HTMLInputElement).value = loc("country");
+    ($("#loc-regions") as HTMLInputElement).value = loc("region");
+    ($("#loc-cities") as HTMLInputElement).value = loc("city");
+    ($("#loc-remote") as HTMLInputElement).checked = !!sel?.locations.some((l) => l.kind === "remote");
+    ($("#band-min") as HTMLInputElement).value = String(sel?.searchBand.minYears ?? state.suggestedSearchBand.minYears);
+    ($("#band-max") as HTMLInputElement).value = String(sel?.searchBand.maxYears ?? state.suggestedSearchBand.maxYears);
+  }
+
+  const checked = (name: string): string[] => [...document.querySelectorAll<HTMLInputElement>(`input[name=${name}]:checked`)].map((i) => i.value);
+  const split = (id: string): string[] => ($(id) as HTMLInputElement).value.split(",").map((v) => v.trim()).filter(Boolean);
+
+  $("#selection-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const out = $("#selection-msg");
+    const locations = [
+      ...split("#loc-countries").map((value) => ({ kind: "country", value })),
+      ...split("#loc-regions").map((value) => ({ kind: "region", value })),
+      ...split("#loc-cities").map((value) => ({ kind: "city", value })),
+      ...(($("#loc-remote") as HTMLInputElement).checked ? [{ kind: "remote", value: "Remote" }] : []),
+    ];
+    try {
+      const r = await api.post<{ changed: boolean; selection: Selection }>("/api/v1/roles/selections", {
+        expectedRevision: state.selection?.revisionNo ?? 0, expectedCatalogVersion: state.catalogVersion,
+        targetFamilies: checked("family"), roleSlugs: checked("role"), locations,
+        workModes: checked("workMode"), seniorityLevels: checked("seniority"),
+        searchBand: { minYears: Number(($("#band-min") as HTMLInputElement).value), maxYears: Number(($("#band-max") as HTMLInputElement).value) },
+      });
+      say(out, r.changed ? `Saved as revision ${r.selection.revisionNo}.` : "Nothing changed.", "ok");
+      await load(false);
+    } catch (e) {
+      say(out, describe(e), "error");
+    }
+  });
+
+  async function load(withForm = true): Promise<void> {
+    state = await api.get<State>("/api/v1/roles/recommendations");
+    catalog = await api.get<Catalog>("/api/v1/roles/catalog");
+    renderExperience();
+    renderCards();
+    if (withForm) renderSelection();
+    else $("#selection-revision").textContent = state.selection ? `Saved revision ${state.selection.revisionNo}.` : "Nothing saved yet.";
+  }
+
+  // Expected rejections (a bad id, for example) are shown on the page; transport, auth and server failures go to the session gate.
+  startPage({
+    load: async () => {
+      try {
+        await load();
+      } catch (e) {
+        if (e instanceof ApiError && e.kind === "client") say(msg, describe(e), "error");
+        else throw e;
+      }
+    },
+  });
+</script>

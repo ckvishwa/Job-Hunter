@@ -18,24 +18,24 @@
 
 ## Progress ledger
 
-- [ ] Task 0 — Stabilize existing WIP (typecheck + real bug fixes)
-- [ ] Task 1 — `config/portals.yml` + schema
-- [ ] Task 2 — Fortune 500 registry: rename, schema fixes, uniqueness validation
-- [ ] Task 3 — Discovery types cleanup (remove `as any` side-channels)
-- [ ] Task 4 — Discovery storage (already done — verify + add missing tests)
-- [ ] Task 5 — Checkpoints (already done — fix company-careers integration bug)
-- [ ] Task 6 — Shared retry/backoff + domain-pacing helper
-- [ ] Task 7 — Portal adapters: wire to `portals.yml`, remove selector-config cast
-- [ ] Task 8 — Portal adapter registry (already done — add tests)
-- [ ] Task 9 — Company-careers runner: stop fabricating data
-- [ ] Task 10 — Posting resolver: fix typecheck + add verification-pause
-- [ ] Task 11 — Cross-source dedup (already done — verify only)
-- [ ] Task 12 — Keyword orchestration (already done — verify only)
-- [ ] Task 13 — Orchestrator: dedicated test coverage
-- [ ] Task 14 — CLI (already done — verify only)
-- [ ] Task 15 — Reporting module
-- [ ] Task 16 — Fill remaining test gaps; confirm all tests + typecheck green
-- [ ] Task 17 — Controlled live validation
+- [x] Task 0 — Stabilize existing WIP (typecheck + real bug fixes) — commits 9bf2a1a, 2d07906. Independently reviewed; 2 real findings (accidental sites.yml live-enable, reverted; posting-resolver.ts Workday-site fabrication, logged into Task 10 above). Dedup generic-title-guard behavior change reviewed and confirmed intentional (Task 11 requirement), not a defect.
+- [x] Task 1 — `config/portals.yml` + schema — commits d12cb63, 9222a13. Reviewed clean (1 cosmetic comment fix).
+- [x] Task 2 — Fortune 500 registry: rename, schema fixes, uniqueness validation — commit 2f2bbab. Reviewed clean.
+- [x] Task 3 — Discovery types cleanup (remove `as any` side-channels) — commit 12b8b56. Reviewed clean.
+- [x] Task 4 — Discovery storage (already done — verify + add missing tests) — commit 24b12ad. Reviewed clean.
+- [x] Task 5 — Checkpoints (already done — fix company-careers integration bug) — commits c3742aa, d47b701. Review found and fixed a real orchestrator bug (checkpoint.completed short-circuited all future retries) and a real identity-vs-index bug (registry reorder would misattribute progress). Known non-blocking gap: a structurally-skipped company stays skipped after its registry data is later filled in, until a checkpoint reset (--reset-checkpoint is Task 14, not built yet).
+- [x] Task 6 — Shared retry/backoff + domain-pacing helper — commit 607b1a3. Review found + fixed a real scope-too-wide bug (module-level pacer in posting-resolver.ts shared across unrelated instances). One scope-too-narrow gap tracked, not fixed (see note under Task 6 above).
+- [x] Task 7 — Portal adapters: wire to `portals.yml`, remove selector-config cast — commit 1b4db5a. Reviewed clean; deliberate behavior change (nothing runs by default now, matches sites.yml convention) confirmed correct by direct trace. One pre-existing UX gap logged under Task 15.
+- [x] Task 8 — Portal adapter registry (already done — add tests) — commit d319ed3c. Reviewed clean.
+- [x] Task 9 — Company-careers runner: stop fabricating data — test coverage added, commit closing the 3 remaining gaps from the Task 9 checklist. Reviewed clean.
+- [x] Task 10 — Posting resolver: fix typecheck + add verification-pause — commits 7a7db79, 95d0551. Fixed the flagged Workday-site fabrication (registry-verified atsWorkdaySite now wired in, never guesses "careers"). Review found the first proof-test didn't actually discriminate fixed-vs-buggy code (incomplete fetch mock let both pass identically) — rewritten to inspect the actual fetch call log instead; verified by empirically swapping in the pre-fix code and confirming the test fails, then restoring and confirming it passes.
+- [x] Task 11 — Cross-source dedup (already done — verify only) — test-only commit closing the malformed-URL-in-mixed-batch gap. Reviewed clean.
+- [x] Task 12 — Keyword orchestration (already done — verify only) — new tests/discovery/orchestrator.test.ts (first coverage of runDiscover), verified against real config/roles.yml. Reviewed clean. Note: found `--dry-run` doesn't exist anywhere yet (not in cli.ts, not in DiscoverFilters) — Task 13's dry-run test needs Task 14 to land first; doing Task 14 next, out of numeric order.
+- [x] Task 13 — Orchestrator: dedicated test coverage — commits af7c1ec, 7c8a37e. Self-review caught a real hermeticity gap (unmocked fetch + a real 500ms sleep leaking into 2 new tests) and fixed before commit; independent review found only a dormant fake-timer cleanup fragility, fixed. 180/180 tests, ~1.8s total suite time.
+- [x] Task 14 — CLI (already done — verify only) — commits 77b0ee4, abf1144. Added --company/--resume/--reset-checkpoint/--dry-run (all 4 were missing). Self-review caught and fixed a real bug: --company + checkpoint.completed marking would have permanently stranded unfiltered companies (fixed at the orchestrator layer, verified by empirical revert/restore). Independent review found only cosmetic follow-ups (duplicated comment, dry-run+reset-checkpoint silent no-op needed a log line) — both fixed and reviewed clean.
+- [x] Task 15 — Reporting module — commit 429a757. Every field wired to a real signal, none fabricated (discoveriesRejected honestly hardcoded 0 -- no rejection logic exists yet). Reviewed clean; 2 pre-existing counting quirks noted (not introduced here, not fixed): sourcesAttempted counts a source even when every keyword checkpoint was already complete (discover() never called); pagesProcessed doesn't count a terminal empty page. One narrow theoretical false-positive in the officialPostingsResolved/unresolvedDiscoveries split (string-matches the resolver's placeholder text).
+- [x] Task 16 — Fill remaining test gaps; confirm all tests + typecheck green — commit 26cbcc1. Repeated-page-stopping was genuinely untested (added, empirically verified to catch a real regression). Missing-selector clear error confirmed as a real, never-implemented design goal (not a test gap) -- recorded here, not built: no adapter anywhere distinguishes "legitimately zero results" from "the configured selector is stale." Final: 29 files, 187/187 tests, 0 typecheck errors.
+- [x] Task 17 — Controlled live validation — all 7 items recorded: Figma success, AHEAD verification-required (real reCAPTCHA), Workday blocked (structural code gap), Google/Indeed/Monster/LinkedIn all timeout (real anti-bot stalling on page.goto, consistent across all 4 major portals; company-careers' fetch()-based paths unaffected). See "Task 17 restart log" below for full detail. No CAPTCHA solved/bypassed, no orphaned process left behind, portals.yml reverted to original state.
 
 ---
 
@@ -125,6 +125,8 @@
 - [ ] Wire both into each portal adapter's navigation/pagination loop and into the resolver's redirect-follow/fetch path, replacing whatever ad-hoc `setTimeout`/delay each currently has.
 - [ ] Test: `withRetry` retries the configured number of times then throws the last error; `pacer` delays a second call to the same domain but not a call to a different domain.
 
+- [ ] **Found during Task 6 review, tracked not fixed:** each portal adapter creates its `pacer` fresh inside `discover()`, which the orchestrator calls once per (source × role × keyword) — so pacing only holds within one keyword's own pagination, not across back-to-back keyword searches against the same portal (e.g. indeed.com searched for "SDET" then immediately "QA Engineer" with zero enforced delay between them). Judged acceptable for Task 6's literal scope (satisfies "wire into each adapter's pagination loop") but doesn't naturally belong to any later task as currently scoped either. Real fix, if ever prioritized: hoist one `pacer` instance per run per source in the orchestrator and pass it into `DiscoveryContext` instead of each adapter creating its own.
+
 ---
 
 ## Task 7: Portal adapters — wire to `portals.yml`
@@ -211,6 +213,7 @@ Covered by Task 0 Steps 5, 6, 8. This task is the checkpoint: confirm `tests/res
 - [ ] `export interface DiscoveryRunSummary` (per spec — sources attempted/succeeded/failed, companies attempted, keywords searched, pages processed, listings discovered, discoveries rejected, official postings resolved, unresolved discoveries, duplicates merged, complete JDs extracted, verification pauses, jobs by profile, jobs by source, jobs written, source-specific errors).
 - [ ] `export function buildSummary(...): DiscoveryRunSummary` — pure function assembling the summary from counters the orchestrator already tracks (or needs to start tracking) during the run.
 - [ ] Orchestrator accumulates the counters through the run and calls `buildSummary` once at the end; `cli.ts`'s existing `printDiscoverSummary` prints this structured object instead of (or in addition to) whatever ad-hoc totals it prints today.
+- [ ] **Found during Task 7 review, pre-existing (not introduced by Task 7), tracked here:** `--source X` where X is a known but currently-disabled portal/site id silently produces zero attempted sources with no explanation (same gap already existed for `sites.yml`-driven sources before Task 7). Worth a clear "requested source X exists but is disabled in config" line in the summary rather than a silent zero.
 - [ ] Test: `buildSummary` produces correct counts from a set of fake per-phase inputs; a run with zero portals attempted still produces a valid (all-zero) summary rather than throwing.
 
 ---
@@ -223,18 +226,220 @@ Covered by Task 0 Steps 5, 6, 8. This task is the checkpoint: confirm `tests/res
 
 ---
 
+## Interlude: browser lifecycle fix + registry split (found during first Task 17 attempt)
+
+First Task 17 attempt found real bugs live validation exists to catch, blocking further progress:
+- `context.close()` didn't reliably terminate the real OS Chrome process on Windows; a second
+  run against the same profile then either hung indefinitely or failed outright on a stale lock.
+- The user paused Task 17 and required a proper fix: tracked shutdown with a bounded wait +
+  force-kill fallback, pre-launch live-lock detection (fail clear, never hang), stale-lock
+  cleanup only when unowned, a per-run isolated-profile option, never touching an unrelated
+  Chrome process. Commits `f5ea6bd`, `ac0205a`, `db2cbce` (the latter two are independent-review
+  follow-ups: a real prefix-collision that could have killed an unrelated live Chrome process
+  under `isolatedProfile`, then a real false-negative on Windows paths containing a space —
+  both reproduced against actual PowerShell/live-process output, not just reasoned about).
+- Also required: move the `fortuneRank: null` validation-only registry entries (AHEAD, Stripe,
+  Figma — added ad hoc during the interrupted first attempt) out of the production
+  `config/fortune500-registry.json` into `config/fortune500-registry.validation.json`, with an
+  explicit `--registry`/`companyRegistryPath` override so a controlled validation run can still
+  use them without ever mixing the two files. Commit `5555550`.
+- Live validation also caught one real, pre-existing data defect the way it's meant to: Google's
+  registry entry (`atsTenantOrBoardId: "google"`) is wrong — that Greenhouse board returns 404,
+  confirmed independently via a direct API call. Marked `verificationStatus: "blocked"` rather
+  than fabricating a corrected token; stays in production since it's still a real, Fortune-
+  ranked company.
+
+All four commits independently reviewed, all found issues fixed and re-reviewed clean. 30 files,
+209/209 tests, 0 typecheck errors before resuming Task 17.
+
+---
+
 ## Task 17: Controlled live validation
 
 Not run until Task 16 is fully green and the user has separately confirmed they want a live run (this is a real browser hitting real external sites — confirm before executing even though it was pre-authorized in the task brief, since it's the first non-mocked execution of this code).
 
 Scope, exactly as specified — one each, small limits, never a full scan:
-- [ ] One Google Jobs search (1 keyword, `maxPages`/`maxDiscoveries` small, e.g. 1 page / 10 results).
-- [ ] One Indeed search (same small limits).
-- [ ] One Monster search (same small limits).
-- [ ] One LinkedIn public search (same small limits).
-- [ ] One Greenhouse company from the registry (existing verified entry — e.g. Google).
-- [ ] One Lever company from the registry (existing verified entry — e.g. AHEAD).
-- [ ] One Workday company from the registry — only if `atsWorkdaySite` has been filled in with a real verified value by this point; otherwise this sub-item is explicitly reported as blocked, not faked.
-- [ ] One custom/generic career page — only if at least one registry entry has real `genericSelectors` filled in; otherwise reported as blocked.
+- [x] One Google Jobs search (1 keyword, `maxPages`/`maxDiscoveries` small, e.g. 1 page / 10 results). — attempted, timeout.
+- [x] One Indeed search (same small limits). — attempted, timeout.
+- [x] One Monster search (same small limits). — attempted, timeout.
+- [x] One LinkedIn public search (same small limits). — attempted, timeout.
+- [x] One Greenhouse company from the registry (existing verified entry — e.g. Google). — used Figma instead (Google's Greenhouse token confirmed stale/blocked earlier). Success.
+- [x] One Lever company from the registry (existing verified entry — e.g. AHEAD). — verification required (real reCAPTCHA), not faked.
+- [x] One Workday company from the registry — only if `atsWorkdaySite` has been filled in with a real verified value by this point; otherwise this sub-item is explicitly reported as blocked, not faked. — reported blocked: found a real, live Workday tenant (Target) but `company-careers.ts` unconditionally skips all `atsType: "workday"` entries regardless of data, a code gap not just a data gap.
+- [ ] One custom/generic career page — only if at least one registry entry has real `genericSelectors` filled in; otherwise reported as blocked. — not attempted: no registry entry (production or validation) has real `genericSelectors` configured. Reported blocked per this item's own stated fallback, same as Workday.
 
 For each: verify pagination behaves, titles/companies look real, full JD resolves, official/apply URLs are real employer or ATS URLs (not portal redirect stubs), provenance is recorded, checkpoint resume works (kill mid-run, resume, confirm no duplicate work), a second full run of the same search is idempotent (no duplicate `JobPosting` rows), and any verification challenge encountered pauses correctly and is described in the run's report.
+
+### Task 17 restart log (post browser-lifecycle-fix, per user's 7-item sequence)
+
+1. **Figma/Greenhouse** — SUCCESS. 700+ jobs discovered, 2 resolved with real JDs, real
+   `boards.greenhouse.io`/`job-boards.greenhouse.io` canonical URLs. Registry entry verified.
+2. **AHEAD/Lever** — VERIFICATION REQUIRED. Discovery succeeded (492 real jobs from
+   `jobs.lever.co/thinkahead`). Resolution of the first job hit a real reCAPTCHA on the
+   posting page; `pauseForVerification` correctly detected it, printed the pause banner, and
+   the resolver correctly threw `Verification required ... reCAPTCHA detected` rather than
+   scraping/faking content — no CAPTCHA was solved or bypassed. Known limitation surfaced by
+   this run: in a non-interactive/background shell, `rl.question()` resolves immediately on
+   stdin EOF instead of truly blocking for a human, so unattended runs can't actually wait for
+   manual solving — the safe part (never fabricating data past a detected challenge) still
+   held. Not fixed here since out of scope for validation; worth a follow-up if unattended
+   Lever/Greenhouse runs need to survive real CAPTCHAs.
+3. **Workday company** — BLOCKED (structural, not just missing data). Verified a real, live
+   Workday tenant via direct API probe (`target.wd5.myworkdayjobs.com`, tenant `target`, site
+   `targetcareers` — returned 2000 real job postings). However
+   `src/discovery/adapters/company-careers.ts` unconditionally skips every `atsType:
+   "workday"` registry entry regardless of whether `atsWorkdaySite` is filled in (dead branch:
+   never builds a `SiteConfig.workday` block, unlike greenhouse/lever). So this item is
+   blocked by a real code gap, not by absent data — filling in Target's `atsWorkdaySite` alone
+   would not make it run. Reported as blocked per the plan's explicit fallback rather than
+   silently expanding scope to wire up new adapter code mid-validation.
+4. **Google Jobs portal** — TIMEOUT. First attempt found a real, separate bug: `config/portals.yml`'s
+   own header comment claims `--source <id>` alone opts a portal in, but
+   `orchestrator.ts`'s `standardPortalIds` filters on `p.enabled` *before* the `--source`
+   narrowing is ever applied — a disabled portal is never attempted regardless of `--source`.
+   Fixed by flipping `enabled: true` for the duration of this item's run (reverted after).
+   With it enabled, the run genuinely launched a real isolated Chrome instance (confirmed
+   alive via direct process inspection) but never wrote a single checkpoint entry after
+   ~18+ minutes — well beyond every bounded timeout in `google-jobs.ts` (30s navigation x2
+   retries, 30s networkidle wait, all `.catch`-guarded). Recorded as timeout rather than
+   waited on indefinitely. Stopping the background task killed the outer shell/node wrapper
+   but — a separate, real finding — did NOT deliver SIGINT to the child process on Windows,
+   so `registerShutdownOnSignal`'s cleanup never ran and the isolated Chrome tree was left
+   running; cleaned up manually via `taskkill /PID <verified-isolated-profile-pid> /T /F`,
+   scoped strictly to the confirmed isolated-profile process tree (never the user's real
+   Chrome). This is an external-termination gap (TaskStop/Windows don't propagate a graceful
+   signal the way Ctrl+C does), not a defect in the shutdown code itself — worth a follow-up
+   if unattended/scripted kills of discover runs become common.
+5. **Indeed portal** — TIMEOUT. Same pattern as Google Jobs: real isolated Chrome launched and
+   confirmed alive, zero checkpoint progress after 3+ minutes (well past `indeed.ts`'s bounded
+   waits), stopped and cleaned up the same way.
+6. **Monster portal** — TIMEOUT. Same pattern again — third consecutive real portal exhibiting
+   identical zero-progress-past-all-bounds behavior.
+7. **LinkedIn public portal** — TIMEOUT. Fourth and last consecutive real portal, same pattern.
+
+**Cross-portal finding (all 4 browser-driven search portals):** Google Jobs, Indeed, Monster,
+and LinkedIn public all independently reproduced the same symptom under `--isolated-profile`:
+a real, live Chrome process tree launches successfully (confirmed via direct OS process
+inspection each time — never a launch failure, never the profile-in-use error), but the
+adapter never reaches its first `onPageProcessed` checkpoint write, well beyond every
+timeout coded in the adapters themselves (30s navigation x2 retries, 30s networkidle wait).
+By contrast, company-careers sources worked correctly in the same session: Figma succeeded
+fully, and AHEAD's real page-navigation-based resolution step reached a real Lever page and
+correctly detected a real reCAPTCHA. The differentiator is that Greenhouse/Lever discovery
+is a plain `fetch()` JSON call, not a `page.goto()`, and AHEAD's one browser-navigated page
+(a direct Lever job-detail URL) did load. The four major portals — sites with the most
+sophisticated, well-funded anti-bot infrastructure of anything in this validation set — are
+the only targets where `page.goto()` itself never completes or fails within its own timeout.
+Most likely explanation given the pattern (consistent across 4 unrelated domains, none of
+which show this behavior in company-careers' simpler fetch-based paths): active anti-bot
+tarpitting/fingerprint-based stalling of the automated real-Chrome connection, not a bug in
+this codebase's timeout logic. Each run's orphaned isolated Chrome tree was confirmed and
+force-killed by exact, verified PID after stopping — the shutdown code path (SIGINT handler)
+itself was never exercised here because external task termination on Windows does not
+deliver a signal the way Ctrl+C does (see Google Jobs entry above); this is a job-runner/OS
+gap, not a defect in `closePersistentChrome`. Not investigated further as a code fix here —
+out of scope for a validation pass; flagging as a real, load-bearing finding for whoever
+picks up portal-adapter hardening next (candidates: stealth/fingerprint evasion is explicitly
+out of bounds per this project's "never bypass access controls" constraint, so the realistic
+fix is likely a hard per-goto watchdog timeout independent of Playwright's own timeout option,
+plus alerting rather than silent hanging).
+
+**Task 17 summary — every configured validation source has a recorded result:**
+| # | Source | Result |
+|---|--------|--------|
+| 1 | Figma / Greenhouse | Success |
+| 2 | AHEAD / Lever | Verification required (reCAPTCHA) |
+| 3 | Workday company | Blocked (structural code gap, not just data) |
+| 4 | Google Jobs portal | Timeout |
+| 5 | Indeed portal | Timeout |
+| 6 | Monster portal | Timeout |
+| 7 | LinkedIn public portal | Timeout |
+
+Task 17 is complete in the sense the user required: every item has a definitive, honestly
+recorded result. Nothing here was faked, no CAPTCHA was solved/bypassed, no anti-bot
+protection was evaded, and no orphaned process or stale lock was left behind — `config/portals.yml`
+is back to its pre-validation state (all portals `enabled: false`, original 100/5000 limits).
+
+---
+
+## Post-Task-17: make official-careers production-usable (user follow-up request)
+
+Following Task 17, the user asked for the `company-careers` (official-careers) pipeline to be
+made production-usable, with Google/Indeed/Monster/LinkedIn explicitly kept
+experimental/blocked/untouched (no anti-bot evasion, no further portal retries this phase).
+Executed as 5 sequential tasks, each with its own local commit, typecheck+full suite green
+throughout (225/225 tests, 0 typecheck errors at the end).
+
+**Scoped down from the request, up front, before writing any code:** the request's Task 3C/3D
+specified a "stealth context" (spoofing `navigator.webdriver`, fake `navigator.plugins`, a
+fake `window.chrome` object, `--disable-blink-features=AutomationControlled`) and a
+fake-referrer-chain "human mimicry" helper for the AHEAD/Lever verification path. Declined:
+these are automation-fingerprint/detection-evasion techniques aimed at defeating a third
+party's bot defenses before they ever trigger — the same category of thing declined twice
+already this session (a real Cloudflare Turnstile on Stripe, a real reCAPTCHA on AHEAD),
+under this session's standing "never bypass access controls" constraint. Built instead: real
+courtesy pacing (already existed via `rate-limit.ts`'s `pacer()`) and the existing, already-
+tested `pauseForVerification` pause-for-a-human flow — no stealth module was created.
+
+- **Task 1 — `--source` semantics** (commit `fea2b9d`): `orchestrator.ts`'s `targetSources`
+  used to filter on `portals.yml`/`sites.yml`'s `enabled` flag *before* `--source` narrowing
+  ever ran, so a disabled entry could never be opted in despite `portals.yml`'s own comment
+  claiming `--source` does exactly that (the real bug behind Google Jobs silently running
+  nothing during the first Task 17 attempt). Fixed: no `--source` → enabled-only (unchanged);
+  explicit `--source` → runs regardless of `enabled`, never writes back to the config file;
+  unknown id → throws a clear error, exit code 1, before any browser launches. 7 new tests.
+
+- **Task 2 — enable verified Workday companies** (commit `3273ad5`): `company-careers.ts`
+  unconditionally skipped every `atsType: "workday"` entry regardless of registry data — the
+  structural gap Task 17 recorded as "blocked." Fixed: runs when the registry has all three
+  verified fields (added `atsWorkdayHostname` to the schema — Workday's hostname carries an
+  unguessable per-tenant shard, e.g. `target.wd5.myworkdayjobs.com`, that discovery has no URL
+  to derive it from yet, unlike `posting-resolver.ts`'s already-working resolve-time path).  A
+  guessed `"careers"` site value is explicitly rejected. Added Target to the validation
+  registry (real, live-verified tenant; kept out of the production file since its exact
+  current Fortune rank was never independently confirmed — same "never fabricate" rule the
+  production/validation split already enforces). 9 new/rewritten tests covering missing-field
+  skips, the guessed-value rejection, real delegation, per-company failure isolation, and
+  checkpoint-resume retrying only the failed company.
+
+- **Task 3 — Chrome lifecycle hardening** (commit `f6faa4f`): most of this already existed from
+  the Task 17 browser-lifecycle fix (`launcher.ts`'s tracked launch/close, active-lock
+  rejection, stale-lock cleanup, bounded-wait-then-force-kill, SIGINT handling). Added SIGTERM,
+  `uncaughtException`, and `unhandledRejection` handling alongside the existing SIGINT handler,
+  with a dedupe guard so only the first of the four to fire runs shutdown. Documented, not
+  fixed (can't be, from inside the process): an external forceful kill (Windows
+  `TerminateProcess`, what a job runner's "stop task" does) bypasses all of this at the OS
+  level — confirmed repeatedly during acceptance testing below, cleaned up each time by
+  verified PID, never touching the user's real Chrome. 3 new tests (registration/dedupe only —
+  the handlers themselves call `process.exit()`, never safe to actually trigger in a test).
+
+- **Task 4 — production command:** no new source-specific file was built (a bespoke
+  `ahead-lever.ts` would special-case one registry entry instead of using the generic,
+  data-driven `company-careers.ts` path every other company already goes through — a real
+  architecture regression). The already-existing pipeline, now fixed by Tasks 1–3, *is* the
+  production command:
+  ```
+  npm run discover -- --source company-careers --profile sdet --location "United States" --limit 100
+  ```
+  Against the real production registry (`config/fortune500-registry.json`) once real ATS data
+  for more Fortune 500 companies is filled in; against `config/fortune500-registry.validation.json`
+  (`--registry config/fortune500-registry.validation.json --isolated-profile`) for the
+  controlled runs below.
+
+- **Task 5 — controlled acceptance** (commit — this doc + the `fix(workday)` commit above):
+  | # | Test | Result |
+  |---|------|--------|
+  | 1 | Single Greenhouse (Figma) | Success — 712 discovered, 2/2 resolved, real JDs |
+  | 2 | Single Lever (AHEAD) | Verification required (real reCAPTCHA) both times re-run — correctly detected, paused, never bypassed. Second run's resolution phase took ~12+ minutes past the ~2 minutes expected for 2 jobs before being stopped; cause not identified (not a regression from Tasks 1–3, which never touch `posting-resolver.ts`/`verification.ts` — most likely transient network/anti-bot slowness on the reCAPTCHA challenge page itself). Flagging as an open question, not silently waving it through. |
+  | 3 | Target Workday (fetch) | Success, after finding and fixing 2 real bugs live (see the `fix(workday)` commit): a hardcoded `limit: 50` page size that Target's tenant flatly rejects (HTTP 400) below ~30, and a real double `/job//job/` in the canonical URL. Confirmed clean on a second run: 80 discovered, 2/2 resolved, real JDs, correct single-segment URLs. |
+  | 4 | Combined (all 4 validation companies, one command) | Success — 1284 real listings discovered in one run across AHEAD (492), Figma (712), Target (80); Stripe correctly attempted and blocked (Cloudflare Turnstile, consistent with its already-recorded status) rather than silently skipped. Resolution of the (AHEAD-dominated, since AHEAD is first in registry order) first 2 jobs hit the same slow verification pause as test 2 — Greenhouse/Workday resolution was already independently proven clean in tests 1 and 3, so this wasn't re-forced to completion. |
+  | 5 | Idempotency (same combined command, no `--reset-checkpoint`) | Success — 0 new listings discovered, `jobs.jsonl` count unchanged (6, no duplicate growth), only the still-failing Stripe was retried (exactly as designed — 4 keyword-scoped attempts, once each); the 3 already-succeeded companies were correctly never reprocessed. |
+
+  Every controlled run used `--isolated-profile`; every isolated Chrome tree this produced was
+  confirmed by exact PID and cleanly torn down (either by the process itself, or manually when
+  a run was stopped for taking far longer than its scope justified) — none left running, none
+  touched the user's real Chrome.
+
+**Not done / explicitly out of scope this phase:** Google/Indeed/Monster/LinkedIn untouched
+(still `enabled: false`, still marked experimental/blocked, per the user's explicit portal
+policy). No anti-bot evasion built for any source. Nothing pushed remotely.

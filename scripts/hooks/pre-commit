@@ -1,0 +1,21 @@
+#!/bin/sh
+# Refuses a commit that stages candidate data. NOT INSTALLED BY ANY SCRIPT IN THIS REPO:
+# installing a hook is the repository owner's decision, and this one would replace whatever
+# hook you already have. To use it, either copy it:
+#
+#   cp scripts/hooks/pre-commit .git/hooks/pre-commit   # check .git/hooks/pre-commit first
+#
+# or point Git at this directory, which replaces the hooks path for the whole repository:
+#
+#   git config core.hooksPath scripts/hooks
+#
+# Bypass for one commit you have checked yourself: git commit --no-verify
+set -e
+
+if [ ! -d node_modules ]; then
+  echo "pre-commit: node_modules is missing, so the private-data guard cannot run." >&2
+  echo "Run 'npm install', or bypass this one commit with --no-verify after checking what is staged." >&2
+  exit 1
+fi
+
+exec npx --no-install tsx src/ci/private-staged.ts

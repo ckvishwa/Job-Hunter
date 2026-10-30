@@ -1,7 +1,14 @@
 import { readFileSync } from "node:fs";
 import { load as parseYaml } from "js-yaml";
 import type { ZodType } from "zod";
-import { companyRegistrySchema, type CompanyRegistryEntry, rolesFileSchema, sitesFileSchema } from "./schema.js";
+import {
+  companyRegistrySchema,
+  type CompanyRegistryEntry,
+  type PortalConfig,
+  portalsFileSchema,
+  rolesFileSchema,
+  sitesFileSchema,
+} from "./schema.js";
 import type { CollectSettings, RoleConfig, SiteConfig } from "../types.js";
 
 export class ConfigValidationError extends Error {
@@ -41,6 +48,11 @@ export function loadRolesConfig(filePath: string): RoleConfig[] {
 export function loadCollectSettings(filePath: string): CollectSettings {
   const parsed = parseAndValidate(filePath, sitesFileSchema);
   return parsed.settings as CollectSettings;
+}
+
+export function loadPortalsConfig(filePath: string): PortalConfig[] {
+  const parsed = parseAndValidate(filePath, portalsFileSchema);
+  return parsed.portals as PortalConfig[];
 }
 
 export function loadCompanyRegistry(filePath: string): CompanyRegistryEntry[] {

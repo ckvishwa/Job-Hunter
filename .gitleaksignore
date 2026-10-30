@@ -1,0 +1,15 @@
+# Accepted HISTORICAL findings. Published Git history is not rewritten, so these stay visible to a full-history scan.
+# Each line is a gitleaks fingerprint (commit:file:rule:line). Reviewed 2026-10-09.
+# A local Windows account name sat in a launcher test fixture added by db2cbce (2026-07-28). It was replaced with a
+# synthetic name in the working tree by the SDLC-T01 change; the two lines below only cover the old commit.
+db2cbce270056b885f10918dfc631b96bbf08f5a:tests/browser/launcher.test.ts:local-user-home-path:68
+db2cbce270056b885f10918dfc631b96bbf08f5a:tests/browser/launcher.test.ts:local-user-home-path:80
+# JH-REPO-001 R6.3 (2026-10-29). Reviewed history, nothing secret:
+# - a local Windows profile path in a recovery doc and in an experiment script default; both were removed from the tree in the next commit.
+# - generic-api-key false positives: rows of the preservation inventory pair a file path with a SHA-256 hash.
+07d86c1aed23973bb7b11f3aa0310c2d1224290b:docs/recovery/JOB-HUNTER-CONSOLIDATION-PLAN-2026-10-29.md:local-user-home-path:3
+07d86c1aed23973bb7b11f3aa0310c2d1224290b:docs/recovery/preservation-file-inventory-2026-10-29.csv:generic-api-key:56
+07d86c1aed23973bb7b11f3aa0310c2d1224290b:docs/recovery/preservation-file-inventory-2026-10-29.csv:generic-api-key:127
+0ccdbc21f1cd7bdd8b861370479dad05a849d4d9:services/ai/ml_experiment.py:local-user-home-path:111
+docs/recovery/preservation-file-inventory-2026-10-29.csv:generic-api-key:56
+docs/recovery/preservation-file-inventory-2026-10-29.csv:generic-api-key:127

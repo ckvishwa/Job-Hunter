@@ -1,0 +1,186 @@
+{
+ "schema": "orbital-ml-employer-sides/1",
+ "version": 1,
+ "salt": "orbital-ml-split-v2",
+ "frozenAt": "2026-10-14T04:44:51.425Z",
+ "frozenBy": "local",
+ "method": "terciles of rule-admitted share (unlabeled corpus facts only); lowest-hash employers per tercile held out",
+ "employers": [
+  {
+   "company": "Abnormal Security",
+   "side": "train",
+   "stratum": "mid",
+   "ruleShare": 0.2386,
+   "postings": 88
+  },
+  {
+   "company": "Cloudflare",
+   "side": "train",
+   "stratum": "low",
+   "ruleShare": 0.1258,
+   "postings": 445
+  },
+  {
+   "company": "Coinbase",
+   "side": "train",
+   "stratum": "mid",
+   "ruleShare": 0.1498,
+   "postings": 227
+  },
+  {
+   "company": "Databricks",
+   "side": "train",
+   "stratum": "low",
+   "ruleShare": 0.0883,
+   "postings": 895
+  },
+  {
+   "company": "Datadog",
+   "side": "train",
+   "stratum": "low",
+   "ruleShare": 0.1324,
+   "postings": 438
+  },
+  {
+   "company": "Discord",
+   "side": "train",
+   "stratum": "low",
+   "ruleShare": 0.125,
+   "postings": 48
+  },
+  {
+   "company": "Dragos",
+   "side": "train",
+   "stratum": "high",
+   "ruleShare": 0.3148,
+   "postings": 54
+  },
+  {
+   "company": "Dropbox",
+   "side": "heldout",
+   "stratum": "low",
+   "ruleShare": 0,
+   "postings": 32
+  },
+  {
+   "company": "Elastic",
+   "side": "heldout",
+   "stratum": "mid",
+   "ruleShare": 0.1425,
+   "postings": 372
+  },
+  {
+   "company": "Expel",
+   "side": "train",
+   "stratum": "high",
+   "ruleShare": 0.25,
+   "postings": 8
+  },
+  {
+   "company": "GitLab",
+   "side": "train",
+   "stratum": "mid",
+   "ruleShare": 0.1806,
+   "postings": 216
+  },
+  {
+   "company": "Huntress",
+   "side": "heldout",
+   "stratum": "high",
+   "ruleShare": 0.5,
+   "postings": 36
+  },
+  {
+   "company": "MongoDB",
+   "side": "train",
+   "stratum": "high",
+   "ruleShare": 0.2941,
+   "postings": 391
+  },
+  {
+   "company": "Okta",
+   "side": "train",
+   "stratum": "high",
+   "ruleShare": 0.3581,
+   "postings": 377
+  },
+  {
+   "company": "Palantir",
+   "side": "train",
+   "stratum": "low",
+   "ruleShare": 0.1282,
+   "postings": 312
+  },
+  {
+   "company": "Recorded Future",
+   "side": "heldout",
+   "stratum": "mid",
+   "ruleShare": 0.2391,
+   "postings": 46
+  },
+  {
+   "company": "Reddit",
+   "side": "train",
+   "stratum": "mid",
+   "ruleShare": 0.1389,
+   "postings": 144
+  },
+  {
+   "company": "Robinhood",
+   "side": "train",
+   "stratum": "mid",
+   "ruleShare": 0.1543,
+   "postings": 175
+  },
+  {
+   "company": "SentinelOne",
+   "side": "heldout",
+   "stratum": "high",
+   "ruleShare": 0.5226,
+   "postings": 266
+  },
+  {
+   "company": "Sparksoft",
+   "side": "train",
+   "stratum": "high",
+   "ruleShare": 0.4375,
+   "postings": 32
+  },
+  {
+   "company": "Spotify",
+   "side": "train",
+   "stratum": "low",
+   "ruleShare": 0.0361,
+   "postings": 83
+  },
+  {
+   "company": "Stripe",
+   "side": "heldout",
+   "stratum": "low",
+   "ruleShare": 0.0953,
+   "postings": 724
+  },
+  {
+   "company": "Toast",
+   "side": "heldout",
+   "stratum": "low",
+   "ruleShare": 0.0484,
+   "postings": 310
+  },
+  {
+   "company": "Twilio",
+   "side": "train",
+   "stratum": "mid",
+   "ruleShare": 0.1931,
+   "postings": 145
+  },
+  {
+   "company": "Wiz",
+   "side": "train",
+   "stratum": "high",
+   "ruleShare": 0.459,
+   "postings": 122
+  }
+ ],
+ "sha256": "e2df10655ea5e697b6528efc65c402338c40ac537011a741cc85ad91867a01f5"
+}

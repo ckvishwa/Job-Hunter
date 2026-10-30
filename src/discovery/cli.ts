@@ -1,6 +1,8 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { runDiscover, type DiscoverFilters, type DiscoverSummary } from "./orchestrator.js";
+import { createRunEventLog } from "../events/run-events.js";
+import { runDiscover, type DiscoverFilters } from "./orchestrator.js";
+import type { DiscoveryRunSummary } from "./report.js";
 
 export function parseDiscoverArgs(argv: string[]): DiscoverFilters {
   const result: DiscoverFilters = {};
@@ -14,6 +16,28 @@ export function parseDiscoverArgs(argv: string[]): DiscoverFilters {
       result.sources = (result.sources ?? []).concat(value.split(",").filter(Boolean));
     } else if (arg === "--location") {
       result.location = argv[++i];
+    } else if (arg === "--company") {
+      result.company = argv[++i];
+    } else if (arg === "--registry") {
+      result.registryPath = argv[++i];
+    } else if (arg === "--data-dir") {
+      result.dataDir = argv[++i];
+    } else if (arg === "--isolated-profile") {
+      result.isolatedProfile = true;
+    } else if (arg === "--resume") {
+      // Checkpoints are always consulted/retried every run already -- this flag is accepted
+      // as an explicit-intent marker but doesn't change behavior (see DiscoverFilters).
+      result.resume = true;
+    } else if (arg === "--dry-run") {
+      result.dryRun = true;
+    } else if (arg === "--reset-checkpoint") {
+      const next = argv[i + 1];
+      if (next !== undefined && !next.startsWith("--")) {
+        result.resetCheckpoint = next;
+        i += 1;
+      } else {
+        result.resetCheckpoint = true;
+      }
     } else if (arg === "--limit") {
       const value = argv[++i];
       const parsed = Number(value);
@@ -24,23 +48,68 @@ export function parseDiscoverArgs(argv: string[]): DiscoverFilters {
           `Ignoring invalid --limit value "${value ?? ""}" - must be a positive integer.`,
         );
       }
+    } else if (arg === "--resolve-concurrency") {
+      const value = argv[++i];
+      const parsed = Number(value);
+      if (Number.isInteger(parsed) && parsed > 0) {
+        result.resolveConcurrency = parsed;
+      } else {
+        console.error(`Ignoring invalid --resolve-concurrency value "${value ?? ""}" - must be a positive integer.`);
+      }
+    } else if (arg === "--resolve-job-timeout-ms") {
+      const value = argv[++i];
+      const parsed = Number(value);
+      if (Number.isInteger(parsed) && parsed > 0) {
+        result.resolveJobTimeoutMs = parsed;
+      } else {
+        console.error(`Ignoring invalid --resolve-job-timeout-ms value "${value ?? ""}" - must be a positive integer.`);
+      }
+    } else if (arg === "--resolve-total-timeout-ms") {
+      const value = argv[++i];
+      const parsed = Number(value);
+      if (Number.isInteger(parsed) && parsed > 0) {
+        result.resolveTotalTimeoutMs = parsed;
+      } else {
+        console.error(`Ignoring invalid --resolve-total-timeout-ms value "${value ?? ""}" - must be a positive integer.`);
+      }
     }
   }
   return result;
 }
 
-function printDiscoverSummary(summary: DiscoverSummary): void {
+function printDiscoverSummary(summary: DiscoveryRunSummary): void {
   console.log("\n=== Discovery & Orchestration Summary ===");
   console.log(`Sources attempted: ${summary.sourcesAttempted}`);
   console.log(`Sources succeeded: ${summary.sourcesSucceeded}`);
   console.log(`Sources failed: ${summary.sourcesFailed}`);
+  console.log(`Companies attempted: ${summary.companiesAttempted}`);
+  console.log(`Keywords searched: ${summary.keywordsSearched}`);
+  console.log(`Pages processed: ${summary.pagesProcessed}`);
   console.log(`Listings discovered: ${summary.listingsDiscovered}`);
-  console.log(`Full JDs extracted/resolved: ${summary.jdsExtracted}`);
-  console.log(`Duplicates removed: ${summary.duplicatesRemoved}`);
-  console.log(`Jobs written to jobs.jsonl: ${summary.jobsWritten}`);
-  console.log("Totals by matched profile:");
-  for (const [profile, count] of Object.entries(summary.totalsByProfile)) {
+  console.log(`Listings evaluated: ${summary.listingsEvaluated}`);
+  console.log(`Irrelevant listings rejected: ${summary.discoveriesRejected}`);
+  console.log(`Relevant listings retained: ${summary.relevantRetained}`);
+  console.log("Retained by profile:");
+  for (const [profile, count] of Object.entries(summary.retainedByProfile)) {
     console.log(`  ${profile}: ${count}`);
+  }
+  console.log(`Resolutions attempted: ${summary.resolutionsAttempted}`);
+  console.log(`Resolutions succeeded: ${summary.resolutionsSucceeded}`);
+  console.log(`Resolutions timed out: ${summary.resolutionsTimedOut}`);
+  console.log(`Unresolved: ${summary.unresolvedDiscoveries}`);
+  console.log(`Duplicates merged: ${summary.duplicatesMerged}`);
+  console.log(`Full JDs extracted/resolved: ${summary.jdsExtracted}`);
+  console.log(`Verification pauses: ${summary.verificationPauses}`);
+  console.log(`Jobs written to jobs.jsonl: ${summary.jobsWritten}`);
+  console.log(`Total discovery time: ${summary.discoveryTimeMs}ms`);
+  console.log(`Total resolution time: ${summary.resolutionTimeMs}ms`);
+  console.log("Jobs by matched profile:");
+  for (const [profile, count] of Object.entries(summary.jobsByProfile)) {
+    console.log(`  ${profile}: ${count}`);
+  }
+  console.log("Jobs by source:");
+  for (const [source, count] of Object.entries(summary.jobsBySource)) {
+    console.log(`  ${source}: ${count}`);
   }
   if (summary.errors.length) {
     console.log("Errors:");
@@ -53,15 +122,23 @@ function printDiscoverSummary(summary: DiscoverSummary): void {
 
 async function main(): Promise<void> {
   const filters = parseDiscoverArgs(process.argv.slice(2));
+  // --data-dir redirects every output (jobs, discovered, checkpoints, failures) so a proof or
+  // validation run never mixes with the working dataset in data/.
+  const dataDir = filters.dataDir ?? "data";
   const summary = await runDiscover(
     {
       sitesConfigPath: path.resolve("config/sites.yml"),
       rolesConfigPath: path.resolve("config/roles.yml"),
-      discoveredJobsPath: path.resolve("data/discovered-jobs.jsonl"),
-      jobsStorePath: path.resolve("data/jobs.jsonl"),
-      checkpointsPath: path.resolve("data/checkpoints.json"),
+      portalsConfigPath: path.resolve("config/portals.yml"),
+      discoveredJobsPath: path.resolve(dataDir, "discovered-jobs.jsonl"),
+      jobsStorePath: path.resolve(dataDir, "jobs.jsonl"),
+      checkpointsPath: path.resolve(dataDir, "checkpoints.json"),
+      failuresPath: path.resolve(dataDir, "job-failures.jsonl"),
     },
     filters,
+    undefined,
+    undefined,
+    createRunEventLog("discovery"),
   );
   printDiscoverSummary(summary);
 }

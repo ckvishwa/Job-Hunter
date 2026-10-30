@@ -1,6 +1,8 @@
 import type { DiscoveredJobLite, PortalDiscoveryAdapter, DiscoveryContext } from "../types.js";
 import { pauseForVerification } from "../../browser/verification.js";
+import { pacer, withRetry } from "../rate-limit.js";
 import type { SiteConfig } from "../../types.js";
+import type { PortalConfig } from "../../config/schema.js";
 
 export interface GenericPortalSelectors {
   searchInputSelector?: string;
@@ -17,14 +19,48 @@ export interface GenericPortalSelectors {
   searchUrlTemplate?: string; // e.g. "https://example.com/jobs?q={{keyword}}&l={{location}}&page={{page}}"
 }
 
-export function validateGenericPortalConfig(site: SiteConfig): void {
-  const gp = site.generic as unknown as GenericPortalSelectors | undefined;
+// This adapter is invoked from two distinct config sources (see design spec §11 /
+// orchestrator.ts): a config/portals.yml entry with type: "generic" (a job-search portal),
+// or a config/sites.yml entry's SiteConfig.generic (a company career-page selector set).
+// They're different concepts with different schemas -- portalConfig, when present, wins.
+function selectorsFromPortalConfig(pc: PortalConfig): GenericPortalSelectors {
+  if (!pc.jobLinkSelector) {
+    throw new Error(`Portal "${pc.id}" (type: generic) is missing required "jobLinkSelector"`);
+  }
+  return {
+    searchInputSelector: pc.searchInputSelector,
+    searchButtonSelector: pc.searchButtonSelector,
+    resultCardSelector: pc.resultCardSelector,
+    jobLinkSelector: pc.jobLinkSelector,
+    nextButtonSelector: pc.nextButtonSelector,
+    loadMoreSelector: pc.loadMoreSelector,
+    titleSelector: pc.titleSelector,
+    locationSelector: pc.locationSelector,
+    companySelector: pc.companySelector,
+    salarySelector: pc.salarySelector,
+    dateSelector: pc.dateSelector,
+    searchUrlTemplate: pc.searchUrlTemplate,
+  };
+}
+
+function selectorsFromSiteConfig(site: SiteConfig): GenericPortalSelectors {
+  const gp = site.generic;
   if (!gp) {
     throw new Error(`Site "${site.id}" uses generic portal adapter but has no generic/selectors config`);
   }
-  if (!gp.resultCardSelector || !gp.jobLinkSelector || !gp.titleSelector || !gp.locationSelector) {
-    throw new Error(`Site "${site.id}" generic portal config is missing required selectors`);
-  }
+  // sites.yml's genericSelectorsSchema has no companySelector/salarySelector/dateSelector/
+  // searchUrlTemplate fields (it's the company career-page shape, not portals.yml's) --
+  // left explicitly absent here, never fabricated.
+  return {
+    searchInputSelector: gp.searchInputSelector,
+    searchButtonSelector: gp.searchButtonSelector,
+    resultCardSelector: gp.resultCardSelector,
+    jobLinkSelector: gp.jobLinkSelector,
+    nextButtonSelector: gp.nextButtonSelector,
+    loadMoreSelector: gp.loadMoreSelector,
+    titleSelector: gp.titleSelector,
+    locationSelector: gp.locationSelector,
+  };
 }
 
 export const configurableGenericPortalAdapter: PortalDiscoveryAdapter = {
@@ -33,35 +69,50 @@ export const configurableGenericPortalAdapter: PortalDiscoveryAdapter = {
   async discover(context: DiscoveryContext): Promise<void> {
     const { page, keyword, location, settings, checkpoint, onPageProcessed } = context;
     const startPage = checkpoint.lastPage + 1;
+    const pace = pacer(settings.delayBetweenRequestsMs);
 
-    // We expect the config to be passed in some site settings, but for this discovery adapter,
-    // we can retrieve the selector set from generic metadata in SiteConfig if passed.
-    // If not, we fall back to generic selectors or a placeholder.
-    // Let's assume the site config is passed in context or options.
-    // Wait, how does the orchestrator pass site details? We can attach siteConfig to context or options.
-    // Let's modify DiscoveryContext to include siteConfig if needed!
-    // Wait! Let's check DiscoveryContext again. It does not have siteConfig. Let's add it!
-    // Yes! Let's extend DiscoveryContext to include the SiteConfig object.
-    const siteConfig = (context as any).siteConfig as SiteConfig;
-    if (!siteConfig) {
-      throw new Error("Generic Portal adapter requires siteConfig in the discovery context");
+    let gp: GenericPortalSelectors;
+    let baseUrl: string;
+    let sourceId: string;
+    let companyFallbackName: string;
+
+    if (context.portalConfig) {
+      gp = selectorsFromPortalConfig(context.portalConfig);
+      baseUrl = context.portalConfig.baseUrl;
+      sourceId = context.portalConfig.id;
+      companyFallbackName = context.portalConfig.id;
+    } else if (context.siteConfig) {
+      gp = selectorsFromSiteConfig(context.siteConfig);
+      baseUrl = context.siteConfig.url;
+      sourceId = context.siteConfig.id;
+      companyFallbackName = context.siteConfig.name;
+    } else {
+      throw new Error("Generic Portal adapter requires either portalConfig or siteConfig in the discovery context");
     }
 
-    validateGenericPortalConfig(siteConfig);
-    const gp = siteConfig.generic as unknown as GenericPortalSelectors;
-
     for (let pageNum = startPage; pageNum <= settings.maxPagesPerSource; pageNum++) {
-      let url = siteConfig.url;
+      let url = baseUrl;
       if (gp.searchUrlTemplate) {
         url = gp.searchUrlTemplate
           .replace("{{keyword}}", encodeURIComponent(keyword))
           .replace("{{location}}", encodeURIComponent(location))
           .replace("{{page}}", String(pageNum));
-        await page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs });
+        await pace(url);
+        await withRetry(
+          () => page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs }),
+          { retries: 2, backoffMs: 500 },
+        );
       } else {
         if (pageNum === startPage) {
-          await page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs });
-          await pauseForVerification(page);
+          await pace(url);
+          await withRetry(
+            () => page.goto(url, { waitUntil: "domcontentloaded", timeout: settings.navigationTimeoutMs }),
+            { retries: 2, backoffMs: 500 },
+          );
+          const initialVerification = await pauseForVerification(page);
+          if (initialVerification.detected) {
+            context.onVerificationPause?.();
+          }
           if (keyword && gp.searchInputSelector && gp.searchButtonSelector) {
             await page.fill(gp.searchInputSelector, keyword);
             await page.click(gp.searchButtonSelector);
@@ -78,7 +129,10 @@ export const configurableGenericPortalAdapter: PortalDiscoveryAdapter = {
         }
       }
 
-      await pauseForVerification(page);
+      const verification = await pauseForVerification(page);
+      if (verification.detected) {
+        context.onVerificationPause?.();
+      }
 
       const cards = await page.$$(gp.resultCardSelector);
       if (cards.length === 0) {
@@ -91,7 +145,7 @@ export const configurableGenericPortalAdapter: PortalDiscoveryAdapter = {
         const href = await card.$eval(gp.jobLinkSelector, (el) => (el as HTMLAnchorElement).href).catch(() => "");
         const company = gp.companySelector
           ? await card.$eval(gp.companySelector, (el) => el.textContent?.trim() ?? "").catch(() => "")
-          : siteConfig.name;
+          : companyFallbackName;
         const loc = await card.$eval(gp.locationSelector, (el) => el.textContent?.trim() ?? "").catch(() => "");
         const salary = gp.salarySelector
           ? await card.$eval(gp.salarySelector, (el) => el.textContent?.trim() ?? null).catch(() => null)
@@ -106,7 +160,7 @@ export const configurableGenericPortalAdapter: PortalDiscoveryAdapter = {
         const jobId = new URL(href).pathname.split("/").pop() || href;
 
         jobs.push({
-          source: siteConfig.id,
+          source: sourceId,
           searchKeyword: keyword,
           title,
           company,
@@ -118,6 +172,12 @@ export const configurableGenericPortalAdapter: PortalDiscoveryAdapter = {
           sourceJobId: jobId,
           discoveredAt: new Date().toISOString(),
           matchedProfiles: [],
+          department: null,
+          descriptionSnippet: null,
+          searchedProfile: null,
+          matchedKeywords: [],
+          matchedFields: [],
+          relevanceReason: "",
         });
       }
 

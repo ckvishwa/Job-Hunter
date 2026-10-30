@@ -98,4 +98,63 @@ describe("Extended Deduplication & Provenance", () => {
     expect(result[0]!.matchedProfiles).toContain("cloud");
     expect(result[0]!.matchedProfiles).toContain("security");
   });
+
+  it("a malformed URL in one incoming record doesn't throw and doesn't corrupt the merge for other records", () => {
+    const existing = [
+      makeJob({
+        id: "existing-1",
+        canonicalUrl: "https://careers.google.com/jobs/1",
+        requisitionId: "req-1",
+      }),
+    ];
+    const incoming = [
+      // Malformed URL, no matching requisitionId/title/description tier -- must
+      // still be kept in the result, not silently dropped.
+      makeJob({
+        id: "malformed-1",
+        canonicalUrl: "not a url at all",
+        requisitionId: "req-malformed",
+        title: "Chaos Engineer",
+        location: "Nowhere",
+        descriptionText: "This record has a malformed canonical URL on purpose.",
+      }),
+      // Valid record that should merge into the existing job as normal.
+      makeJob({
+        id: "existing-1-update",
+        canonicalUrl: "https://careers.google.com/jobs/1",
+        requisitionId: "req-1",
+        title: "Updated Title",
+      }),
+      // Valid, distinct new record that should be inserted as normal.
+      makeJob({
+        id: "fresh-1",
+        canonicalUrl: "https://careers.google.com/jobs/2",
+        requisitionId: "req-2",
+        title: "Fresh Distinct Role",
+        location: "Austin",
+        descriptionText: "A completely separate posting for a fresh distinct role.",
+      }),
+    ];
+
+    let result: JobPosting[] = [];
+    expect(() => {
+      result = mergeJobs(existing, incoming, "2026-02-01T00:00:00.000Z");
+    }).not.toThrow();
+
+    // 3 records expected: the malformed one, the merged existing+update, and the fresh one.
+    expect(result).toHaveLength(3);
+
+    const malformed = result.find((j) => j.canonicalUrl === "not a url at all");
+    expect(malformed).toBeDefined();
+    expect(malformed!.title).toBe("Chaos Engineer");
+
+    const merged = result.find((j) => j.canonicalUrl === "https://careers.google.com/jobs/1");
+    expect(merged).toBeDefined();
+    expect(merged!.title).toBe("Updated Title");
+    expect(merged!.id).toBe("existing-1"); // preserved from original, not the malformed record
+
+    const fresh = result.find((j) => j.canonicalUrl === "https://careers.google.com/jobs/2");
+    expect(fresh).toBeDefined();
+    expect(fresh!.title).toBe("Fresh Distinct Role");
+  });
 });

@@ -1,0 +1,21 @@
+{
+  "searches": [
+    {
+      "company": "Stripe",
+      "careersUrl": "https://stripe.com/careers/search",
+      "queries": ["SDET", "QA", "security engineer"],
+      "maxJobs": 1,
+      "registry": "config/fortune500-registry.validation.json",
+      "selection": { "openReview": false, "reviewByTeam": true },
+      "selectors": {
+        "searchBoxName": "Search for a role",
+        "resultLink": "a[href*='/careers/listing/']",
+        "resultTeam": ".careers-role-result__metadata-team",
+        "resultLocation": ".careers-role-result__metadata-location",
+        "emptyStateText": "no open roles match your search",
+        "descriptionContainer": "main",
+        "listingIdPattern": "^/careers/listing/[^/]+/(\\d{6,})/?$"
+      }
+    }
+  ]
+}
