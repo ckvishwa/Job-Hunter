@@ -7,9 +7,9 @@ db2cbce270056b885f10918dfc631b96bbf08f5a:tests/browser/launcher.test.ts:local-us
 # JH-REPO-001 R6.3 (2026-10-29). Reviewed history, nothing secret:
 # - a local Windows profile path in a recovery doc and in an experiment script default; both were removed from the tree in the next commit.
 # - generic-api-key false positives: rows of the preservation inventory pair a file path with a SHA-256 hash.
-40713e2940507998d376deeb8f876f1cd1081ba4:docs/recovery/JOB-HUNTER-CONSOLIDATION-PLAN-2026-10-29.md:local-user-home-path:3
-40713e2940507998d376deeb8f876f1cd1081ba4:docs/recovery/preservation-file-inventory-2026-10-29.csv:generic-api-key:56
-40713e2940507998d376deeb8f876f1cd1081ba4:docs/recovery/preservation-file-inventory-2026-10-29.csv:generic-api-key:127
-3ebfe9cc80b1544f653876543a5298fceb0f03df:services/ai/ml_experiment.py:local-user-home-path:111
+07d86c1aed23973bb7b11f3aa0310c2d1224290b:docs/recovery/JOB-HUNTER-CONSOLIDATION-PLAN-2026-10-29.md:local-user-home-path:3
+07d86c1aed23973bb7b11f3aa0310c2d1224290b:docs/recovery/preservation-file-inventory-2026-10-29.csv:generic-api-key:56
+07d86c1aed23973bb7b11f3aa0310c2d1224290b:docs/recovery/preservation-file-inventory-2026-10-29.csv:generic-api-key:127
+0ccdbc21f1cd7bdd8b861370479dad05a849d4d9:services/ai/ml_experiment.py:local-user-home-path:111
 docs/recovery/preservation-file-inventory-2026-10-29.csv:generic-api-key:56
 docs/recovery/preservation-file-inventory-2026-10-29.csv:generic-api-key:127
